@@ -171,6 +171,7 @@ function GoalFields({ form, onChange }: { form: GoalInput; onChange: (update: Go
       <input
         className={styles.input}
         placeholder="Name"
+        aria-label="Goal name"
         value={form.name}
         onChange={(e) => onChange({ ...form, name: e.target.value })}
       />
@@ -179,6 +180,7 @@ function GoalFields({ form, onChange }: { form: GoalInput; onChange: (update: Go
         type="number"
         step="0.01"
         placeholder="Target"
+        aria-label="Target amount"
         value={form.target}
         onChange={(e) => onChange({ ...form, target: Number(e.target.value) })}
       />
@@ -187,6 +189,7 @@ function GoalFields({ form, onChange }: { form: GoalInput; onChange: (update: Go
         type="number"
         step="0.01"
         placeholder="Saved"
+        aria-label="Amount saved so far"
         value={form.saved}
         onChange={(e) => onChange({ ...form, saved: Number(e.target.value) })}
       />
@@ -195,6 +198,7 @@ function GoalFields({ form, onChange }: { form: GoalInput; onChange: (update: Go
         type="number"
         step="0.01"
         placeholder="Monthly contribution"
+        aria-label="Monthly contribution"
         value={form.monthlyContribution}
         onChange={(e) => onChange({ ...form, monthlyContribution: Number(e.target.value) })}
       />
