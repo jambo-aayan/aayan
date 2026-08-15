@@ -98,9 +98,6 @@ Name + date, scoped to the Health Pillar. Generates a "prep sheet" beforehand (s
 ## Migrating existing data
 The Claude.ai artifact has a working **Export** feature (Map view footer) producing a single JSON blob of the full app state. Bring that file into the new project and write a one-time import script/endpoint mapping it onto the new schema — don't ask the user to re-enter months of habit history, streaks, or financial figures. Treat the exported JSON's shape as the source of truth for what fields exist; it reflects everything actually built, not just what's documented here. The old flat "bucket" list in the export will need mapping onto the new Pillar → Area structure (Health absorbs most of the old buckets; Finances and Religion carry over closer to as-is).
 
-## Suggested stack (not yet decided — see wayfinder map)
-- **Next.js (App Router) + TypeScript** — single framework for frontend + API routes, one deploy target
-- **PostgreSQL + Prisma** — habit check-ins as a real table (`habit_id, date, level`), not a JSON blob, since correlation/insights need date-range queries
-- **Password-gate auth** — single user, no identity provider needed
-- **Railway or Fly.io** — bundled Postgres + app hosting, git-push deploys, cheap at this scale
-- **PWA manifest** — this is used every morning on mobile; treat mobile as the primary surface, desktop as secondary
+## Stack
+
+See [ADR-0001](./docs/adr/0001-stack-choice.md) for the stack decision and reasoning — kept out of this file since `CONTEXT.md` is domain vocabulary only, not implementation detail.
