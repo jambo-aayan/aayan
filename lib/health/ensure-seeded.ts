@@ -27,7 +27,10 @@ export async function ensureHealthAreasSeeded(): Promise<void> {
 
   if (missing.length === 0) return;
 
+  // skipDuplicates guards against two concurrent first-loads both computing
+  // the same "missing" set and racing to insert the same id.
   await prisma.area.createMany({
     data: missing.map((area) => ({ ...area, pillarId: HEALTH_PILLAR_ID })),
+    skipDuplicates: true,
   });
 }
