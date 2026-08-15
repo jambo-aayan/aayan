@@ -1,0 +1,574 @@
+<!--
+  PROTOTYPE v2 — throwaway. Answers wayfinder ticket #3.
+
+  v1 (mvp-ui-variants.html) tested three different NAVIGATION STRUCTURES and
+  got real feedback: the structure is basically settled —
+    Welcome (calm, uncluttered) -> Pillars -> Pillar dashboard (with a
+    mindmap-style widget for Areas) -> Area -> Action ("how to do it")
+  — but none of the three felt "clean, modern... not mechanic and old".
+
+  So this round holds the flow above FIXED and instead tests three visual
+  languages for it, fully clickable end-to-end (Health: Welcome -> Pillars
+  -> Health Dashboard -> Sleep Area -> Action detail. Finances: its own
+  dashboard shape, since it has no Area layer per CONTEXT.md).
+
+  Read-only. Mock data only. Not for production.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>PROTOTYPE v2 — MVP UI mood variants</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    background: #0b0b0c;
+  }
+  #stage {
+    max-width: 430px;
+    margin: 0 auto;
+    height: 100vh;
+    overflow: hidden;
+    position: relative;
+  }
+  #app {
+    position: relative;
+    height: 100%;
+    overflow-y: auto;
+    transition: opacity .18s ease;
+  }
+  #app.fading { opacity: 0; }
+  button { font-family: inherit; cursor: pointer; }
+  h1, h2, h3, p { margin: 0; }
+
+  /* ================= shared layout bits ================= */
+  .screen { min-height: 100%; display: flex; flex-direction: column; }
+  .header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 20px 22px 8px;
+  }
+  .back-btn {
+    width: 34px; height: 34px;
+    border-radius: 50%;
+    border: none;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+  .crumb { font-size: 12px; letter-spacing: .04em; text-transform: uppercase; opacity: .55; }
+  .content { flex: 1; padding: 8px 22px 40px; }
+  .progress-track { height: 6px; border-radius: 999px; overflow: hidden; }
+  .progress-fill { height: 100%; border-radius: 999px; }
+
+  /* ================= WELCOME ================= */
+  .welcome-screen {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 40px;
+    position: relative;
+    overflow: hidden;
+  }
+  .welcome-eyebrow { font-size: 13px; letter-spacing: .08em; text-transform: uppercase; opacity: .6; margin-bottom: 14px; }
+  .welcome-title { font-size: 30px; font-weight: 600; line-height: 1.25; margin-bottom: 14px; }
+  .welcome-sub { font-size: 15px; line-height: 1.55; opacity: .7; max-width: 300px; margin-bottom: 40px; }
+  .continue-btn {
+    padding: 15px 36px;
+    border-radius: 999px;
+    border: none;
+    font-size: 15px;
+    font-weight: 600;
+  }
+
+  /* ================= PILLAR TILES ================= */
+  .pillar-tiles { display: flex; flex-direction: column; gap: 14px; margin-top: 18px; }
+  .pillar-tile {
+    border: none;
+    text-align: left;
+    padding: 26px;
+    border-radius: 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    width: 100%;
+  }
+  .pillar-tile .name { font-size: 19px; font-weight: 600; }
+  .pillar-tile .hint { font-size: 13px; opacity: .65; }
+
+  /* ================= MINDMAP WIDGET ================= */
+  .mindmap-wrap {
+    position: relative;
+    height: 260px;
+    margin: 10px 0 22px;
+    border-radius: 24px;
+    overflow: hidden;
+  }
+  .mm-node {
+    position: absolute;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    text-align: center;
+    font-size: 11px;
+    font-weight: 600;
+    border: none;
+    transform: translate(-50%, -50%);
+  }
+  .mm-node.core { width: 64px; height: 64px; left: 50%; top: 50%; font-size: 12px; z-index: 2; }
+  .mm-node.leaf { width: 56px; height: 56px; z-index: 1; }
+  .mm-link { position: absolute; height: 1.5px; transform-origin: left center; z-index: 0; }
+
+  /* ================= today strip ================= */
+  .today-strip { display: flex; flex-direction: column; gap: 10px; margin-bottom: 22px; }
+  .today-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 16px;
+    border-radius: 16px;
+  }
+  .today-row .name { font-size: 14px; font-weight: 500; }
+  .dot { width: 22px; height: 22px; border-radius: 50%; flex-shrink: 0; }
+
+  /* ================= area / action detail ================= */
+  .area-list { display: flex; flex-direction: column; gap: 10px; }
+  .action-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 18px;
+    border-radius: 18px;
+  }
+  .action-row .name { font-size: 15px; font-weight: 500; }
+  .action-row .streak { font-size: 12px; opacity: .6; margin-top: 2px; }
+
+  .action-hero {
+    padding: 30px 26px;
+    border-radius: 26px;
+    margin: 10px 0 22px;
+    text-align: center;
+  }
+  .action-hero .name { font-size: 21px; font-weight: 600; margin-bottom: 8px; }
+  .action-hero .desc { font-size: 14px; opacity: .7; line-height: 1.55; margin-bottom: 22px; }
+  .checkin-btn {
+    width: 84px; height: 84px;
+    border-radius: 50%;
+    border: none;
+    font-size: 13px;
+    font-weight: 700;
+    margin: 0 auto;
+  }
+  .streak-badge { font-size: 13px; opacity: .65; margin-top: 14px; }
+
+  .goal-card { padding: 18px; border-radius: 18px; margin-bottom: 12px; }
+  .goal-top { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 8px; }
+
+  /* ================================================================
+     STYLE A — Warm & Calm
+     ================================================================ */
+  body[data-style="A"] {
+    --bg: #FBF7F1;
+    --bg2: #F3ECE1;
+    --ink: #2B2622;
+    --muted: #857E73;
+    --card: #FFFFFF;
+    --border: #EBE3D6;
+    --health: #6E8B74;
+    --health-soft: #E7EEE6;
+    --finance: #B87B4B;
+    --finance-soft: #F3E5D6;
+  }
+  body[data-style="A"] #app { background: var(--bg); color: var(--ink); font-family: "Iowan Old Style", "Georgia", ui-serif, serif; }
+  body[data-style="A"] .crumb, body[data-style="A"] .continue-btn, body[data-style="A"] .checkin-btn { font-family: -apple-system, sans-serif; }
+  body[data-style="A"] .back-btn { background: var(--card); color: var(--ink); box-shadow: 0 2px 8px rgba(43,38,34,.08); }
+  body[data-style="A"] .welcome-screen::before {
+    content: ""; position: absolute; inset: -20%;
+    background:
+      radial-gradient(circle at 25% 20%, rgba(110,139,116,.18), transparent 55%),
+      radial-gradient(circle at 80% 75%, rgba(184,123,75,.16), transparent 55%);
+    filter: blur(10px);
+  }
+  body[data-style="A"] .welcome-title, body[data-style="A"] .welcome-eyebrow, body[data-style="A"] .welcome-sub { position: relative; }
+  body[data-style="A"] .continue-btn { background: var(--ink); color: var(--bg); position: relative; }
+  body[data-style="A"] .pillar-tile { background: var(--card); border: 1px solid var(--border); }
+  body[data-style="A"] .pillar-tile.health { background: var(--health-soft); }
+  body[data-style="A"] .pillar-tile.finance { background: var(--finance-soft); }
+  body[data-style="A"] .mindmap-wrap { background: var(--card); border: 1px solid var(--border); }
+  body[data-style="A"] .mm-node.core { background: var(--ink); color: var(--bg); }
+  body[data-style="A"] .mm-node.leaf { background: var(--bg2); color: var(--ink); }
+  body[data-style="A"] .mm-node.leaf.active { background: var(--health); color: white; }
+  body[data-style="A"] .mm-link { background: var(--border); }
+  body[data-style="A"] .today-row, body[data-style="A"] .action-row, body[data-style="A"] .goal-card { background: var(--card); border: 1px solid var(--border); }
+  body[data-style="A"] .action-hero { background: var(--health-soft); }
+  body[data-style="A"] .checkin-btn { background: var(--health); color: white; }
+  body[data-style="A"] .progress-track { background: var(--border); }
+  body[data-style="A"] .progress-fill { background: var(--finance); }
+  body[data-style="A"] .dot.full { background: var(--health); }
+  body[data-style="A"] .dot.min { background: var(--finance); opacity: .6; }
+  body[data-style="A"] .dot.none { background: var(--border); }
+
+  /* ================================================================
+     STYLE B — Cool Minimal / Glass
+     ================================================================ */
+  body[data-style="B"] {
+    --bg: #EEF2F7;
+    --ink: #10151C;
+    --muted: #667085;
+    --card: rgba(255,255,255,.62);
+    --border: rgba(255,255,255,.9);
+    --health: #2FA790;
+    --health-soft: rgba(47,167,144,.12);
+    --finance: #4C5FD5;
+    --finance-soft: rgba(76,95,213,.10);
+  }
+  body[data-style="B"] #app {
+    background:
+      radial-gradient(circle at 15% 10%, rgba(76,95,213,.14), transparent 45%),
+      radial-gradient(circle at 90% 30%, rgba(47,167,144,.14), transparent 45%),
+      var(--bg);
+    color: var(--ink);
+  }
+  body[data-style="B"] .crumb { letter-spacing: .12em; font-weight: 600; }
+  body[data-style="B"] .back-btn { background: var(--card); backdrop-filter: blur(14px); color: var(--ink); border: 1px solid var(--border); }
+  body[data-style="B"] .welcome-eyebrow { color: var(--finance); font-weight: 700; }
+  body[data-style="B"] .welcome-title { font-weight: 700; letter-spacing: -.01em; }
+  body[data-style="B"] .continue-btn { background: var(--ink); color: white; box-shadow: 0 10px 30px rgba(16,21,28,.25); }
+  body[data-style="B"] .pillar-tile, body[data-style="B"] .mindmap-wrap, body[data-style="B"] .today-row, body[data-style="B"] .action-row, body[data-style="B"] .goal-card, body[data-style="B"] .action-hero {
+    background: var(--card);
+    backdrop-filter: blur(20px);
+    border: 1px solid var(--border);
+    box-shadow: 0 8px 24px rgba(16,21,28,.06);
+  }
+  body[data-style="B"] .pillar-tile.health .name { color: var(--health); }
+  body[data-style="B"] .pillar-tile.finance .name { color: var(--finance); }
+  body[data-style="B"] .mm-node.core { background: var(--ink); color: white; }
+  body[data-style="B"] .mm-node.leaf { background: rgba(255,255,255,.85); color: var(--ink); border: 1px solid var(--border); }
+  body[data-style="B"] .mm-node.leaf.active { background: var(--health); color: white; }
+  body[data-style="B"] .mm-link { background: rgba(16,21,28,.12); }
+  body[data-style="B"] .checkin-btn { background: var(--finance); color: white; box-shadow: 0 10px 26px rgba(76,95,213,.35); }
+  body[data-style="B"] .progress-track { background: rgba(16,21,28,.08); }
+  body[data-style="B"] .progress-fill { background: var(--finance); }
+  body[data-style="B"] .dot.full { background: var(--health); }
+  body[data-style="B"] .dot.min { background: var(--finance); opacity: .6; }
+  body[data-style="B"] .dot.none { background: rgba(16,21,28,.12); }
+
+  /* ================================================================
+     STYLE C — Soft Dark / Ambient
+     ================================================================ */
+  body[data-style="C"] {
+    --bg: #0E1013;
+    --ink: #F2F1EE;
+    --muted: #9A9EA6;
+    --card: rgba(255,255,255,.045);
+    --border: rgba(255,255,255,.09);
+    --health: #59D9A6;
+    --health-soft: rgba(89,217,166,.12);
+    --finance: #8AA6FF;
+    --finance-soft: rgba(138,166,255,.12);
+  }
+  body[data-style="C"] #app {
+    background:
+      radial-gradient(circle at 20% 15%, rgba(138,166,255,.18), transparent 45%),
+      radial-gradient(circle at 85% 70%, rgba(89,217,166,.16), transparent 45%),
+      var(--bg);
+    color: var(--ink);
+  }
+  body[data-style="C"] .muted, body[data-style="C"] .hint, body[data-style="C"] .streak, body[data-style="C"] .desc { color: #9AA0AC; }
+  body[data-style="C"] .back-btn { background: var(--card); color: var(--ink); border: 1px solid var(--border); }
+  body[data-style="C"] .welcome-eyebrow { color: var(--health); }
+  body[data-style="C"] .welcome-title { font-weight: 600; text-shadow: 0 0 40px rgba(138,166,255,.25); }
+  body[data-style="C"] .continue-btn { background: var(--ink); color: var(--bg); }
+  body[data-style="C"] .pillar-tile, body[data-style="C"] .mindmap-wrap, body[data-style="C"] .today-row, body[data-style="C"] .action-row, body[data-style="C"] .goal-card, body[data-style="C"] .action-hero {
+    background: var(--card);
+    border: 1px solid var(--border);
+  }
+  body[data-style="C"] .pillar-tile.health .name { color: var(--health); }
+  body[data-style="C"] .pillar-tile.finance .name { color: var(--finance); }
+  body[data-style="C"] .mm-node.core { background: rgba(255,255,255,.9); color: var(--bg); }
+  body[data-style="C"] .mm-node.leaf { background: rgba(255,255,255,.06); color: var(--ink); border: 1px solid var(--border); }
+  body[data-style="C"] .mm-node.leaf.active { background: var(--health); color: var(--bg); }
+  body[data-style="C"] .mm-link { background: rgba(255,255,255,.14); }
+  body[data-style="C"] .checkin-btn { background: var(--health); color: var(--bg); box-shadow: 0 0 30px rgba(89,217,166,.4); }
+  body[data-style="C"] .progress-track { background: rgba(255,255,255,.08); }
+  body[data-style="C"] .progress-fill { background: var(--finance); }
+  body[data-style="C"] .dot.full { background: var(--health); }
+  body[data-style="C"] .dot.min { background: var(--finance); opacity: .7; }
+  body[data-style="C"] .dot.none { background: rgba(255,255,255,.14); }
+
+  /* ---------- switcher ---------- */
+  #switcher {
+    position: fixed;
+    bottom: 16px; left: 50%;
+    transform: translateX(-50%);
+    background: rgba(20,20,22,.92);
+    color: white;
+    border-radius: 999px;
+    padding: 8px 6px;
+    display: flex; align-items: center; gap: 4px;
+    box-shadow: 0 8px 24px rgba(0,0,0,.35);
+    z-index: 200;
+    font-size: 13px;
+    backdrop-filter: blur(10px);
+  }
+  #switcher button { background: rgba(255,255,255,.14); border: none; color: white; width: 30px; height: 30px; border-radius: 50%; font-size: 16px; }
+  #switcher .label { padding: 0 10px; font-weight: 600; white-space: nowrap; }
+</style>
+</head>
+<body data-style="A">
+<div id="stage"><div id="app"></div></div>
+<div id="switcher">
+  <button id="prev" aria-label="Previous style">←</button>
+  <span class="label" id="switcher-label"></span>
+  <button id="next" aria-label="Next style">→</button>
+</div>
+
+<script>
+// ---------------------------------------------------------------------------
+// Mock data
+// ---------------------------------------------------------------------------
+const HEALTH_AREAS = [
+  { key: "spine", name: "Spine & Pain", angle: -60, actions: [
+    { name: "Stretch routine", desc: "10 minutes, spine-safe — no axial loading. Targets the lumbar-stiffness cascade before it reaches your neck.", state: "full", streak: 12 } ] },
+  { key: "sleep", name: "Sleep", angle: -20, actions: [
+    { name: "Phone out of bedroom", desc: "The single highest-leverage change for the possible OSA under investigation. Charge it in the hallway.", state: "min", streak: 3 } ] },
+  { key: "diet", name: "Diet", angle: 20, actions: [
+    { name: "Log meals", desc: "Just what you ate — no calorie targets. Protein's already a strength; this is about the pattern, not the number.", state: "full", streak: 5 } ] },
+  { key: "body", name: "Body Comp.", angle: 60, actions: [
+    { name: "Waist measurement", desc: "Weekly, same morning, same tape position. Tracking ratio, not scale weight.", state: "none", streak: 0 } ] },
+  { key: "bp", name: "Blood Pressure", angle: 100, actions: [] },
+  { key: "looks", name: "Looks", angle: 140, actions: [] },
+  { key: "healthcare", name: "Healthcare Nav.", angle: 180, actions: [] },
+];
+
+const FINANCE_GOALS = [
+  { name: "Emergency fund", saved: 4200, target: 6000 },
+  { name: "LISA", saved: 8100, target: 20000 },
+];
+
+// ---------------------------------------------------------------------------
+// Tiny router — screen state + back stack
+// ---------------------------------------------------------------------------
+const nav = { stack: [{ screen: "welcome" }] };
+function push(next) { nav.stack.push(next); render(true); }
+function back() { if (nav.stack.length > 1) { nav.stack.pop(); render(true); } }
+function current() { return nav.stack[nav.stack.length - 1]; }
+
+function header(title, crumb) {
+  return `
+    <div class="header">
+      ${nav.stack.length > 1 ? `<button class="back-btn" onclick="back()">←</button>` : `<div style="width:34px"></div>`}
+      <div>
+        ${crumb ? `<div class="crumb">${crumb}</div>` : ""}
+        ${title ? `<h2 style="margin-top:2px">${title}</h2>` : ""}
+      </div>
+    </div>`;
+}
+
+// ---------------------------------------------------------------------------
+// Screens
+// ---------------------------------------------------------------------------
+function screenWelcome() {
+  return `
+    <div class="welcome-screen">
+      <div class="welcome-eyebrow">Good evening</div>
+      <div class="welcome-title">Everything's steady.<br/>Take a moment first.</div>
+      <div class="welcome-sub">No numbers here — just a quiet start. When you're ready, your pillars are one tap away.</div>
+      <button class="continue-btn" onclick="push({screen:'pillars'})">Continue</button>
+    </div>`;
+}
+
+function screenPillars() {
+  return `
+    <div class="screen">
+      ${header("Your pillars", "MVP")}
+      <div class="content">
+        <div class="pillar-tiles">
+          <button class="pillar-tile health" onclick="push({screen:'healthDashboard'})">
+            <div class="name">Health</div>
+            <div class="hint">2 of 7 areas active today</div>
+          </button>
+          <button class="pillar-tile finance" onclick="push({screen:'financeDashboard'})">
+            <div class="name">Finances</div>
+            <div class="hint">On track for House deposit</div>
+          </button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function mindmapWidget() {
+  const R = 100;
+  const nodes = HEALTH_AREAS.map(a => {
+    const rad = (a.angle * Math.PI) / 180;
+    const x = 50 + (Math.cos(rad) * R) / 2.6;
+    const y = 50 + (Math.sin(rad) * R) / 3.6;
+    const active = a.actions.length > 0;
+    return { ...a, x, y, active };
+  });
+  const links = nodes.map(n => `<div class="mm-link" style="width:${R/2.6}px; left:50%; top:50%; transform: rotate(${n.angle}deg)"></div>`).join("");
+  const leaves = nodes.map(n => `
+    <button class="mm-node leaf ${n.active ? 'active' : ''}" style="left:${n.x}%; top:${n.y}%" onclick="push({screen:'area', areaKey:'${n.key}'})">
+      ${n.name}
+    </button>`).join("");
+  return `
+    <div class="mindmap-wrap">
+      <div class="mm-node core">Health</div>
+      ${links}
+      ${leaves}
+    </div>`;
+}
+
+function screenHealthDashboard() {
+  return `
+    <div class="screen">
+      ${header("Health", "Pillar")}
+      <div class="content">
+        ${mindmapWidget()}
+        <div class="today-strip">
+          ${HEALTH_AREAS.filter(a => a.actions.length).flatMap(a => a.actions.map(act => `
+            <div class="today-row">
+              <div>
+                <div class="name">${act.name}</div>
+                <div class="crumb" style="margin-top:2px">${a.name}</div>
+              </div>
+              <div class="dot ${act.state}"></div>
+            </div>
+          `)).join("")}
+        </div>
+      </div>
+    </div>`;
+}
+
+function screenFinanceDashboard() {
+  const accessible = 18400, total = 31200, target = 45000;
+  return `
+    <div class="screen">
+      ${header("Finances", "Pillar")}
+      <div class="content">
+        <div class="action-hero">
+          <div class="crumb" style="margin-bottom:6px">Accessible net worth</div>
+          <div class="name" style="font-size:32px">£${accessible.toLocaleString()}</div>
+          <div class="desc">£${total.toLocaleString()} total, pension excluded</div>
+          <div class="progress-track"><div class="progress-fill" style="width:${Math.round(accessible/target*100)}%"></div></div>
+          <div class="streak-badge">House deposit — on track</div>
+        </div>
+        ${FINANCE_GOALS.map(g => `
+          <div class="goal-card" onclick="push({screen:'action', name:g.name, desc:'Monthly contribution keeps this on its projected date.', state:'full', streak: 0, isGoal:true, saved:g.saved, target:g.target})">
+            <div class="goal-top"><span>${g.name}</span><span class="crumb">£${g.saved.toLocaleString()} / £${g.target.toLocaleString()}</span></div>
+            <div class="progress-track"><div class="progress-fill" style="width:${Math.round(g.saved/g.target*100)}%"></div></div>
+          </div>
+        `).join("")}
+      </div>
+    </div>`;
+}
+
+function screenArea(s) {
+  const area = HEALTH_AREAS.find(a => a.key === s.areaKey);
+  return `
+    <div class="screen">
+      ${header(area.name, "Health · Area")}
+      <div class="content">
+        <div class="area-list">
+          ${area.actions.length ? area.actions.map(act => `
+            <div class="action-row" onclick='push({screen:"action", name:${JSON.stringify(act.name)}, desc:${JSON.stringify(act.desc)}, state:"${act.state}", streak:${act.streak}})'>
+              <div>
+                <div class="name">${act.name}</div>
+                <div class="streak">${act.state === 'none' ? 'not started' : act.state + ' · ' + act.streak + ' day streak'}</div>
+              </div>
+              <div class="dot ${act.state}"></div>
+            </div>
+          `).join("") : `<div class="crumb">Nothing tracked in this area yet.</div>`}
+        </div>
+      </div>
+    </div>`;
+}
+
+function screenAction(s) {
+  const states = ["none", "full", "min"];
+  let state = s.state;
+  return `
+    <div class="screen">
+      ${header(null, "Action")}
+      <div class="content">
+        <div class="action-hero">
+          <div class="name">${s.name}</div>
+          <div class="desc">${s.desc}</div>
+          <button class="checkin-btn" id="checkin-btn">${state === 'none' ? 'Check in' : state === 'full' ? 'Full ✓' : 'Minimum'}</button>
+          ${!s.isGoal ? `<div class="streak-badge">${s.streak} day streak</div>` : ""}
+        </div>
+      </div>
+    </div>`;
+}
+
+// ---------------------------------------------------------------------------
+// Render
+// ---------------------------------------------------------------------------
+function render(animate) {
+  const app = document.getElementById("app");
+  const doRender = () => {
+    const s = current();
+    let html = "";
+    if (s.screen === "welcome") html = screenWelcome();
+    else if (s.screen === "pillars") html = screenPillars();
+    else if (s.screen === "healthDashboard") html = screenHealthDashboard();
+    else if (s.screen === "financeDashboard") html = screenFinanceDashboard();
+    else if (s.screen === "area") html = screenArea(s);
+    else if (s.screen === "action") html = screenAction(s);
+    app.innerHTML = html;
+    app.scrollTop = 0;
+    app.classList.remove("fading");
+    const btn = document.getElementById("checkin-btn");
+    if (btn) btn.addEventListener("click", () => {
+      const order = ["none", "min", "full"];
+      const i = (order.indexOf(current().state) + 1) % order.length;
+      current().state = order[i];
+      render(false);
+    });
+  };
+  if (animate) {
+    app.classList.add("fading");
+    setTimeout(doRender, 120);
+  } else {
+    doRender();
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Style switcher
+// ---------------------------------------------------------------------------
+const STYLES = [
+  { key: "A", name: "Warm & Calm" },
+  { key: "B", name: "Cool Minimal / Glass" },
+  { key: "C", name: "Soft Dark / Ambient" },
+];
+function currentIndex() {
+  const params = new URLSearchParams(location.search);
+  const key = (params.get("style") || "A").toUpperCase();
+  const i = STYLES.findIndex(v => v.key === key);
+  return i === -1 ? 0 : i;
+}
+function setStyle(index) {
+  const s = STYLES[(index + STYLES.length) % STYLES.length];
+  const params = new URLSearchParams(location.search);
+  params.set("style", s.key);
+  history.replaceState(null, "", `${location.pathname}?${params.toString()}`);
+  document.body.setAttribute("data-style", s.key);
+  document.getElementById("switcher-label").textContent = `${s.key} — ${s.name}`;
+}
+document.getElementById("prev").addEventListener("click", () => setStyle(currentIndex() - 1));
+document.getElementById("next").addEventListener("click", () => setStyle(currentIndex() + 1));
+document.addEventListener("keydown", (e) => {
+  if (e.key === "ArrowLeft" && (e.metaKey || e.altKey)) return setStyle(currentIndex() - 1);
+  if (e.key === "ArrowRight" && (e.metaKey || e.altKey)) return setStyle(currentIndex() + 1);
+  if (e.key === "Backspace" || e.key === "Escape") back();
+});
+
+setStyle(currentIndex());
+render(false);
+</script>
+</body>
+</html>
