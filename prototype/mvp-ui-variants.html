@@ -1,0 +1,467 @@
+<!--
+  PROTOTYPE — throwaway. Answers wayfinder ticket #3: does the radial mind-map
+  carry over, or does the Health+Finances MVP move to a conventional layout?
+
+  Three variants of the Health+Finances MVP home screen, switchable via
+  ?variant=, as a standalone file — no app scaffold exists yet to host this
+  as sub-shape A on a real route, so this is sub-shape B.
+
+  Read-only. Mock data only. Not for production.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>PROTOTYPE — MVP UI variants</title>
+<style>
+  :root {
+    --bg: #f6f5f2;
+    --panel: #ffffff;
+    --ink: #1c1b19;
+    --muted: #6b6862;
+    --line: #e4e1da;
+    --health: #2f7d5f;
+    --health-bg: #e7f3ee;
+    --finance: #2f5d8a;
+    --finance-bg: #e8f0f8;
+    --accent: #c96f34;
+    --radius: 14px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+  }
+  #app {
+    max-width: 430px;
+    margin: 0 auto;
+    min-height: 100vh;
+    background: var(--panel);
+    padding-bottom: 96px;
+    position: relative;
+  }
+  h1, h2, h3 { margin: 0; }
+  .muted { color: var(--muted); }
+  .pill {
+    display: inline-block;
+    font-size: 12px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-weight: 600;
+  }
+  .pill.full { background: #d7ede1; color: var(--health); }
+  .pill.min { background: #f0e6d8; color: var(--accent); }
+  .progress {
+    height: 6px;
+    background: var(--line);
+    border-radius: 999px;
+    overflow: hidden;
+  }
+  .progress > div { height: 100%; background: var(--finance); }
+  button { font-family: inherit; cursor: pointer; }
+
+  /* ---------- Variant A: radial mind-map ---------- */
+  .v-a-canvas {
+    position: relative;
+    height: 520px;
+    margin: 24px auto 0;
+  }
+  .v-a-node {
+    position: absolute;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    font-weight: 700;
+    border: none;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.08);
+  }
+  .v-a-node.center {
+    width: 84px; height: 84px;
+    left: 50%; top: 50%;
+    transform: translate(-50%, -50%);
+    background: var(--ink);
+    color: white;
+    font-size: 13px;
+    z-index: 3;
+  }
+  .v-a-node.pillar {
+    width: 150px; height: 150px;
+    font-size: 15px;
+    flex-direction: column;
+    gap: 4px;
+    z-index: 2;
+  }
+  .v-a-node.pillar.health { background: var(--health-bg); color: var(--health); left: 12%; top: 14%; }
+  .v-a-node.pillar.finance { background: var(--finance-bg); color: var(--finance); right: 10%; top: 44%; }
+  .v-a-node.area {
+    width: 74px; height: 74px;
+    font-size: 11px;
+    background: var(--panel);
+    border: 1.5px solid var(--line);
+    color: var(--ink);
+    z-index: 1;
+  }
+  .v-a-link {
+    position: absolute;
+    background: var(--line);
+    height: 2px;
+    transform-origin: left center;
+    z-index: 0;
+  }
+  .v-a-detail {
+    margin: 16px 20px 0;
+    padding: 16px;
+    border-radius: var(--radius);
+    border: 1px solid var(--line);
+  }
+  .v-a-legend { padding: 0 20px; margin-top: 8px; }
+
+  /* ---------- Variant B: card dashboard ---------- */
+  .v-b-today {
+    margin: 20px 20px 0;
+    padding: 16px;
+    border-radius: var(--radius);
+    background: #fbf8f2;
+    border: 1px solid var(--line);
+  }
+  .v-b-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .v-b-row:last-child { border-bottom: none; }
+  .v-b-check {
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    border: 2px solid var(--line);
+    flex-shrink: 0;
+  }
+  .v-b-check.full { background: var(--health); border-color: var(--health); }
+  .v-b-check.min { background: var(--accent); border-color: var(--accent); opacity: .6; }
+  .v-b-cards { display: grid; gap: 14px; padding: 20px; }
+  .v-b-card {
+    border-radius: var(--radius);
+    padding: 18px;
+    border: 1px solid var(--line);
+  }
+  .v-b-card.health { background: var(--health-bg); }
+  .v-b-card.finance { background: var(--finance-bg); }
+  .v-b-stats { display: flex; gap: 20px; margin-top: 12px; }
+  .v-b-stat-num { font-size: 20px; font-weight: 700; }
+
+  /* ---------- Variant C: tab app ---------- */
+  .v-c-header {
+    padding: 20px 20px 12px;
+    border-bottom: 1px solid var(--line);
+  }
+  .v-c-content { padding: 16px 20px; }
+  .v-c-accordion {
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    margin-bottom: 10px;
+    overflow: hidden;
+  }
+  .v-c-accordion summary {
+    padding: 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-weight: 600;
+    list-style: none;
+  }
+  .v-c-accordion summary::-webkit-details-marker { display: none; }
+  .v-c-accordion .body { padding: 0 14px 14px; }
+  .v-c-habit-row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 14px; }
+  .v-c-tabbar {
+    position: fixed;
+    bottom: 56px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 100%;
+    max-width: 430px;
+    display: flex;
+    background: var(--panel);
+    border-top: 1px solid var(--line);
+  }
+  .v-c-tab {
+    flex: 1;
+    border: none;
+    background: none;
+    padding: 12px 0;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--muted);
+  }
+  .v-c-tab.active { color: var(--ink); border-top: 2px solid var(--ink); margin-top: -1px; }
+  .v-c-goal { margin-bottom: 14px; }
+  .v-c-goal-top { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 6px; }
+
+  /* ---------- switcher ---------- */
+  #switcher {
+    position: fixed;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--ink);
+    color: white;
+    border-radius: 999px;
+    padding: 8px 6px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+    z-index: 100;
+    font-size: 13px;
+  }
+  #switcher button {
+    background: rgba(255,255,255,0.12);
+    border: none;
+    color: white;
+    width: 30px; height: 30px;
+    border-radius: 50%;
+    font-size: 16px;
+  }
+  #switcher .label { padding: 0 10px; font-weight: 600; white-space: nowrap; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="switcher">
+  <button id="prev" aria-label="Previous variant">←</button>
+  <span class="label" id="switcher-label"></span>
+  <button id="next" aria-label="Next variant">→</button>
+</div>
+
+<script>
+// ---------------------------------------------------------------------------
+// Mock data — Health + Finances MVP only, per CONTEXT.md
+// ---------------------------------------------------------------------------
+const DATA = {
+  health: {
+    label: "Health",
+    areas: [
+      { name: "Spine & Pain", habits: [{ n: "Stretch routine", state: "full", streak: 12 }] },
+      { name: "Sleep", habits: [{ n: "Phone out of bedroom", state: "min", streak: 3 }] },
+      { name: "Diet", habits: [{ n: "Log meals", state: "full", streak: 5 }] },
+      { name: "Body Composition", habits: [{ n: "Weekly waist measurement", state: "none", streak: 2 }] },
+      { name: "Blood Pressure", habits: [] },
+      { name: "Looks", habits: [] },
+      { name: "Healthcare Navigation", habits: [] },
+    ],
+  },
+  finance: {
+    label: "Finances",
+    accessibleNetWorth: 18400,
+    totalNetWorth: 31200,
+    northStar: { label: "House deposit", target: 45000, onTrack: true },
+    goals: [
+      { name: "Emergency fund", saved: 4200, target: 6000 },
+      { name: "LISA", saved: 8100, target: 20000 },
+    ],
+  },
+  today: [
+    { n: "Stretch routine", pillar: "Health", state: "full" },
+    { n: "Log meals", pillar: "Health", state: "full" },
+    { n: "Phone out of bedroom", pillar: "Health", state: "min" },
+    { n: "Review weekly spend", pillar: "Finances", state: "none" },
+  ],
+};
+
+// ---------------------------------------------------------------------------
+// Variant A — radial mind-map (carries over the original prototype's metaphor,
+// scoped down to just the two MVP pillars + their areas)
+// ---------------------------------------------------------------------------
+function renderVariantA(root) {
+  const areaPositions = [
+    { top: "2%", left: "38%" },
+    { top: "10%", left: "62%" },
+    { top: "30%", left: "2%" },
+    { top: "34%", left: "70%" },
+    { top: "56%", left: "6%" },
+    { top: "72%", left: "24%" },
+    { top: "80%", left: "50%" },
+  ];
+  root.innerHTML = `
+    <div class="v-a-canvas">
+      <div class="v-a-node center">You</div>
+      <div class="v-a-node pillar health" data-pillar="health">Health</div>
+      <div class="v-a-node pillar finance" data-pillar="finance">Finances</div>
+      ${DATA.health.areas.map((a, i) => `
+        <div class="v-a-node area" style="top:${areaPositions[i].top};left:${areaPositions[i].left}" data-area="${a.name}">
+          ${a.name}
+        </div>
+      `).join("")}
+    </div>
+    <div class="v-a-legend muted">Tap a node to inspect it below. Health's Areas radiate around it; Finances stays a single node for the MVP (no Area layer needed).</div>
+    <div class="v-a-detail" id="v-a-detail">
+      <div class="muted">Tap "Health" or "Finances" to see its detail here.</div>
+    </div>
+  `;
+  root.querySelectorAll("[data-pillar]").forEach(el => {
+    el.addEventListener("click", () => {
+      const p = DATA[el.dataset.pillar];
+      const detail = root.querySelector("#v-a-detail");
+      if (el.dataset.pillar === "health") {
+        detail.innerHTML = `<h3>${p.label}</h3><div class="muted" style="margin-top:6px">${p.areas.length} Areas · tap an Area node to drill in</div>`;
+      } else {
+        detail.innerHTML = `<h3>${p.label}</h3><div style="margin-top:8px">Accessible net worth: <b>£${p.accessibleNetWorth.toLocaleString()}</b></div><div class="muted">Total: £${p.totalNetWorth.toLocaleString()}</div>`;
+      }
+    });
+  });
+  root.querySelectorAll("[data-area]").forEach(el => {
+    el.addEventListener("click", () => {
+      const a = DATA.health.areas.find(x => x.name === el.dataset.area);
+      const detail = root.querySelector("#v-a-detail");
+      detail.innerHTML = `<h3>${a.name}</h3>` + (a.habits.length
+        ? a.habits.map(h => `<div class="v-b-row"><span>${h.n}</span><span class="pill ${h.state === 'none' ? 'min' : h.state}">${h.state === 'none' ? 'not started' : h.state + ' · ' + h.streak}</span></div>`).join("")
+        : `<div class="muted" style="margin-top:6px">No active habits in this Area yet.</div>`);
+    });
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Variant B — card dashboard (Today checklist + Pillar summary cards)
+// ---------------------------------------------------------------------------
+function renderVariantB(root) {
+  root.innerHTML = `
+    <div style="padding:20px 20px 0"><h2>Good morning</h2><div class="muted">Wednesday, checking in</div></div>
+    <div class="v-b-today">
+      <h3 style="font-size:14px;margin-bottom:4px">Today</h3>
+      ${DATA.today.map(t => `
+        <div class="v-b-row">
+          <div><div>${t.n}</div><div class="muted" style="font-size:12px">${t.pillar}</div></div>
+          <div class="v-b-check ${t.state}"></div>
+        </div>
+      `).join("")}
+    </div>
+    <div class="v-b-cards">
+      <div class="v-b-card health">
+        <h3>Health</h3>
+        <div class="v-b-stats">
+          <div><div class="v-b-stat-num">${DATA.health.areas.filter(a=>a.habits.some(h=>h.state!=='none')).length}/${DATA.health.areas.length}</div><div class="muted" style="font-size:12px">Areas active</div></div>
+          <div><div class="v-b-stat-num">12</div><div class="muted" style="font-size:12px">day streak</div></div>
+        </div>
+      </div>
+      <div class="v-b-card finance">
+        <h3>Finances</h3>
+        <div class="v-b-stats">
+          <div><div class="v-b-stat-num">£${(DATA.finance.accessibleNetWorth/1000).toFixed(1)}k</div><div class="muted" style="font-size:12px">accessible</div></div>
+          <div><div class="v-b-stat-num">£${(DATA.finance.totalNetWorth/1000).toFixed(1)}k</div><div class="muted" style="font-size:12px">total</div></div>
+        </div>
+        <div style="margin-top:12px">
+          <div class="muted" style="font-size:12px;margin-bottom:4px">${DATA.finance.northStar.label} — on track</div>
+          <div class="progress"><div style="width:${Math.round(DATA.finance.accessibleNetWorth/DATA.finance.northStar.target*100)}%"></div></div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// ---------------------------------------------------------------------------
+// Variant C — bottom-tab app (Today / Health / Finances)
+// ---------------------------------------------------------------------------
+function renderVariantC(root, tab = "today") {
+  let content = "";
+  if (tab === "today") {
+    content = `
+      <div class="v-c-content">
+        ${DATA.today.map(t => `
+          <div class="v-b-row">
+            <div><div>${t.n}</div><div class="muted" style="font-size:12px">${t.pillar}</div></div>
+            <div class="v-b-check ${t.state}"></div>
+          </div>
+        `).join("")}
+      </div>`;
+  } else if (tab === "health") {
+    content = `
+      <div class="v-c-content">
+        ${DATA.health.areas.map(a => `
+          <details class="v-c-accordion" ${a.habits.length ? "open" : ""}>
+            <summary>${a.name} <span class="muted" style="font-weight:400">${a.habits.length} habit${a.habits.length===1?"":"s"}</span></summary>
+            <div class="body">
+              ${a.habits.length ? a.habits.map(h => `
+                <div class="v-c-habit-row"><span>${h.n}</span><span class="pill ${h.state === 'none' ? 'min' : h.state}">${h.state === 'none' ? 'not started' : h.state + ' · ' + h.streak}</span></div>
+              `).join("") : `<div class="muted">Nothing tracked here yet.</div>`}
+            </div>
+          </details>
+        `).join("")}
+      </div>`;
+  } else {
+    content = `
+      <div class="v-c-content">
+        <div style="margin-bottom:18px">
+          <div class="muted" style="font-size:12px">Accessible net worth</div>
+          <div style="font-size:28px;font-weight:700">£${DATA.finance.accessibleNetWorth.toLocaleString()}</div>
+          <div class="muted" style="font-size:13px">£${DATA.finance.totalNetWorth.toLocaleString()} total</div>
+        </div>
+        ${DATA.finance.goals.map(g => `
+          <div class="v-c-goal">
+            <div class="v-c-goal-top"><span>${g.name}</span><span class="muted">£${g.saved.toLocaleString()} / £${g.target.toLocaleString()}</span></div>
+            <div class="progress"><div style="width:${Math.round(g.saved/g.target*100)}%"></div></div>
+          </div>
+        `).join("")}
+      </div>`;
+  }
+  root.innerHTML = `
+    <div class="v-c-header">
+      <h2>${tab === "today" ? "Today" : tab === "health" ? "Health" : "Finances"}</h2>
+    </div>
+    ${content}
+    <div class="v-c-tabbar">
+      <button class="v-c-tab ${tab==='today'?'active':''}" data-tab="today">TODAY</button>
+      <button class="v-c-tab ${tab==='health'?'active':''}" data-tab="health">HEALTH</button>
+      <button class="v-c-tab ${tab==='finance'?'active':''}" data-tab="finance">FINANCES</button>
+    </div>
+  `;
+  root.querySelectorAll("[data-tab]").forEach(el => {
+    el.addEventListener("click", () => renderVariantC(root, el.dataset.tab));
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Switcher — standard prototype floating bar, ?variant= in the URL, wraps,
+// arrow-key navigable (ignoring inputs, though this prototype has none).
+// ---------------------------------------------------------------------------
+const VARIANTS = [
+  { key: "A", name: "Radial mind-map", render: renderVariantA },
+  { key: "B", name: "Card dashboard", render: renderVariantB },
+  { key: "C", name: "Tab app", render: renderVariantC },
+];
+
+function currentIndex() {
+  const params = new URLSearchParams(location.search);
+  const key = (params.get("variant") || "A").toUpperCase();
+  const i = VARIANTS.findIndex(v => v.key === key);
+  return i === -1 ? 0 : i;
+}
+
+function setVariant(index) {
+  const v = VARIANTS[(index + VARIANTS.length) % VARIANTS.length];
+  const params = new URLSearchParams(location.search);
+  params.set("variant", v.key);
+  history.replaceState(null, "", `${location.pathname}?${params.toString()}`);
+  document.getElementById("switcher-label").textContent = `${v.key} — ${v.name}`;
+  v.render(document.getElementById("app"));
+}
+
+document.getElementById("prev").addEventListener("click", () => setVariant(currentIndex() - 1));
+document.getElementById("next").addEventListener("click", () => setVariant(currentIndex() + 1));
+document.addEventListener("keydown", (e) => {
+  const tag = document.activeElement.tagName;
+  if (tag === "INPUT" || tag === "TEXTAREA" || document.activeElement.isContentEditable) return;
+  if (e.key === "ArrowLeft") setVariant(currentIndex() - 1);
+  if (e.key === "ArrowRight") setVariant(currentIndex() + 1);
+});
+
+setVariant(currentIndex());
+</script>
+</body>
+</html>
