@@ -4,9 +4,11 @@ import pageStyles from "@/components/page-header.module.css";
 import { Card } from "@/components/card";
 import { EditableText } from "@/components/editable-text";
 import { HabitsList } from "@/components/habits-list";
+import { ActionGoalsList } from "@/components/action-goals-list";
 import { getArea } from "@/lib/health/data";
 import { updateAreaCurrentState, updateAreaNorthStar } from "@/lib/health/actions";
 import { getHabitsForArea } from "@/lib/habits/data";
+import { getActionGoalsForArea } from "@/lib/action-goals/data";
 
 export default async function AreaPage({
   params,
@@ -17,7 +19,7 @@ export default async function AreaPage({
   const area = await getArea(areaId);
   if (!area) notFound();
 
-  const habits = await getHabitsForArea(areaId);
+  const [habits, goals] = await Promise.all([getHabitsForArea(areaId), getActionGoalsForArea(areaId)]);
 
   return (
     <>
@@ -39,6 +41,9 @@ export default async function AreaPage({
         </Card>
         <Card title="Habits">
           <HabitsList areaId={area.id} initialHabits={habits} />
+        </Card>
+        <Card title="Goals">
+          <ActionGoalsList areaId={area.id} initialGoals={goals} />
         </Card>
       </div>
     </>
