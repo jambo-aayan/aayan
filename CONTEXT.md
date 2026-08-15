@@ -28,7 +28,7 @@ _Avoid_: Task (reserved for wayfinder's own ticket type — don't reuse it for i
 When something genuinely spans two Pillars (e.g. "buy a house" touches both Finances and Relationship), it lives in exactly one Pillar as its source of truth, with a visible link from the other — never duplicated as two independent copies. Extends the cross-links the original prototype's mind-map view already drew between buckets.
 
 **North Star**:
-Every Pillar has one, and every Area has one — a single headline goal that Actions within it work toward, always visible when you open that Pillar or Area. Originally a Finances-only concept (see "Finance" below); generalized to the whole hierarchy.
+Every Pillar has one, and every Area has one — a single headline goal that Actions within it work toward, always visible when you open that Pillar or Area. Originally a Finances-only concept (see "Finance" below); generalized to the whole hierarchy. **Optional, not mandatory upfront** — the structure supports setting one on any Pillar/Area, but nothing requires it to be filled in before launch. The user will set them from inside the app as they decide what each one should be, not as part of this spec.
 _Avoid_: Don't confuse with an ordinary Goal — a North Star is the *one* headline target for its Pillar/Area, not one of potentially several Goals.
 
 **Current state**:
@@ -37,7 +37,7 @@ A short free-text status field on an Area — where things stand right now (e.g.
 ## Pillars
 
 ### Health (MVP)
-Areas: Ankylosing Spondylitis, Sleep, Diet, Body Composition, Blood Pressure, Looks, Healthcare Navigation. See "Existing content, tuned to this user" below — these Areas carry their prior detail forward unchanged, just renested under Health. Health itself has a Pillar-level North Star (not yet chosen); each Area has its own North Star plus a free-text Current state (see "Language").
+Areas: Ankylosing Spondylitis, Sleep, Diet, Body Composition, Blood Pressure, Looks, Healthcare Navigation. See "Existing content, tuned to this user" below — these Areas carry their prior detail forward unchanged, just renested under Health. Health can have a Pillar-level North Star, and each Area can have its own North Star plus a free-text Current state (see "Language") — left empty at launch, filled in by the user later from inside the app, not decided as part of this spec.
 
 **Area naming convention**: Areas are named for the user's actual, specific issue or focus — not a generic category. "Spine & Pain" became "Ankylosing Spondylitis" for this reason. Apply the same lens to any new Area; existing Areas with already-specific names (Sleep, Diet, ...) don't need renaming.
 
@@ -87,6 +87,18 @@ _Avoid_: "Symptoms" (the original prototype's broader, headache/sleep-specific t
 
 ## Appointments (deferred — not in Health+Finances MVP)
 Name + date, scoped to the Health Pillar. Generates a "prep sheet" beforehand (symptom summary, habit adherence, background context, blank space for the user's own questions) and prompts for outcome notes afterward. The follow-up half matters as much as the prep half — the thing that gets lost with multiple clinicians over months is what the last one actually said. Fully designed already, from the original prototype — just not part of this MVP; revisit post-launch.
+
+## Explicit non-goals
+Stated directly, to stop scope creep before it starts:
+- **No generic task board / Kanban feature.** Habits and Goals are the only work-tracking primitives — don't add a general-purpose board/board-column concept.
+- **No events/calendar system.** Appointments (deferred) has dates, but that's not a calendar feature — don't build one.
+- **No heavy financial reporting.** Net worth, Goals, and the Transactions list/category breakdown (see "Finance") are the ceiling for MVP — no generated reports, statements, or budget-vs-actual analysis beyond that.
+
+## Setup / first-run
+What needs real user input before the app is useful, vs. what ships pre-filled:
+- **Finance needs a real setup flow.** There's no way to seed the user's actual salary, savings, or goals — a first-run (or Settings-accessible, for redoing later) flow should capture: monthly income + fixed outgoings (Baseline), starting Items (assets/liabilities, at least enough for a starting net worth), existing Goals (e.g. Emergency fund, LISA — target and amount already saved), and the Finances North Star (target + deadline) if the user wants to set it now.
+- **Health needs no dedicated wizard.** The tuned seed content (see "Existing content, tuned to this user") already covers it — Areas, and example Habits (seeded inactive, per the opt-in principle). The user activates and edits from inside the app as needed; no upfront wizard.
+- **Everything seeded or entered must be editable in-app afterward** — via Settings, or inline "click to edit" on the item itself (whichever fits the item). This isn't a one-time input; the user expects to revise Habits, Goals, Areas' Current state, and Finance figures over time without needing a redeploy.
 
 ## Behavioural principles (learned by hitting them — keep these)
 1. **Low-maintenance is a hard constraint**, stated explicitly and repeatedly by the user. Features that add friction to routine daily input have been rejected before (e.g. a frequency picker on every habit add, tags on every task). Any new recurring-input feature should have a sensible default and *not* ask a question every time it's used.
