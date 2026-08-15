@@ -1,14 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { setActionGoalStatus } from "@/lib/action-goals/actions";
+import type { GoalStatus } from "@/lib/action-goals/status";
 import styles from "./my-day-goals.module.css";
 
 export type MyDayGoal = {
   id: string;
   name: string;
   areaName: string;
-  status: "NOT_STARTED" | "IN_PROGRESS" | "DONE";
+  status: GoalStatus;
   dueDate: Date | null;
 };
 
@@ -19,9 +20,20 @@ function formatDate(date: Date): string {
 export function MyDayGoals({ initialGoals }: { initialGoals: MyDayGoal[] }) {
   const [goals, setGoals] = useState(initialGoals);
   const [error, setError] = useState<string | null>(null);
+  // Remembers each goal's status from just before it was marked DONE, so
+  // unchecking restores it instead of always resetting to NOT_STARTED —
+  // an IN_PROGRESS goal shouldn't lose that state from one checkbox tap.
+  const statusBeforeDone = useRef<Record<string, GoalStatus>>({});
 
   async function handleToggleDone(goal: MyDayGoal) {
-    const newStatus = goal.status === "DONE" ? "NOT_STARTED" : "DONE";
+    let newStatus: GoalStatus;
+    if (goal.status === "DONE") {
+      newStatus = statusBeforeDone.current[goal.id] ?? "NOT_STARTED";
+    } else {
+      statusBeforeDone.current[goal.id] = goal.status;
+      newStatus = "DONE";
+    }
+
     setGoals((prev) => prev.map((g) => (g.id === goal.id ? { ...g, status: newStatus } : g)));
     const result = await setActionGoalStatus(goal.id, newStatus);
     if (!result.ok) {

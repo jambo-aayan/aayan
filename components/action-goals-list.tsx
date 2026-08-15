@@ -9,15 +9,10 @@ import {
   type ActionGoalInput,
 } from "@/lib/action-goals/actions";
 import { useUndoableCrudList, type ActionResult } from "@/lib/hooks/use-undoable-crud-list";
+import { STATUS_LABEL } from "@/lib/action-goals/status";
 import styles from "./action-goals-list.module.css";
 
 type ActionGoal = ActionGoalInput & { id: string; areaId: string };
-
-const STATUS_LABEL: Record<ActionGoalInput["status"], string> = {
-  NOT_STARTED: "Not started",
-  IN_PROGRESS: "In progress",
-  DONE: "Done",
-};
 
 const EMPTY_FORM: ActionGoalInput = { name: "", status: "NOT_STARTED", dueDate: null, myday: false };
 

@@ -2,10 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
+import type { GoalStatus } from "./status";
 
 export type ActionGoalInput = {
   name: string;
-  status: "NOT_STARTED" | "IN_PROGRESS" | "DONE";
+  status: GoalStatus;
   dueDate: Date | null;
   myday: boolean;
 };
