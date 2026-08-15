@@ -4,21 +4,43 @@ import { Card } from "@/components/card";
 import { NetWorthStats } from "@/components/net-worth-stats";
 import { BaselineForm } from "@/components/baseline-form";
 import { ItemsManager } from "@/components/items-manager";
-import { getItems, getBaseline } from "@/lib/finance/data";
+import { GoalsManager } from "@/components/goals-manager";
+import { FinanceNorthStarCard } from "@/components/finance-north-star-card";
+import { getItems, getBaseline, getGoals, getFinanceNorthStar } from "@/lib/finance/data";
+import { netWorth } from "@/lib/finance/net-worth";
+import { surplus } from "@/lib/finance/baseline-math";
 
 export default async function FinancesPage() {
-  const [items, baseline] = await Promise.all([getItems(), getBaseline()]);
+  const [items, baseline, goals, financeNorthStar] = await Promise.all([
+    getItems(),
+    getBaseline(),
+    getGoals(),
+    getFinanceNorthStar(),
+  ]);
+  const { accessible } = netWorth(items);
+  const monthlySurplus = surplus(baseline.monthlyIncome, baseline.fixedOutgoings);
 
   return (
     <>
       <PageHeader title="Finances" />
       <div className={pageStyles.content}>
         <NetWorthStats items={items} />
+        <Card title="North Star">
+          <FinanceNorthStarCard
+            initialTarget={financeNorthStar.target}
+            initialDeadline={financeNorthStar.deadline}
+            accessibleNetWorth={accessible}
+            actualMonthlyRate={monthlySurplus}
+          />
+        </Card>
         <Card title="Baseline">
           <BaselineForm
             initialIncome={baseline.monthlyIncome}
             initialOutgoings={baseline.fixedOutgoings}
           />
+        </Card>
+        <Card title="Goals">
+          <GoalsManager initialGoals={goals} surplus={monthlySurplus} />
         </Card>
         <Card title="Items">
           <ItemsManager initialItems={items} />

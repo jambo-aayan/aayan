@@ -106,3 +106,26 @@ model Baseline {
   fixedOutgoings Decimal  @default(0) @db.Decimal(12, 2)
   updatedAt      DateTime @updatedAt
 }
+
+/// A savings target (Emergency Fund, LISA, ...) — distinct from the
+/// Finances North Star, which is the single headline target below.
+model Goal {
+  id                  String   @id @default(cuid())
+  name                String
+  target              Decimal  @db.Decimal(12, 2)
+  saved               Decimal  @db.Decimal(12, 2)
+  monthlyContribution Decimal  @db.Decimal(12, 2)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+/// Singleton: the single headline Finances target + deadline, tracked
+/// against accessible net worth. Both fields nullable — optional, not
+/// mandatory upfront, same as a Pillar/Area's North Star. id is always
+/// FINANCE_NORTH_STAR_ID.
+model FinanceNorthStar {
+  id        String    @id
+  target    Decimal?  @db.Decimal(12, 2)
+  deadline  DateTime? @db.Date
+  updatedAt DateTime  @updatedAt
+}
