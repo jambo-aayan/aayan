@@ -1,12 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { createItem, deleteItem, restoreItem, updateItem, type ItemInput } from "@/lib/finance/actions";
+import { useUndoableCrudList, type ActionResult } from "@/lib/hooks/use-undoable-crud-list";
 import styles from "./items-manager.module.css";
 
 type Item = ItemInput & { id: string };
-
-const UNDO_WINDOW_MS = 5000;
 
 const EMPTY_FORM: ItemInput = { name: "", type: "ASSET", value: 0, liquid: false, excluded: false };
 
@@ -15,20 +14,14 @@ function formatGBP(value: number): string {
 }
 
 export function ItemsManager({ initialItems }: { initialItems: Item[] }) {
-  const [items, setItems] = useState(initialItems);
+  const { items, error, undo, add, update, remove, undoDelete } = useUndoableCrudList<Item, ItemInput>(
+    initialItems,
+    { create: createItem, update: updateItem, remove: deleteItem, restore: restoreItem }
+  );
   const [form, setForm] = useState<ItemInput>(EMPTY_FORM);
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [listError, setListError] = useState<string | null>(null);
-  const [undo, setUndo] = useState<Item | null>(null);
-  const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (undoTimer.current) clearTimeout(undoTimer.current);
-    };
-  }, []);
 
   async function handleAdd() {
     if (!form.name.trim()) {
@@ -37,42 +30,9 @@ export function ItemsManager({ initialItems }: { initialItems: Item[] }) {
     }
     setAdding(true);
     setAddError(null);
-    const result = await createItem(form);
+    const ok = await add(form);
     setAdding(false);
-    if (!result.ok) {
-      setAddError(result.error);
-      return;
-    }
-    setItems((prev) => [...prev, result.item]);
-    setForm(EMPTY_FORM);
-  }
-
-  async function handleDelete(item: Item) {
-    setListError(null);
-    setItems((prev) => prev.filter((i) => i.id !== item.id));
-    const result = await deleteItem(item.id);
-    if (!result.ok) {
-      // Roll back the optimistic removal — the row is still there server-side.
-      setItems((prev) => [...prev, item]);
-      setListError(result.error);
-      return;
-    }
-    setUndo(item);
-    if (undoTimer.current) clearTimeout(undoTimer.current);
-    undoTimer.current = setTimeout(() => setUndo(null), UNDO_WINDOW_MS);
-  }
-
-  async function handleUndo() {
-    if (!undo) return;
-    if (undoTimer.current) clearTimeout(undoTimer.current);
-    const item = undo;
-    setUndo(null);
-    const result = await restoreItem(item);
-    if (!result.ok) {
-      setListError(result.error);
-      return;
-    }
-    setItems((prev) => [...prev, item]);
+    if (ok) setForm(EMPTY_FORM);
   }
 
   return (
@@ -84,9 +44,10 @@ export function ItemsManager({ initialItems }: { initialItems: Item[] }) {
               key={item.id}
               item={item}
               onCancel={() => setEditingId(null)}
-              onSaved={(updated) => {
-                setItems((prev) => prev.map((i) => (i.id === updated.id ? updated : i)));
-                setEditingId(null);
+              onSaved={async (input) => {
+                const result = await update(item.id, input, { ...input, id: item.id });
+                if (result.ok) setEditingId(null);
+                return result;
               }}
             />
           ) : (
@@ -104,7 +65,7 @@ export function ItemsManager({ initialItems }: { initialItems: Item[] }) {
                 <button type="button" className={styles.link} onClick={() => setEditingId(item.id)}>
                   Edit
                 </button>
-                <button type="button" className={styles.link} onClick={() => handleDelete(item)}>
+                <button type="button" className={styles.link} onClick={() => remove(item)}>
                   Delete
                 </button>
               </div>
@@ -113,7 +74,7 @@ export function ItemsManager({ initialItems }: { initialItems: Item[] }) {
         )}
         {items.length === 0 && <li className={styles.empty}>No items yet.</li>}
       </ul>
-      {listError && <p className={styles.error}>{listError}</p>}
+      {error && <p className={styles.error}>{error}</p>}
 
       <div className={styles.addForm}>
         <ItemFields form={form} onChange={setForm} />
@@ -126,7 +87,7 @@ export function ItemsManager({ initialItems }: { initialItems: Item[] }) {
       {undo && (
         <div className={styles.toast}>
           <span>Deleted &ldquo;{undo.name}&rdquo;.</span>
-          <button type="button" className={styles.undoBtn} onClick={handleUndo}>
+          <button type="button" className={styles.undoBtn} onClick={undoDelete}>
             Undo
           </button>
         </div>
@@ -187,7 +148,7 @@ function ItemEditRow({
 }: {
   item: Item;
   onCancel: () => void;
-  onSaved: (item: Item) => void;
+  onSaved: (input: ItemInput) => Promise<ActionResult>;
 }) {
   const [form, setForm] = useState<ItemInput>(item);
   const [saving, setSaving] = useState(false);
@@ -196,13 +157,9 @@ function ItemEditRow({
   async function handleSave() {
     setSaving(true);
     setError(null);
-    const result = await updateItem(item.id, form);
+    const result = await onSaved(form);
     setSaving(false);
-    if (!result.ok) {
-      setError(result.error);
-      return;
-    }
-    onSaved({ ...form, id: item.id });
+    if (!result.ok) setError(result.error);
   }
 
   return (

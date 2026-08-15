@@ -129,3 +129,26 @@ model FinanceNorthStar {
   deadline  DateTime? @db.Date
   updatedAt DateTime  @updatedAt
 }
+
+enum TransactionDirection {
+  IN
+  OUT
+}
+
+/// A dated, categorized ledger entry — distinct from Baseline's fixed
+/// monthly summary. linkedItemId is a placeholder for a future
+/// linked-account reference (account-linking tickets); nothing populates
+/// it yet, and there's no FK relation since that entity doesn't exist yet.
+model Transaction {
+  id           String               @id @default(cuid())
+  date         DateTime             @db.Date
+  amount       Decimal              @db.Decimal(12, 2)
+  direction    TransactionDirection
+  category     String
+  source       String?
+  linkedItemId String?
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+
+  @@index([date])
+}

@@ -6,19 +6,30 @@ import { BaselineForm } from "@/components/baseline-form";
 import { ItemsManager } from "@/components/items-manager";
 import { GoalsManager } from "@/components/goals-manager";
 import { FinanceNorthStarCard } from "@/components/finance-north-star-card";
-import { getItems, getBaseline, getGoals, getFinanceNorthStar } from "@/lib/finance/data";
+import { TransactionsManager } from "@/components/transactions-manager";
+import { CategoryBreakdownView } from "@/components/category-breakdown-view";
+import {
+  getItems,
+  getBaseline,
+  getGoals,
+  getFinanceNorthStar,
+  getTransactions,
+} from "@/lib/finance/data";
 import { netWorth } from "@/lib/finance/net-worth";
 import { surplus } from "@/lib/finance/baseline-math";
+import { categoryBreakdown } from "@/lib/finance/category-breakdown";
 
 export default async function FinancesPage() {
-  const [items, baseline, goals, financeNorthStar] = await Promise.all([
+  const [items, baseline, goals, financeNorthStar, transactions] = await Promise.all([
     getItems(),
     getBaseline(),
     getGoals(),
     getFinanceNorthStar(),
+    getTransactions(),
   ]);
   const { accessible } = netWorth(items);
   const monthlySurplus = surplus(baseline.monthlyIncome, baseline.fixedOutgoings);
+  const breakdown = categoryBreakdown(transactions, new Date());
 
   return (
     <>
@@ -41,6 +52,12 @@ export default async function FinancesPage() {
         </Card>
         <Card title="Goals">
           <GoalsManager initialGoals={goals} surplus={monthlySurplus} />
+        </Card>
+        <Card title="This month by category">
+          <CategoryBreakdownView breakdown={breakdown} />
+        </Card>
+        <Card title="Transactions">
+          <TransactionsManager initialTransactions={transactions} />
         </Card>
         <Card title="Items">
           <ItemsManager initialItems={items} />
