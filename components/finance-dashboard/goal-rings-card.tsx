@@ -1,12 +1,7 @@
 import { Ring } from "./ring";
 import { goalProgressPercent } from "@/lib/finance/goal-math";
+import { formatGBP } from "@/lib/finance/format";
 import styles from "./dashboard.module.css";
-
-function formatGBP(value: number): string {
-  return new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP", maximumFractionDigits: 0 }).format(
-    value
-  );
-}
 
 export function GoalRingsCard({ goals }: { goals: { id: string; name: string; saved: number; target: number }[] }) {
   return (
@@ -25,7 +20,7 @@ export function GoalRingsCard({ goals }: { goals: { id: string; name: string; sa
               />
               <div style={{ fontSize: 12, fontWeight: 600, marginTop: 8 }}>{goal.name}</div>
               <div style={{ fontSize: 10.5, color: "var(--muted)", marginTop: 1 }}>
-                {formatGBP(goal.saved)} / {formatGBP(goal.target)}
+                {formatGBP(goal.saved, true)} / {formatGBP(goal.target, true)}
               </div>
             </div>
           ))}

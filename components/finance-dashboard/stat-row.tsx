@@ -1,10 +1,6 @@
 import styles from "./dashboard.module.css";
-
-function formatGBP(value: number): string {
-  return new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP", maximumFractionDigits: 0 }).format(
-    value
-  );
-}
+import { formatGBP } from "@/lib/finance/format";
+import { CHART_COLORS } from "@/lib/finance/palette";
 
 function StatCard({
   color,
@@ -42,11 +38,26 @@ export function StatRow({
 }) {
   return (
     <div className={styles.statRow}>
-      <StatCard color="#D9714B" label="Accessible net worth" value={formatGBP(accessible)} sub="excludes e.g. pension" />
-      <StatCard color="#6C7A8C" label="Total net worth" value={formatGBP(total)} sub="everything, incl. excluded" />
-      <StatCard color="#6E8B74" label="Monthly surplus" value={formatGBP(surplus)} sub="income − outgoings" />
       <StatCard
-        color="#C79A3D"
+        color={CHART_COLORS.coral}
+        label="Accessible net worth"
+        value={formatGBP(accessible, true)}
+        sub="excludes e.g. pension"
+      />
+      <StatCard
+        color={CHART_COLORS.slate}
+        label="Total net worth"
+        value={formatGBP(total, true)}
+        sub="everything, incl. excluded"
+      />
+      <StatCard
+        color={CHART_COLORS.health}
+        label="Monthly surplus"
+        value={formatGBP(surplus, true)}
+        sub="income − outgoings"
+      />
+      <StatCard
+        color={CHART_COLORS.amber}
         label="North Star"
         value={northStarPercent !== null ? `${northStarPercent}%` : "—"}
         sub={northStarPercent !== null ? "of target" : "not set"}

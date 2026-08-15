@@ -1,13 +1,7 @@
 import { BreakdownRing } from "./ring";
+import { formatGBP } from "@/lib/finance/format";
+import { BREAKDOWN_SEGMENT_COLORS } from "@/lib/finance/palette";
 import styles from "./dashboard.module.css";
-
-const SEGMENT_COLORS = ["#D9714B", "#C79A3D", "#6C7A8C", "#6E8B74", "#8A6FB8", "#4A90A4"];
-
-function formatGBP(value: number): string {
-  return new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP", maximumFractionDigits: 0 }).format(
-    value
-  );
-}
 
 export function BreakdownRingCard({
   breakdown,
@@ -16,7 +10,10 @@ export function BreakdownRingCard({
   breakdown: { name: string; value: number }[];
   accessible: number;
 }) {
-  const segments = breakdown.map((b, i) => ({ ...b, color: SEGMENT_COLORS[i % SEGMENT_COLORS.length] }));
+  const segments = breakdown.map((b, i) => ({
+    ...b,
+    color: BREAKDOWN_SEGMENT_COLORS[i % BREAKDOWN_SEGMENT_COLORS.length],
+  }));
 
   return (
     <div className={`${styles.bentoCard} ${styles.span2}`}>
@@ -52,7 +49,7 @@ export function BreakdownRingCard({
                   }}
                 />
                 {seg.name}
-                <span style={{ marginLeft: "auto", color: "var(--muted)" }}>{formatGBP(seg.value)}</span>
+                <span style={{ marginLeft: "auto", color: "var(--muted)" }}>{formatGBP(seg.value, true)}</span>
               </div>
             ))}
           </div>

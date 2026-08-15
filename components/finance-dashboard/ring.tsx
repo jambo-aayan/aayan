@@ -22,7 +22,13 @@ export function Ring({
 
   return (
     <div style={{ position: "relative", width: size, height: size }}>
-      <svg width={size} height={size} style={{ transform: "rotate(-90deg)" }}>
+      <svg
+        width={size}
+        height={size}
+        style={{ transform: "rotate(-90deg)" }}
+        role="img"
+        aria-label={`${centerLabel}${centerSub ? ` ${centerSub}` : ""}`}
+      >
         <circle cx={size / 2} cy={size / 2} r={r} stroke={trackColor} strokeWidth={STROKE_WIDTH} fill="none" />
         <circle
           cx={size / 2}
@@ -77,9 +83,13 @@ export function BreakdownRing({
     []
   );
 
+  const ariaLabel = `${centerLabel}${centerSub ? ` ${centerSub}` : ""}: ${segments
+    .map((s) => `${s.name} ${s.value}`)
+    .join(", ")}`;
+
   return (
     <div style={{ position: "relative", width: size, height: size, flexShrink: 0 }}>
-      <svg width={size} height={size} style={{ transform: "rotate(-90deg)" }}>
+      <svg width={size} height={size} style={{ transform: "rotate(-90deg)" }} role="img" aria-label={ariaLabel}>
         {arcs.map(({ length, offset, seg }) => (
           <circle
             key={seg.name}

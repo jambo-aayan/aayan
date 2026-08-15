@@ -1,9 +1,6 @@
 import styles from "./activity-table.module.css";
 import dashboardStyles from "./dashboard.module.css";
-
-function formatGBP(value: number): string {
-  return new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP" }).format(value);
-}
+import { formatGBP } from "@/lib/finance/format";
 
 function formatDate(date: Date): string {
   return new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short" }).format(date);
