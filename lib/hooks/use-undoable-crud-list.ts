@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from "react";
+import { withRetry } from "@/lib/with-retry";
+import { useToast } from "@/components/toast/toast-provider";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 type CreateResult<T> = { ok: true; item: T } | { ok: false; error: string };
@@ -27,6 +29,7 @@ export function useUndoableCrudList<T extends { id: string }, Input>(
   const [error, setError] = useState<string | null>(null);
   const [undo, setUndo] = useState<T | null>(null);
   const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { notifyError } = useToast();
 
   useEffect(() => {
     return () => {
@@ -36,9 +39,10 @@ export function useUndoableCrudList<T extends { id: string }, Input>(
 
   async function add(input: Input): Promise<boolean> {
     setError(null);
-    const result = await actions.create(input);
+    const result = await withRetry(() => actions.create(input));
     if (!result.ok) {
       setError(result.error);
+      notifyError(result.error, { onRetry: () => add(input) });
       return false;
     }
     setItems((prev) => [...prev, result.item]);
@@ -50,8 +54,11 @@ export function useUndoableCrudList<T extends { id: string }, Input>(
   // list-level `error` below — a save failure on row 8 of 20 shouldn't
   // only be visible scrolled away from the row still open in edit mode.
   async function update(id: string, input: Input, merged: T): Promise<ActionResult> {
-    const result = await actions.update(id, input);
-    if (!result.ok) return result;
+    const result = await withRetry(() => actions.update(id, input));
+    if (!result.ok) {
+      notifyError(result.error, { onRetry: () => update(id, input, merged) });
+      return result;
+    }
     setItems((prev) => prev.map((i) => (i.id === id ? merged : i)));
     return result;
   }
@@ -59,10 +66,11 @@ export function useUndoableCrudList<T extends { id: string }, Input>(
   async function remove(item: T) {
     setError(null);
     setItems((prev) => prev.filter((i) => i.id !== item.id));
-    const result = await actions.remove(item.id);
+    const result = await withRetry(() => actions.remove(item.id));
     if (!result.ok) {
       setItems((prev) => [...prev, item]);
       setError(result.error);
+      notifyError(result.error, { onRetry: () => remove(item) });
       return;
     }
     setUndo(item);
@@ -70,17 +78,25 @@ export function useUndoableCrudList<T extends { id: string }, Input>(
     undoTimer.current = setTimeout(() => setUndo(null), UNDO_WINDOW_MS);
   }
 
+  // Shared by the initial undo click and by the toast's manual "Retry" once
+  // the undo window has already closed — both need the same restore +
+  // setItems behavior, not just the bare action call.
+  async function restore(item: T) {
+    const result = await withRetry(() => actions.restore(item));
+    if (!result.ok) {
+      setError(result.error);
+      notifyError(result.error, { onRetry: () => restore(item) });
+      return;
+    }
+    setItems((prev) => [...prev, item]);
+  }
+
   async function undoDelete() {
     if (!undo) return;
     if (undoTimer.current) clearTimeout(undoTimer.current);
     const item = undo;
     setUndo(null);
-    const result = await actions.restore(item);
-    if (!result.ok) {
-      setError(result.error);
-      return;
-    }
-    setItems((prev) => [...prev, item]);
+    await restore(item);
   }
 
   return { items, error, undo, add, update, remove, undoDelete };

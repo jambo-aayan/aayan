@@ -3,6 +3,8 @@
 import { useState } from "react";
 import styles from "./editable-text.module.css";
 import type { SaveResult } from "@/lib/health/actions";
+import { withRetry } from "@/lib/with-retry";
+import { useToast } from "@/components/toast/toast-provider";
 
 export function EditableText({
   label,
@@ -19,16 +21,18 @@ export function EditableText({
   const [value, setValue] = useState(initialValue ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { notifyError } = useToast();
 
   async function handleSave() {
     setSaving(true);
     setError(null);
-    const result = await onSave(value);
+    const result = await withRetry(() => onSave(value));
     setSaving(false);
     if (result.ok) {
       setEditing(false);
     } else {
       setError(result.error);
+      notifyError(result.error, { onRetry: handleSave });
     }
   }
 

@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { requiredMonthlyRate, verdict, projectedValue } from "@/lib/finance/north-star-math";
 import { updateFinanceNorthStar } from "@/lib/finance/actions";
+import { withRetry } from "@/lib/with-retry";
+import { useToast } from "@/components/toast/toast-provider";
 import styles from "./finance-north-star-card.module.css";
 
 const PROJECTION_YEARS = 5;
@@ -33,6 +35,7 @@ export function FinanceNorthStarCard({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState({ target: initialTarget, deadline: initialDeadline });
+  const { notifyError } = useToast();
 
   async function handleSave() {
     const targetNum = target === "" ? null : Number(target);
@@ -43,10 +46,11 @@ export function FinanceNorthStarCard({
     }
     setSaving(true);
     setError(null);
-    const result = await updateFinanceNorthStar(targetNum, deadlineDate);
+    const result = await withRetry(() => updateFinanceNorthStar(targetNum, deadlineDate));
     setSaving(false);
     if (!result.ok) {
       setError(result.error);
+      notifyError(result.error, { onRetry: handleSave });
       return;
     }
     setSaved({ target: targetNum, deadline: deadlineDate });

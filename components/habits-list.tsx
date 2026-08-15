@@ -2,9 +2,21 @@
 
 import { useState } from "react";
 import { dailyStreak, weeklyStreak, isEstablished, type Frequency } from "@/lib/habits/streak";
-import { createHabit, updateHabit, deleteHabit, setHabitActive, cycleTodayCheckIn } from "@/lib/habits/actions";
+import {
+  createHabit,
+  updateHabit,
+  deleteHabit,
+  restoreHabit,
+  setHabitActive,
+  cycleTodayCheckIn,
+  type DeletedHabit,
+} from "@/lib/habits/actions";
 import { utcMidnight } from "@/lib/habits/date-utils";
+import { withRetry } from "@/lib/with-retry";
+import { useToast } from "@/components/toast/toast-provider";
 import styles from "./habits-list.module.css";
+
+const UNDO_WINDOW_MS = 5000;
 
 type CheckInLevel = "FULL" | "MINIMUM" | null;
 
@@ -42,6 +54,25 @@ export function HabitsList({
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
+  // A toggle can now be in flight for over a second across withRetry's
+  // backoff — block re-entrant clicks on the same habit so a slow, later-
+  // reverting first request can't clobber a second toggle's optimistic state.
+  const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
+  const { notifyError, notifyUndo } = useToast();
+
+  function withPending(id: string, fn: () => Promise<void>): () => void {
+    return () => {
+      if (pendingIds.has(id)) return;
+      setPendingIds((prev) => new Set(prev).add(id));
+      fn().finally(() => {
+        setPendingIds((prev) => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
+      });
+    };
+  }
 
   async function handleAdd() {
     if (!form.name.trim()) {
@@ -50,10 +81,11 @@ export function HabitsList({
     }
     setAdding(true);
     setError(null);
-    const result = await createHabit(areaId, form.name, form.frequency);
+    const result = await withRetry(() => createHabit(areaId, form.name, form.frequency));
     setAdding(false);
     if (!result.ok) {
       setError(result.error);
+      notifyError(result.error, { onRetry: handleAdd });
       return;
     }
     setHabits((prev) => [...prev, { ...result.habit, checkInDates: [], todayLevel: null }]);
@@ -77,30 +109,58 @@ export function HabitsList({
       })
     );
 
-    const result = await cycleTodayCheckIn(habit.id);
+    const result = await withRetry(() => cycleTodayCheckIn(habit.id));
     if (!result.ok) {
       // Revert on failure.
       setHabits((prev) => prev.map((h) => (h.id === habit.id ? habit : h)));
       setError(result.error);
+      notifyError(result.error, { onRetry: () => handleToggleCheckIn(habit) });
     }
   }
 
   async function handleToggleActive(habit: HabitWithCheckIns) {
     setHabits((prev) => prev.map((h) => (h.id === habit.id ? { ...h, active: !h.active } : h)));
-    const result = await setHabitActive(habit.id, !habit.active);
+    const result = await withRetry(() => setHabitActive(habit.id, !habit.active));
     if (!result.ok) {
       setHabits((prev) => prev.map((h) => (h.id === habit.id ? habit : h)));
       setError(result.error);
+      notifyError(result.error, { onRetry: () => handleToggleActive(habit) });
     }
   }
 
   async function handleDelete(habit: HabitWithCheckIns) {
     setHabits((prev) => prev.filter((h) => h.id !== habit.id));
-    const result = await deleteHabit(habit.id);
+    const result = await withRetry(() => deleteHabit(habit.id));
     if (!result.ok) {
       setHabits((prev) => [...prev, habit]);
       setError(result.error);
+      notifyError(result.error, { onRetry: () => handleDelete(habit) });
+      return;
     }
+    const deleted = result.deleted;
+    notifyUndo(`Deleted "${habit.name}".`, () => handleUndoDelete(deleted), UNDO_WINDOW_MS);
+  }
+
+  async function handleUndoDelete(deleted: DeletedHabit) {
+    const result = await withRetry(() => restoreHabit(deleted));
+    if (!result.ok) {
+      setError(result.error);
+      notifyError(result.error, { onRetry: () => handleUndoDelete(deleted) });
+      return;
+    }
+    setHabits((prev) => [
+      ...prev,
+      {
+        id: deleted.id,
+        areaId: deleted.areaId,
+        name: deleted.name,
+        frequency: deleted.frequency,
+        active: deleted.active,
+        checkInDates: deleted.checkIns.map((c) => c.date),
+        todayLevel:
+          deleted.checkIns.find((c) => c.date.getTime() === utcMidnight(new Date()).getTime())?.level ?? null,
+      },
+    ]);
   }
 
   return (
@@ -141,10 +201,16 @@ export function HabitsList({
                     type="button"
                     className={`${styles.dot} ${styles[habit.todayLevel?.toLowerCase() ?? "none"]}`}
                     aria-label={`Check in: currently ${habit.todayLevel ?? "not checked in"}`}
-                    onClick={() => handleToggleCheckIn(habit)}
+                    disabled={pendingIds.has(habit.id)}
+                    onClick={withPending(habit.id, () => handleToggleCheckIn(habit))}
                   />
                 )}
-                <button type="button" className={styles.link} onClick={() => handleToggleActive(habit)}>
+                <button
+                  type="button"
+                  className={styles.link}
+                  disabled={pendingIds.has(habit.id)}
+                  onClick={withPending(habit.id, () => handleToggleActive(habit))}
+                >
                   {habit.active ? "Deactivate" : "Activate"}
                 </button>
                 <button type="button" className={styles.link} onClick={() => setEditingId(habit.id)}>
@@ -197,14 +263,16 @@ function HabitEditRow({
   const [frequency, setFrequency] = useState<Frequency>(habit.frequency);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { notifyError } = useToast();
 
   async function handleSave() {
     setSaving(true);
     setError(null);
-    const result = await updateHabit(habit.id, name, frequency);
+    const result = await withRetry(() => updateHabit(habit.id, name, frequency));
     setSaving(false);
     if (!result.ok) {
       setError(result.error);
+      notifyError(result.error, { onRetry: handleSave });
       return;
     }
     onSaved(name, frequency);

@@ -3,6 +3,8 @@
 import { useRef, useState } from "react";
 import { setActionGoalStatus } from "@/lib/action-goals/actions";
 import type { GoalStatus } from "@/lib/action-goals/status";
+import { withRetry } from "@/lib/with-retry";
+import { useToast } from "@/components/toast/toast-provider";
 import styles from "./my-day-goals.module.css";
 
 export type MyDayGoal = {
@@ -20,12 +22,19 @@ function formatDate(date: Date): string {
 export function MyDayGoals({ initialGoals }: { initialGoals: MyDayGoal[] }) {
   const [goals, setGoals] = useState(initialGoals);
   const [error, setError] = useState<string | null>(null);
+  // Blocks re-entrant clicks while a toggle's withRetry backoff is in
+  // flight, so a slow first request's revert can't clobber a second toggle.
+  const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
+  const { notifyError } = useToast();
   // Remembers each goal's status from just before it was marked DONE, so
   // unchecking restores it instead of always resetting to NOT_STARTED —
   // an IN_PROGRESS goal shouldn't lose that state from one checkbox tap.
   const statusBeforeDone = useRef<Record<string, GoalStatus>>({});
 
   async function handleToggleDone(goal: MyDayGoal) {
+    if (pendingIds.has(goal.id)) return;
+    setPendingIds((prev) => new Set(prev).add(goal.id));
+
     let newStatus: GoalStatus;
     if (goal.status === "DONE") {
       newStatus = statusBeforeDone.current[goal.id] ?? "NOT_STARTED";
@@ -35,11 +44,17 @@ export function MyDayGoals({ initialGoals }: { initialGoals: MyDayGoal[] }) {
     }
 
     setGoals((prev) => prev.map((g) => (g.id === goal.id ? { ...g, status: newStatus } : g)));
-    const result = await setActionGoalStatus(goal.id, newStatus);
+    const result = await withRetry(() => setActionGoalStatus(goal.id, newStatus));
     if (!result.ok) {
       setGoals((prev) => prev.map((g) => (g.id === goal.id ? goal : g)));
       setError(result.error);
+      notifyError(result.error, { onRetry: () => handleToggleDone(goal) });
     }
+    setPendingIds((prev) => {
+      const next = new Set(prev);
+      next.delete(goal.id);
+      return next;
+    });
   }
 
   if (goals.length === 0) {
@@ -55,6 +70,7 @@ export function MyDayGoals({ initialGoals }: { initialGoals: MyDayGoal[] }) {
               <input
                 type="checkbox"
                 checked={goal.status === "DONE"}
+                disabled={pendingIds.has(goal.id)}
                 onChange={() => handleToggleDone(goal)}
               />
               <div>
