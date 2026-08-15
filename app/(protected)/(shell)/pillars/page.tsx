@@ -18,6 +18,14 @@ export default function PillarsPage() {
             <div className={styles.hint}>Net worth, Goals, and Transactions</div>
           </Link>
         </div>
+        <div className={styles.crossCutting}>
+          <Link href="/my-day" className={styles.crossLink}>
+            My Day
+          </Link>
+          <Link href="/all-actions" className={styles.crossLink}>
+            All Actions
+          </Link>
+        </div>
       </div>
     </>
   );

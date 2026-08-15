@@ -43,3 +43,21 @@
     flex-direction: row;
   }
 }
+
+.crossCutting {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.crossLink {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--muted);
+  background: var(--card);
+  padding: 8px 16px;
+  border-radius: 999px;
+  box-shadow:
+    0 1px 2px rgba(33, 29, 25, 0.04),
+    0 8px 22px rgba(33, 29, 25, 0.05);
+}

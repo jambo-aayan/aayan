@@ -37,6 +37,7 @@ model Area {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   habits       Habit[]
+  actionGoals  ActionGoal[]
 
   @@index([pillarId])
 }
@@ -77,6 +78,32 @@ model CheckIn {
 
   @@unique([habitId, date])
   @@index([habitId])
+}
+
+enum GoalStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  DONE
+}
+
+/// The general "Action" Goal — a one-off task scoped to an Area, sibling to
+/// Habit under CONTEXT.md's Action concept. Deliberately NOT the same thing
+/// as the `Goal` model below (a Finance savings target) — CONTEXT.md uses
+/// "Goal" for both, but they're unrelated domain concepts that happen to
+/// share a name; this one is renamed ActionGoal only to avoid the Prisma
+/// model-name clash, not because the product language distinguishes them.
+model ActionGoal {
+  id        String     @id @default(cuid())
+  areaId    String
+  area      Area       @relation(fields: [areaId], references: [id])
+  name      String
+  status    GoalStatus @default(NOT_STARTED)
+  dueDate   DateTime?  @db.Date
+  myday     Boolean    @default(false)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@index([areaId])
 }
 
 enum ItemType {

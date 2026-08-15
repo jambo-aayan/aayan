@@ -1,0 +1,50 @@
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.row {
+  padding: 10px 0;
+  border-top: 1px solid rgba(33, 29, 25, 0.06);
+}
+
+.row:first-child {
+  border-top: none;
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.name {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.nameDone {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--muted);
+  text-decoration: line-through;
+}
+
+.meta {
+  font-size: 11.5px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.empty {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.error {
+  color: #b3261e;
+  font-size: 12px;
+  margin-top: 6px;
+}
