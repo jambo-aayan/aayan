@@ -9,6 +9,11 @@ export default defineConfig({
     path: "prisma/migrations",
   },
   datasource: {
-    url: process.env["DATABASE_URL"],
+    // Migrations need a stable, unpooled connection for their advisory lock —
+    // Neon's pooled connection (the "-pooler" host DATABASE_URL points at in
+    // production) breaks that lock with a P1002 timeout. DIRECT_URL is only
+    // set in production; locally DATABASE_URL already points at a direct
+    // (non-pooled) Postgres, so the fallback keeps dev working unchanged.
+    url: process.env["DIRECT_URL"] ?? process.env["DATABASE_URL"],
   },
 });
