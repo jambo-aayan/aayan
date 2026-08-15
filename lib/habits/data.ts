@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
+import { isSameUtcDay } from "./date-utils";
 
 export async function getHabitsForArea(areaId: string) {
   const habits = await prisma.habit.findMany({
@@ -12,12 +13,4 @@ export async function getHabitsForArea(areaId: string) {
     checkInDates: checkIns.map((c) => c.date),
     todayLevel: checkIns.find((c) => isSameUtcDay(c.date, new Date()))?.level ?? null,
   }));
-}
-
-function isSameUtcDay(a: Date, b: Date): boolean {
-  return (
-    a.getUTCFullYear() === b.getUTCFullYear() &&
-    a.getUTCMonth() === b.getUTCMonth() &&
-    a.getUTCDate() === b.getUTCDate()
-  );
 }

@@ -1,3 +1,5 @@
+export type Frequency = "DAILY" | "WEEKLY";
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 const ESTABLISHED_DAYS = 7;
 const ESTABLISHED_WEEKS = 4;
@@ -56,6 +58,6 @@ export function weeklyStreak(dates: Date[]): number {
   return streak;
 }
 
-export function isEstablished(streak: number, frequency: "DAILY" | "WEEKLY"): boolean {
+export function isEstablished(streak: number, frequency: Frequency): boolean {
   return frequency === "DAILY" ? streak >= ESTABLISHED_DAYS : streak >= ESTABLISHED_WEEKS;
 }

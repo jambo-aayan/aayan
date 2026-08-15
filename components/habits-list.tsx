@@ -1,11 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { dailyStreak, weeklyStreak, isEstablished } from "@/lib/habits/streak";
+import { dailyStreak, weeklyStreak, isEstablished, type Frequency } from "@/lib/habits/streak";
 import { createHabit, updateHabit, deleteHabit, setHabitActive, cycleTodayCheckIn } from "@/lib/habits/actions";
+import { utcMidnight } from "@/lib/habits/date-utils";
 import styles from "./habits-list.module.css";
 
-type Frequency = "DAILY" | "WEEKLY";
 type CheckInLevel = "FULL" | "MINIMUM" | null;
 
 export type HabitWithCheckIns = {
@@ -62,8 +62,7 @@ export function HabitsList({
 
   async function handleToggleCheckIn(habit: HabitWithCheckIns) {
     const newLevel = nextLevel(habit.todayLevel);
-    const now = new Date();
-    const todayDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    const todayDate = utcMidnight(new Date());
 
     setHabits((prev) =>
       prev.map((h) => {
@@ -78,7 +77,7 @@ export function HabitsList({
       })
     );
 
-    const result = await cycleTodayCheckIn(habit.id, areaId);
+    const result = await cycleTodayCheckIn(habit.id);
     if (!result.ok) {
       // Revert on failure.
       setHabits((prev) => prev.map((h) => (h.id === habit.id ? habit : h)));
@@ -88,7 +87,7 @@ export function HabitsList({
 
   async function handleToggleActive(habit: HabitWithCheckIns) {
     setHabits((prev) => prev.map((h) => (h.id === habit.id ? { ...h, active: !h.active } : h)));
-    const result = await setHabitActive(habit.id, areaId, !habit.active);
+    const result = await setHabitActive(habit.id, !habit.active);
     if (!result.ok) {
       setHabits((prev) => prev.map((h) => (h.id === habit.id ? habit : h)));
       setError(result.error);
@@ -97,7 +96,7 @@ export function HabitsList({
 
   async function handleDelete(habit: HabitWithCheckIns) {
     setHabits((prev) => prev.filter((h) => h.id !== habit.id));
-    const result = await deleteHabit(habit.id, areaId);
+    const result = await deleteHabit(habit.id);
     if (!result.ok) {
       setHabits((prev) => [...prev, habit]);
       setError(result.error);
@@ -202,7 +201,7 @@ function HabitEditRow({
   async function handleSave() {
     setSaving(true);
     setError(null);
-    const result = await updateHabit(habit.id, habit.areaId, name, frequency);
+    const result = await updateHabit(habit.id, name, frequency);
     setSaving(false);
     if (!result.ok) {
       setError(result.error);
