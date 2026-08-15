@@ -36,8 +36,47 @@ model Area {
   sortOrder    Int
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+  habits       Habit[]
 
   @@index([pillarId])
+}
+
+enum HabitFrequency {
+  DAILY
+  WEEKLY
+}
+
+enum CheckInLevel {
+  FULL
+  MINIMUM
+}
+
+/// New Habits default to inactive (active: false) — opt-in, not opt-out.
+model Habit {
+  id        String         @id @default(cuid())
+  areaId    String
+  area      Area           @relation(fields: [areaId], references: [id])
+  name      String
+  frequency HabitFrequency
+  active    Boolean        @default(false)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  checkIns  CheckIn[]
+
+  @@index([areaId])
+}
+
+/// One row per (habit, date) actually checked in — "none" is the absence of
+/// a row for that date, not a stored level.
+model CheckIn {
+  id      String       @id @default(cuid())
+  habitId String
+  habit   Habit        @relation(fields: [habitId], references: [id])
+  date    DateTime     @db.Date
+  level   CheckInLevel
+
+  @@unique([habitId, date])
+  @@index([habitId])
 }
 
 enum ItemType {
