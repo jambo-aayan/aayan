@@ -38,3 +38,10 @@ export async function getAllActionsGoals() {
   });
   return goals.map(({ area, ...goal }) => ({ ...goal, areaName: area.name }));
 }
+
+/** Every Goal across every Area, myday or not — the shared source for the
+ * Today view's "myday or due today" filter and the By Date grouping. */
+export async function getEveryGoal() {
+  const goals = await prisma.actionGoal.findMany({ include: { area: true }, orderBy: { createdAt: "asc" } });
+  return goals.map(({ area, ...goal }) => ({ ...goal, areaName: area.name }));
+}

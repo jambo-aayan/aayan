@@ -9,7 +9,7 @@ export default async function AllActionsPage() {
 
   return (
     <>
-      <PageHeader title="All Actions" backHref="/pillars" />
+      <PageHeader title="All Actions" backHref="/today" />
       <div className={pageStyles.content}>
         <Card title="Backlog goals">
           <AllActionsList goals={goals} />

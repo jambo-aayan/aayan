@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import styles from "./sidebar.module.css";
 
 const NAV_ITEMS = [
-  { href: "/pillars", label: "Home", swatch: null },
+  { href: "/today", label: "Home", swatch: null },
   { href: "/health", label: "Health", swatch: "var(--health)" },
   { href: "/finances", label: "Finances", swatch: "var(--coral)" },
 ] as const;

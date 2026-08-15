@@ -9,7 +9,7 @@ export default async function ThoughtsPage() {
 
   return (
     <>
-      <PageHeader title="Thoughts" backHref="/pillars" />
+      <PageHeader title="Thoughts" backHref="/today" />
       <div className={pageStyles.content}>
         <Card>
           <ThoughtsList initialThoughts={thoughts} />
