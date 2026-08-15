@@ -5,10 +5,12 @@ import { setActionGoalStatus } from "@/lib/action-goals/actions";
 import type { GoalStatus } from "@/lib/action-goals/status";
 import { withRetry } from "@/lib/with-retry";
 import { useToast } from "@/components/toast/toast-provider";
+import { ThoughtPrompt } from "@/components/thoughts/thought-prompt";
 import styles from "./my-day-goals.module.css";
 
 export type MyDayGoal = {
   id: string;
+  areaId: string;
   name: string;
   areaName: string;
   status: GoalStatus;
@@ -25,6 +27,7 @@ export function MyDayGoals({ initialGoals }: { initialGoals: MyDayGoal[] }) {
   // Blocks re-entrant clicks while a toggle's withRetry backoff is in
   // flight, so a slow first request's revert can't clobber a second toggle.
   const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
+  const [promptGoalId, setPromptGoalId] = useState<string | null>(null);
   const { notifyError } = useToast();
   // Remembers each goal's status from just before it was marked DONE, so
   // unchecking restores it instead of always resetting to NOT_STARTED —
@@ -49,6 +52,8 @@ export function MyDayGoals({ initialGoals }: { initialGoals: MyDayGoal[] }) {
       setGoals((prev) => prev.map((g) => (g.id === goal.id ? goal : g)));
       setError(result.error);
       notifyError(result.error, { onRetry: () => handleToggleDone(goal) });
+    } else if (newStatus === "DONE") {
+      setPromptGoalId(goal.id);
     }
     setPendingIds((prev) => {
       const next = new Set(prev);
@@ -81,6 +86,9 @@ export function MyDayGoals({ initialGoals }: { initialGoals: MyDayGoal[] }) {
                 </div>
               </div>
             </label>
+            {promptGoalId === goal.id && (
+              <ThoughtPrompt areaId={goal.areaId} onDone={() => setPromptGoalId(null)} />
+            )}
           </li>
         ))}
       </ul>

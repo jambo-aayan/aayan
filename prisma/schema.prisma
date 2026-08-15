@@ -16,12 +16,13 @@ model Session {
 /// A top-level life domain (Health, Finances, ...). id is a stable slug,
 /// not a cuid, so seeding can upsert by a human-readable, idempotent key.
 model Pillar {
-  id        String   @id
+  id        String    @id
   name      String
   northStar String?
   areas     Area[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  thoughts  Thought[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 }
 
 /// A sub-topic within a Pillar (e.g. Sleep within Health). id is a stable
@@ -39,6 +40,7 @@ model Area {
   habits           Habit[]
   actionGoals      ActionGoal[]
   painMobilityLogs PainMobilityLog[]
+  thoughts         Thought[]
 
   @@index([pillarId])
 }
@@ -198,4 +200,22 @@ model Transaction {
   updatedAt    DateTime             @updatedAt
 
   @@index([date])
+}
+
+/// A dated, free-text journal entry, cross-cutting rather than owned by one
+/// feature — pillarId/areaId are both optional and mutually exclusive in
+/// practice (the UI offers one tag, not both): an untagged entry is a
+/// general note, not an error.
+model Thought {
+  id        String   @id @default(cuid())
+  text      String
+  date      DateTime @db.Date
+  pillarId  String?
+  pillar    Pillar?  @relation(fields: [pillarId], references: [id])
+  areaId    String?
+  area      Area?    @relation(fields: [areaId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@index([pillarId])
+  @@index([areaId])
 }
