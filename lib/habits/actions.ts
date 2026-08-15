@@ -47,14 +47,67 @@ export async function updateHabit(
   return { ok: true };
 }
 
-export async function deleteHabit(habitId: string): Promise<ActionResult> {
-  let habit;
+export type DeletedHabit = {
+  id: string;
+  areaId: string;
+  name: string;
+  frequency: Frequency;
+  active: boolean;
+  checkIns: { date: Date; level: "FULL" | "MINIMUM" }[];
+};
+
+export type DeleteHabitResult = { ok: true; deleted: DeletedHabit } | { ok: false; error: string };
+
+/**
+ * CheckIn rows reference their Habit with ON DELETE RESTRICT, so a delete-undo
+ * toast needs the full set of check-ins removed alongside the habit — both to
+ * satisfy the FK and so `restoreHabit` can put everything back exactly.
+ */
+export async function deleteHabit(habitId: string): Promise<DeleteHabitResult> {
+  let result;
   try {
-    habit = await prisma.habit.delete({ where: { id: habitId } });
+    result = await prisma.$transaction(async (tx) => {
+      const checkIns = await tx.checkIn.findMany({ where: { habitId } });
+      await tx.checkIn.deleteMany({ where: { habitId } });
+      const habit = await tx.habit.delete({ where: { id: habitId } });
+      return { habit, checkIns };
+    });
   } catch {
     return { ok: false, error: "Couldn't delete — try again." };
   }
-  revalidatePath(`/health/${habit.areaId}`);
+  revalidatePath(`/health/${result.habit.areaId}`);
+  return {
+    ok: true,
+    deleted: {
+      ...result.habit,
+      checkIns: result.checkIns.map((c) => ({ date: c.date, level: c.level })),
+    },
+  };
+}
+
+/** Recreates a just-deleted habit and its check-ins, for the delete-undo toast. */
+export async function restoreHabit(deleted: DeletedHabit): Promise<ActionResult> {
+  try {
+    await prisma.$transaction(async (tx) => {
+      await tx.habit.create({
+        data: {
+          id: deleted.id,
+          areaId: deleted.areaId,
+          name: deleted.name,
+          frequency: deleted.frequency,
+          active: deleted.active,
+        },
+      });
+      if (deleted.checkIns.length > 0) {
+        await tx.checkIn.createMany({
+          data: deleted.checkIns.map((c) => ({ habitId: deleted.id, date: c.date, level: c.level })),
+        });
+      }
+    });
+  } catch {
+    return { ok: false, error: "Couldn't undo — the habit may already be back." };
+  }
+  revalidatePath(`/health/${deleted.areaId}`);
   return { ok: true };
 }
 

@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { cycleTodayCheckIn } from "@/lib/habits/actions";
+import { withRetry } from "@/lib/with-retry";
+import { useToast } from "@/components/toast/toast-provider";
 import styles from "./my-day-habits.module.css";
 
 type CheckInLevel = "FULL" | "MINIMUM" | null;
@@ -22,15 +24,27 @@ function nextLevel(level: CheckInLevel): CheckInLevel {
 export function MyDayHabits({ initialHabits }: { initialHabits: MyDayHabit[] }) {
   const [habits, setHabits] = useState(initialHabits);
   const [error, setError] = useState<string | null>(null);
+  // Blocks re-entrant clicks while a toggle's withRetry backoff is in
+  // flight, so a slow first request's revert can't clobber a second toggle.
+  const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
+  const { notifyError } = useToast();
 
   async function handleToggle(habit: MyDayHabit) {
+    if (pendingIds.has(habit.id)) return;
+    setPendingIds((prev) => new Set(prev).add(habit.id));
     const newLevel = nextLevel(habit.todayLevel);
     setHabits((prev) => prev.map((h) => (h.id === habit.id ? { ...h, todayLevel: newLevel } : h)));
-    const result = await cycleTodayCheckIn(habit.id);
+    const result = await withRetry(() => cycleTodayCheckIn(habit.id));
     if (!result.ok) {
       setHabits((prev) => prev.map((h) => (h.id === habit.id ? habit : h)));
       setError(result.error);
+      notifyError(result.error, { onRetry: () => handleToggle(habit) });
     }
+    setPendingIds((prev) => {
+      const next = new Set(prev);
+      next.delete(habit.id);
+      return next;
+    });
   }
 
   if (habits.length === 0) {
@@ -50,6 +64,7 @@ export function MyDayHabits({ initialHabits }: { initialHabits: MyDayHabit[] }) 
               type="button"
               className={`${styles.dot} ${styles[habit.todayLevel?.toLowerCase() ?? "none"]}`}
               aria-label={`Check in: currently ${habit.todayLevel ?? "not checked in"}`}
+              disabled={pendingIds.has(habit.id)}
               onClick={() => handleToggle(habit)}
             />
           </li>

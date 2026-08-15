@@ -4,6 +4,8 @@ import { useState } from "react";
 import { logPainMobility, deletePainMobilityLog } from "@/lib/pain-mobility/actions";
 import { weeklyAverage, weekTrend, type Trend } from "@/lib/pain-mobility/trend";
 import { mondayOf } from "@/lib/habits/streak";
+import { withRetry } from "@/lib/with-retry";
+import { useToast } from "@/components/toast/toast-provider";
 import styles from "./pain-mobility-tracker.module.css";
 
 type Log = { id: string; date: Date; pain: number; mobility: number };
@@ -65,6 +67,7 @@ export function PainMobilityTracker({ areaId, initialLogs }: { areaId: string; i
   const [mobility, setMobility] = useState(5);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { notifyError } = useToast();
 
   const todayAtUtcMidnight = new Date(`${todayLocalDateString()}T00:00:00.000Z`);
   const thisWeekStart = mondayOf(todayAtUtcMidnight);
@@ -73,14 +76,13 @@ export function PainMobilityTracker({ areaId, initialLogs }: { areaId: string; i
   async function handleLog() {
     setSaving(true);
     setError(null);
-    const result = await logPainMobility(areaId, {
-      date: new Date(`${date}T00:00:00.000Z`),
-      pain,
-      mobility,
-    });
+    const result = await withRetry(() =>
+      logPainMobility(areaId, { date: new Date(`${date}T00:00:00.000Z`), pain, mobility })
+    );
     setSaving(false);
     if (!result.ok) {
       setError(result.error);
+      notifyError(result.error, { onRetry: handleLog });
       return;
     }
     setLogs((prev) => {
@@ -92,10 +94,11 @@ export function PainMobilityTracker({ areaId, initialLogs }: { areaId: string; i
   async function handleDelete(log: Log) {
     setError(null);
     setLogs((prev) => prev.filter((l) => l.id !== log.id));
-    const result = await deletePainMobilityLog(log.id, areaId);
+    const result = await withRetry(() => deletePainMobilityLog(log.id, areaId));
     if (!result.ok) {
       setLogs((prev) => [...prev, log].sort((a, b) => a.date.getTime() - b.date.getTime()));
       setError(result.error);
+      notifyError(result.error, { onRetry: () => handleDelete(log) });
     }
   }
 

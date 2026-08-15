@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { surplus } from "@/lib/finance/baseline-math";
 import { updateBaseline } from "@/lib/finance/actions";
+import { withRetry } from "@/lib/with-retry";
+import { useToast } from "@/components/toast/toast-provider";
 import styles from "./baseline-form.module.css";
 
 function formatGBP(value: number): string {
@@ -20,6 +22,7 @@ export function BaselineForm({
   const [outgoings, setOutgoings] = useState(String(initialOutgoings));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { notifyError } = useToast();
 
   const incomeNum = Number(income);
   const outgoingsNum = Number(outgoings);
@@ -32,9 +35,12 @@ export function BaselineForm({
     }
     setSaving(true);
     setError(null);
-    const result = await updateBaseline(incomeNum, outgoingsNum);
+    const result = await withRetry(() => updateBaseline(incomeNum, outgoingsNum));
     setSaving(false);
-    if (!result.ok) setError(result.error);
+    if (!result.ok) {
+      setError(result.error);
+      notifyError(result.error, { onRetry: handleSave });
+    }
   }
 
   return (
