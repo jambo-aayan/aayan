@@ -90,9 +90,20 @@
 .historyRow {
   display: flex;
   justify-content: space-between;
+  align-items: center;
   padding: 8px 0;
   border-top: 1px solid rgba(33, 29, 25, 0.06);
   font-size: 12.5px;
+}
+
+.deleteLink {
+  border: none;
+  background: none;
+  color: var(--muted);
+  font-size: 11px;
+  cursor: pointer;
+  margin-left: 10px;
+  padding: 2px 4px;
 }
 
 .historyRow:first-child {

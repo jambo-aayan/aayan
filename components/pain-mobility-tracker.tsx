@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { logPainMobility } from "@/lib/pain-mobility/actions";
+import { logPainMobility, deletePainMobilityLog } from "@/lib/pain-mobility/actions";
 import { weeklyAverage, weekTrend, type Trend } from "@/lib/pain-mobility/trend";
 import { mondayOf } from "@/lib/habits/streak";
 import styles from "./pain-mobility-tracker.module.css";
@@ -12,6 +12,18 @@ function toDateInputValue(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
 
+/** The user's local calendar "today", not UTC — a browser west of UTC could
+ * otherwise default the log form to tomorrow's date in the evening. Stored
+ * log dates stay UTC-midnight; only "what does today default to" cares
+ * about the local clock. */
+function todayLocalDateString(): string {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, "0");
+  const d = String(now.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
 function trendLabel(trend: Trend | null): string {
   if (trend === null) return "not enough data yet";
   if (trend === "UP") return "up vs last week";
@@ -19,10 +31,19 @@ function trendLabel(trend: Trend | null): string {
   return "steady vs last week";
 }
 
-function WeeklyStat({ label, logs, field }: { label: string; logs: Log[]; field: "pain" | "mobility" }) {
-  const now = new Date();
-  const thisWeekStart = mondayOf(now);
-  const priorWeekStart = new Date(thisWeekStart.getTime() - 7 * 24 * 60 * 60 * 1000);
+function WeeklyStat({
+  label,
+  logs,
+  field,
+  thisWeekStart,
+  priorWeekStart,
+}: {
+  label: string;
+  logs: Log[];
+  field: "pain" | "mobility";
+  thisWeekStart: Date;
+  priorWeekStart: Date;
+}) {
   const values = logs.map((l) => ({ date: l.date, value: l[field] }));
   const current = weeklyAverage(values, thisWeekStart);
   const prior = weeklyAverage(values, priorWeekStart);
@@ -39,11 +60,15 @@ function WeeklyStat({ label, logs, field }: { label: string; logs: Log[]; field:
 
 export function PainMobilityTracker({ areaId, initialLogs }: { areaId: string; initialLogs: Log[] }) {
   const [logs, setLogs] = useState(initialLogs);
-  const [date, setDate] = useState(toDateInputValue(new Date()));
+  const [date, setDate] = useState(todayLocalDateString());
   const [pain, setPain] = useState(5);
   const [mobility, setMobility] = useState(5);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const todayAtUtcMidnight = new Date(`${todayLocalDateString()}T00:00:00.000Z`);
+  const thisWeekStart = mondayOf(todayAtUtcMidnight);
+  const priorWeekStart = new Date(thisWeekStart.getTime() - 7 * 24 * 60 * 60 * 1000);
 
   async function handleLog() {
     setSaving(true);
@@ -64,11 +89,33 @@ export function PainMobilityTracker({ areaId, initialLogs }: { areaId: string; i
     });
   }
 
+  async function handleDelete(log: Log) {
+    setError(null);
+    setLogs((prev) => prev.filter((l) => l.id !== log.id));
+    const result = await deletePainMobilityLog(log.id, areaId);
+    if (!result.ok) {
+      setLogs((prev) => [...prev, log].sort((a, b) => a.date.getTime() - b.date.getTime()));
+      setError(result.error);
+    }
+  }
+
   return (
     <div>
       <div className={styles.statRow}>
-        <WeeklyStat label="Pain (weekly avg)" logs={logs} field="pain" />
-        <WeeklyStat label="Mobility (weekly avg)" logs={logs} field="mobility" />
+        <WeeklyStat
+          label="Pain (weekly avg)"
+          logs={logs}
+          field="pain"
+          thisWeekStart={thisWeekStart}
+          priorWeekStart={priorWeekStart}
+        />
+        <WeeklyStat
+          label="Mobility (weekly avg)"
+          logs={logs}
+          field="mobility"
+          thisWeekStart={thisWeekStart}
+          priorWeekStart={priorWeekStart}
+        />
       </div>
 
       <div className={styles.form}>
@@ -119,6 +166,9 @@ export function PainMobilityTracker({ areaId, initialLogs }: { areaId: string; i
               <span>{toDateInputValue(log.date)}</span>
               <span>
                 Pain {log.pain} · Mobility {log.mobility}
+                <button type="button" className={styles.deleteLink} onClick={() => handleDelete(log)}>
+                  Delete
+                </button>
               </span>
             </div>
           ))}

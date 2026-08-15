@@ -16,3 +16,7 @@ export const HEALTH_AREAS_SEED = [
   { id: "looks", name: "Looks", sortOrder: 5 },
   { id: "healthcare-navigation", name: "Healthcare Navigation", sortOrder: 6 },
 ] as const;
+
+/** Referenced by features scoped to this specific Area (e.g. Pain & Mobility
+ * tracking) so they can't silently drift from the seeded id. */
+export const ANKYLOSING_SPONDYLITIS_AREA_ID = HEALTH_AREAS_SEED[0].id;
