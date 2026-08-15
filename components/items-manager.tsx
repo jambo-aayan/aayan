@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { createItem, deleteItem, restoreItem, updateItem, type ItemInput } from "@/lib/finance/actions";
-import { useUndoableCrudList } from "@/lib/hooks/use-undoable-crud-list";
+import { useUndoableCrudList, type ActionResult } from "@/lib/hooks/use-undoable-crud-list";
 import styles from "./items-manager.module.css";
 
 type Item = ItemInput & { id: string };
@@ -45,9 +45,9 @@ export function ItemsManager({ initialItems }: { initialItems: Item[] }) {
               item={item}
               onCancel={() => setEditingId(null)}
               onSaved={async (input) => {
-                const ok = await update(item.id, input, { ...input, id: item.id });
-                if (ok) setEditingId(null);
-                return ok;
+                const result = await update(item.id, input, { ...input, id: item.id });
+                if (result.ok) setEditingId(null);
+                return result;
               }}
             />
           ) : (
@@ -148,15 +148,18 @@ function ItemEditRow({
 }: {
   item: Item;
   onCancel: () => void;
-  onSaved: (input: ItemInput) => Promise<boolean>;
+  onSaved: (input: ItemInput) => Promise<ActionResult>;
 }) {
   const [form, setForm] = useState<ItemInput>(item);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function handleSave() {
     setSaving(true);
-    await onSaved(form);
+    setError(null);
+    const result = await onSaved(form);
     setSaving(false);
+    if (!result.ok) setError(result.error);
   }
 
   return (
@@ -168,6 +171,7 @@ function ItemEditRow({
       <button type="button" className={styles.link} onClick={onCancel}>
         Cancel
       </button>
+      {error && <p className={styles.error}>{error}</p>}
     </li>
   );
 }

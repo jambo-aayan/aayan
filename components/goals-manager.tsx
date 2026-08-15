@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { createGoal, deleteGoal, restoreGoal, updateGoal, type GoalInput } from "@/lib/finance/actions";
-import { useUndoableCrudList } from "@/lib/hooks/use-undoable-crud-list";
+import { useUndoableCrudList, type ActionResult } from "@/lib/hooks/use-undoable-crud-list";
 import { goalProgressPercent, projectedCompletionDate, totalMonthlyContributions, isOvercommitted } from "@/lib/finance/goal-math";
 import styles from "./goals-manager.module.css";
 
@@ -67,9 +67,9 @@ export function GoalsManager({ initialGoals, surplus }: { initialGoals: Goal[]; 
               goal={goal}
               onCancel={() => setEditingId(null)}
               onSaved={async (input) => {
-                const ok = await update(goal.id, input, { ...input, id: goal.id });
-                if (ok) setEditingId(null);
-                return ok;
+                const result = await update(goal.id, input, { ...input, id: goal.id });
+                if (result.ok) setEditingId(null);
+                return result;
               }}
             />
           ) : (
@@ -178,15 +178,18 @@ function GoalEditRow({
 }: {
   goal: Goal;
   onCancel: () => void;
-  onSaved: (input: GoalInput) => Promise<boolean>;
+  onSaved: (input: GoalInput) => Promise<ActionResult>;
 }) {
   const [form, setForm] = useState<GoalInput>(goal);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function handleSave() {
     setSaving(true);
-    await onSaved(form);
+    setError(null);
+    const result = await onSaved(form);
     setSaving(false);
+    if (!result.ok) setError(result.error);
   }
 
   return (
@@ -198,6 +201,7 @@ function GoalEditRow({
       <button type="button" className={styles.link} onClick={onCancel}>
         Cancel
       </button>
+      {error && <p className={styles.error}>{error}</p>}
     </li>
   );
 }

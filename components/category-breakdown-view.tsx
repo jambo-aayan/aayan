@@ -13,7 +13,7 @@ export function CategoryBreakdownView({
     return <p className={styles.empty}>No spending recorded this month yet.</p>;
   }
 
-  const max = Math.max(...breakdown.map((b) => b.total));
+  const max = Math.max(1, ...breakdown.map((b) => b.total));
 
   return (
     <ul className={styles.list}>

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
-type ActionResult = { ok: true } | { ok: false; error: string };
+export type ActionResult = { ok: true } | { ok: false; error: string };
 type CreateResult<T> = { ok: true; item: T } | { ok: false; error: string };
 
 export type CrudActions<T, Input> = {
@@ -45,15 +45,15 @@ export function useUndoableCrudList<T extends { id: string }, Input>(
     return true;
   }
 
-  async function update(id: string, input: Input, merged: T): Promise<boolean> {
-    setError(null);
+  // Returns the full result (not just a boolean) so a caller mid-edit can
+  // show the error next to the row being edited, not just in the shared
+  // list-level `error` below — a save failure on row 8 of 20 shouldn't
+  // only be visible scrolled away from the row still open in edit mode.
+  async function update(id: string, input: Input, merged: T): Promise<ActionResult> {
     const result = await actions.update(id, input);
-    if (!result.ok) {
-      setError(result.error);
-      return false;
-    }
+    if (!result.ok) return result;
     setItems((prev) => prev.map((i) => (i.id === id ? merged : i)));
-    return true;
+    return result;
   }
 
   async function remove(item: T) {

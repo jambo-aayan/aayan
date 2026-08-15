@@ -8,7 +8,7 @@ import {
   updateTransaction,
   type TransactionInput,
 } from "@/lib/finance/actions";
-import { useUndoableCrudList } from "@/lib/hooks/use-undoable-crud-list";
+import { useUndoableCrudList, type ActionResult } from "@/lib/hooks/use-undoable-crud-list";
 import { DEFAULT_CATEGORIES } from "@/lib/finance/categories";
 import styles from "./transactions-manager.module.css";
 
@@ -73,9 +73,9 @@ export function TransactionsManager({ initialTransactions }: { initialTransactio
               transaction={t}
               onCancel={() => setEditingId(null)}
               onSaved={async (input) => {
-                const ok = await update(t.id, input, { ...input, id: t.id });
-                if (ok) setEditingId(null);
-                return ok;
+                const result = await update(t.id, input, { ...input, id: t.id });
+                if (result.ok) setEditingId(null);
+                return result;
               }}
             />
           ) : (
@@ -191,15 +191,18 @@ function TransactionEditRow({
 }: {
   transaction: Transaction;
   onCancel: () => void;
-  onSaved: (input: TransactionInput) => Promise<boolean>;
+  onSaved: (input: TransactionInput) => Promise<ActionResult>;
 }) {
   const [form, setForm] = useState<TransactionInput>(transaction);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function handleSave() {
     setSaving(true);
-    await onSaved(form);
+    setError(null);
+    const result = await onSaved(form);
     setSaving(false);
+    if (!result.ok) setError(result.error);
   }
 
   return (
@@ -211,6 +214,7 @@ function TransactionEditRow({
       <button type="button" className={styles.link} onClick={onCancel}>
         Cancel
       </button>
+      {error && <p className={styles.error}>{error}</p>}
     </li>
   );
 }
