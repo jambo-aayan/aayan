@@ -1,0 +1,448 @@
+<!--
+  PROTOTYPE v4 — throwaway. Answers wayfinder ticket #3.
+
+  v1 settled structure, v2 settled mood (Warm & Calm), v3 added a desktop
+  shell. Feedback on v3: still not "modern and clean" enough, with a
+  reference image — a bento-grid finance dashboard (varied card sizes,
+  bold big numbers, a coral accent, radial progress rings, nested-circle
+  stat visuals, pill buttons/chips).
+
+  v4 keeps the Warm & Calm palette (it already shares the reference's
+  coral accent) and rebuilds the Finance Dashboard specifically as a
+  bento grid in that language, plus a shared top bar (search, brand mark)
+  used on the dashboard-level screens. Health Dashboard keeps its
+  mindmap widget (an earlier decision) but picks up the same top bar and
+  bolder numbers for consistency.
+
+  Read-only. Mock data only. Not for production.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>PROTOTYPE v4 — bento finance dashboard</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    --bg: #F3EEE5;
+    --bg2: #EAE2D3;
+    --card: #FFFFFF;
+    --ink: #211D19;
+    --muted: #857E73;
+    --border: #E7DFD0;
+    --coral: #D9714B;
+    --coral-soft: #F6E1D5;
+    --health: #6E8B74;
+    --health-soft: #E7EEE6;
+    --black-card: #1E1B17;
+    background: var(--bg);
+    color: var(--ink);
+  }
+  .serif { font-family: "Iowan Old Style", "Georgia", ui-serif, serif; }
+  button { font-family: inherit; cursor: pointer; }
+  h1, h2, h3, p { margin: 0; }
+
+  #stage { min-height: 100vh; position: relative; }
+  #stage.force-mobile { max-width: 430px; margin: 0 auto; border-left: 1px solid var(--border); border-right: 1px solid var(--border); }
+  #app { position: relative; transition: opacity .18s ease; }
+  #app.fading { opacity: 0; }
+
+  .back-btn { width: 34px; height: 34px; border-radius: 50%; border: none; background: var(--card); color: var(--ink); box-shadow: 0 2px 8px rgba(33,29,25,.08); display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
+  .crumb { font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+  .dot { width: 22px; height: 22px; border-radius: 50%; flex-shrink: 0; }
+  .dot.full { background: var(--health); }
+  .dot.min { background: var(--coral); opacity: .6; }
+  .dot.none { background: var(--border); }
+
+  /* ============ Welcome ============ */
+  .welcome-screen { height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 40px; position: relative; overflow: hidden; }
+  .welcome-screen::before { content: ""; position: absolute; inset: -20%; background: radial-gradient(circle at 25% 20%, rgba(110,139,116,.16), transparent 55%), radial-gradient(circle at 80% 75%, rgba(217,113,75,.14), transparent 55%); filter: blur(10px); }
+  .welcome-eyebrow, .welcome-title, .welcome-sub, .continue-btn { position: relative; }
+  .welcome-eyebrow { font-size: 13px; letter-spacing: .08em; text-transform: uppercase; opacity: .6; margin-bottom: 14px; }
+  .welcome-title { font-size: 34px; line-height: 1.2; margin-bottom: 14px; font-weight: 600; }
+  .welcome-sub { font-size: 15px; line-height: 1.55; opacity: .7; max-width: 340px; margin-bottom: 40px; }
+  .continue-btn { padding: 15px 36px; border-radius: 999px; border: none; font-size: 15px; font-weight: 600; background: var(--ink); color: var(--bg); }
+
+  /* ============ shell ============ */
+  .app-shell { display: flex; min-height: 100vh; }
+  .sidebar { width: 100%; flex-shrink: 0; background: var(--bg2); border-right: 1px solid var(--border); padding: 22px 16px; display: none; }
+  .sidebar .brand { font-size: 15px; font-weight: 700; padding: 4px 10px 22px; display: flex; align-items: center; gap: 8px; }
+  .brand-mark { width: 26px; height: 26px; border-radius: 50%; background: var(--ink); color: var(--bg); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex-shrink: 0; }
+  .side-item { display: flex; align-items: center; gap: 10px; padding: 12px 12px; border-radius: 12px; border: none; background: none; width: 100%; text-align: left; margin-bottom: 4px; color: var(--ink); font-size: 14px; }
+  .side-item .swatch { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .side-item.active { background: var(--card); box-shadow: 0 2px 8px rgba(33,29,25,.06); font-weight: 700; }
+  .side-item .meta { margin-left: auto; font-size: 11px; color: var(--muted); }
+  .main { flex: 1; min-width: 0; }
+  .content { padding: 8px 22px 40px; max-width: 960px; }
+
+  /* ============ simple header (drill-down screens) ============ */
+  .header { display: flex; align-items: center; gap: 12px; padding: 20px 22px 8px; }
+
+  /* ============ top bar (dashboard-level screens) ============ */
+  .topbar { display: flex; align-items: center; gap: 14px; padding: 22px 22px 10px; flex-wrap: wrap; }
+  .topbar .titles { display: flex; align-items: center; gap: 10px; }
+  .topbar h2 { font-size: 20px; font-weight: 700; }
+  .search-pill { flex: 1; min-width: 140px; max-width: 320px; background: var(--card); border: 1px solid var(--border); border-radius: 999px; padding: 9px 16px; font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 8px; }
+  .avatar { width: 34px; height: 34px; border-radius: 50%; background: var(--ink); color: var(--bg); display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; flex-shrink: 0; }
+  .greet-row { display: flex; align-items: baseline; justify-content: space-between; padding: 6px 22px 20px; flex-wrap: wrap; gap: 12px; }
+  .greet-row .headline { font-size: 26px; font-weight: 700; letter-spacing: -.01em; }
+  .greet-row .headline .wave { font-weight: 400; }
+
+  /* ============ bento grid ============ */
+  .bento-grid { display: grid; grid-template-columns: 1fr; gap: 14px; }
+  .bento-card { background: var(--card); border: 1px solid var(--border); border-radius: 24px; padding: 22px; }
+  .bento-card.dark { background: var(--black-card); color: #F4EFE7; border: none; }
+  .bento-card.tint { background: var(--coral-soft); border: none; }
+  .bento-label { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 700; margin-bottom: 10px; }
+  .bento-card.dark .bento-label { color: rgba(244,239,231,.6); }
+  .bento-big-num { font-size: 30px; font-weight: 700; letter-spacing: -.01em; }
+  .bento-sub { font-size: 13px; color: var(--muted); margin-top: 4px; }
+  .bento-card.dark .bento-sub { color: rgba(244,239,231,.55); }
+
+  .pill-row { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+  .pill-btn { border: none; border-radius: 999px; padding: 10px 18px; font-size: 13px; font-weight: 600; }
+  .pill-btn.primary { background: var(--ink); color: var(--bg); }
+  .pill-btn.ghost { background: var(--bg2); color: var(--ink); }
+  .pill-chip { border-radius: 999px; padding: 6px 12px; font-size: 12px; font-weight: 600; background: var(--bg2); color: var(--ink); border: none; }
+  .pill-chip.active { background: var(--coral); color: white; }
+
+  /* radial ring */
+  .ring-wrap { display: flex; flex-direction: column; align-items: center; }
+  .ring-svg { transform: rotate(-90deg); }
+  .ring-center { position: relative; }
+  .ring-num { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .ring-num .pct { font-size: 26px; font-weight: 700; }
+  .ring-num .lbl { font-size: 10px; color: rgba(244,239,231,.6); text-transform: uppercase; letter-spacing: .05em; margin-top: 2px; }
+
+  /* nested bubble mini-charts */
+  .bubbles-row { display: flex; gap: 22px; margin-top: 8px; }
+  .bubble-item { flex: 1; text-align: center; }
+  .bubble-stack { position: relative; height: 110px; display: flex; align-items: flex-end; justify-content: center; }
+  .bubble { border-radius: 50%; position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); display: flex; align-items: center; justify-content: center; }
+  .bubble.outer { background: var(--bg2); }
+  .bubble.inner { background: var(--coral); color: white; font-size: 11px; font-weight: 700; }
+  .bubble-name { font-size: 13px; font-weight: 600; margin-top: 8px; }
+  .bubble-meta { font-size: 11px; color: var(--muted); }
+
+  /* sparkline */
+  .spark-num { display: flex; align-items: baseline; gap: 8px; }
+  .spark-badge { background: var(--health-soft); color: var(--health); font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 999px; }
+
+  /* systems card */
+  .system-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border-radius: 14px; background: var(--bg); margin-top: 8px; }
+  .system-row .name { font-size: 14px; font-weight: 600; }
+  .system-row .next { font-size: 12px; color: var(--muted); }
+  .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--health); }
+
+  /* streak dot grid (health) */
+  .streak-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin-top: 10px; }
+  .streak-cell { aspect-ratio: 1; border-radius: 6px; background: var(--bg2); }
+  .streak-cell.hit { background: var(--health); }
+
+  /* ============ mindmap (health) ============ */
+  .mindmap-wrap { position: relative; height: 280px; border-radius: 24px; overflow: hidden; background: var(--card); border: 1px solid var(--border); }
+  .mm-node { position: absolute; border-radius: 50%; display: flex; align-items: center; justify-content: center; text-align: center; font-size: 11px; font-weight: 600; border: none; transform: translate(-50%, -50%); }
+  .mm-node.core { width: 64px; height: 64px; left: 50%; top: 50%; font-size: 12px; z-index: 2; background: var(--ink); color: var(--bg); }
+  .mm-node.leaf { width: 56px; height: 56px; z-index: 1; background: var(--bg2); color: var(--ink); }
+  .mm-node.leaf.active { background: var(--health); color: white; }
+  .mm-link { position: absolute; height: 1.5px; transform-origin: left center; z-index: 0; background: var(--border); }
+
+  /* ============ pillar tiles / area list / action hero (reused from v3) ============ */
+  .pillar-tiles { display: flex; flex-direction: column; gap: 14px; margin-top: 6px; }
+  .pillar-tile { border: none; text-align: left; padding: 26px; border-radius: 22px; display: flex; flex-direction: column; gap: 6px; width: 100%; background: var(--card); border: 1px solid var(--border); }
+  .pillar-tile.health { background: var(--health-soft); }
+  .pillar-tile.finance { background: var(--coral-soft); }
+  .pillar-tile .name { font-size: 19px; font-weight: 700; }
+  .pillar-tile .hint { font-size: 13px; opacity: .65; }
+
+  .area-list { display: flex; flex-direction: column; gap: 10px; }
+  .action-row { display: flex; align-items: center; justify-content: space-between; padding: 16px 18px; border-radius: 18px; background: var(--card); border: 1px solid var(--border); }
+  .action-row .name { font-size: 15px; font-weight: 600; }
+  .action-row .streak { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+  .action-hero { padding: 30px 26px; border-radius: 26px; background: var(--health-soft); text-align: center; }
+  .action-hero .name { font-size: 21px; font-weight: 700; margin-bottom: 8px; }
+  .action-hero .desc { font-size: 14px; color: var(--muted); line-height: 1.55; margin-bottom: 22px; }
+  .checkin-btn { width: 84px; height: 84px; border-radius: 50%; border: none; font-size: 13px; font-weight: 700; margin: 0 auto; background: var(--health); color: white; }
+  .streak-badge { font-size: 13px; color: var(--muted); margin-top: 14px; }
+
+  /* ============ desktop ============ */
+  @media (min-width: 860px) {
+    #stage:not(.force-mobile) .sidebar { display: block; width: 250px; }
+    #stage:not(.force-mobile) .content { padding: 0 40px 60px; }
+    #stage:not(.force-mobile) .topbar, #stage:not(.force-mobile) .greet-row { padding-left: 40px; padding-right: 40px; }
+    #stage:not(.force-mobile) .header { padding: 32px 40px 8px; }
+    #stage:not(.force-mobile) .pillar-tiles { flex-direction: row; }
+
+    #stage:not(.force-mobile) .bento-grid { grid-template-columns: repeat(4, 1fr); grid-auto-rows: minmax(120px, auto); }
+    #stage:not(.force-mobile) .span-2 { grid-column: span 2; }
+    #stage:not(.force-mobile) .span-4 { grid-column: span 4; }
+    #stage:not(.force-mobile) .row-2 { grid-row: span 2; }
+
+    #stage:not(.force-mobile) .mindmap-wrap { height: 400px; }
+  }
+
+  /* ---------- preview toggle ---------- */
+  #switcher { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); background: rgba(33,29,25,.92); color: white; border-radius: 999px; padding: 8px 6px; display: flex; align-items: center; gap: 4px; box-shadow: 0 8px 24px rgba(0,0,0,.25); z-index: 200; font-size: 13px; }
+  #switcher button { background: rgba(255,255,255,.14); border: none; color: white; padding: 8px 14px; border-radius: 999px; font-size: 13px; font-weight: 600; }
+  #switcher button.active { background: white; color: var(--ink); }
+</style>
+</head>
+<body>
+<div id="stage"><div id="app"></div></div>
+<div id="switcher">
+  <button id="btn-mobile">Mobile</button>
+  <button id="btn-desktop">Desktop</button>
+</div>
+
+<script>
+// ---------------------------------------------------------------------------
+// Mock data
+// ---------------------------------------------------------------------------
+const HEALTH_AREAS = [
+  { key: "spine", name: "Spine & Pain", angle: -60, actions: [
+    { name: "Stretch routine", desc: "10 minutes, spine-safe — no axial loading. Targets the lumbar-stiffness cascade before it reaches your neck.", state: "full", streak: 12, history: [1,1,1,0,1,1,1,1,0,1,1,1,1,1] } ] },
+  { key: "sleep", name: "Sleep", angle: -20, actions: [
+    { name: "Phone out of bedroom", desc: "The single highest-leverage change for the possible OSA under investigation. Charge it in the hallway.", state: "min", streak: 3, history: [0,0,1,0,1,1,0,1,1,1,0,0,1,1] } ] },
+  { key: "diet", name: "Diet", angle: 20, actions: [
+    { name: "Log meals", desc: "Just what you ate — no calorie targets. Protein's already a strength; this is about the pattern, not the number.", state: "full", streak: 5, history: [1,1,1,1,1,0,1,0,1,1,1,1,1,1] } ] },
+  { key: "body", name: "Body Comp.", angle: 60, actions: [
+    { name: "Waist measurement", desc: "Weekly, same morning, same tape position. Tracking ratio, not scale weight.", state: "none", streak: 0, history: [0,0,0,0,0,0,1,0,0,0,0,0,0,1] } ] },
+  { key: "bp", name: "Blood Pressure", angle: 100, actions: [] },
+  { key: "looks", name: "Looks", angle: 140, actions: [] },
+  { key: "healthcare", name: "Healthcare Nav.", angle: 180, actions: [] },
+];
+const FINANCE = {
+  accessible: 18400, total: 31200,
+  northStar: { label: "House deposit", target: 45000 },
+  goals: [
+    { name: "Emergency fund", saved: 4200, target: 6000 },
+    { name: "LISA", saved: 8100, target: 20000 },
+  ],
+  systems: [
+    { name: "Payday routine", next: "Next: 28th" },
+    { name: "Baseline review", next: "Monthly" },
+  ],
+};
+
+// ---------------------------------------------------------------------------
+// Router
+// ---------------------------------------------------------------------------
+const nav = { stack: [{ screen: "welcome" }] };
+function push(next) { nav.stack.push(next); render(true); }
+function goSidebar(screen) { nav.stack = [{ screen: "pillars" }, { screen }]; render(true); }
+function back() { if (nav.stack.length > 1) { nav.stack.pop(); render(true); } }
+function current() { return nav.stack[nav.stack.length - 1]; }
+
+function sidebar() {
+  const s = current().screen;
+  return `
+    <div class="sidebar">
+      <div class="brand"><span class="brand-mark">P</span> Personal</div>
+      <button class="side-item ${s === 'pillars' ? 'active' : ''}" onclick="goSidebar('pillars')">Home</button>
+      <button class="side-item ${s === 'healthDashboard' || s === 'area' ? 'active' : ''}" onclick="goSidebar('healthDashboard')"><span class="swatch" style="background:var(--health)"></span> Health <span class="meta">2/7 today</span></button>
+      <button class="side-item ${s === 'financeDashboard' ? 'active' : ''}" onclick="goSidebar('financeDashboard')"><span class="swatch" style="background:var(--coral)"></span> Finances <span class="meta">on track</span></button>
+    </div>`;
+}
+function header(title, crumb) {
+  return `<div class="header">
+    ${nav.stack.length > 1 ? `<button class="back-btn" onclick="back()">←</button>` : `<div style="width:34px"></div>`}
+    <div>${crumb ? `<div class="crumb">${crumb}</div>` : ""}${title ? `<h2 style="margin-top:2px">${title}</h2>` : ""}</div>
+  </div>`;
+}
+function topbar(title, subtitle) {
+  return `
+    <div class="topbar">
+      ${nav.stack.length > 1 ? `<button class="back-btn" onclick="back()">←</button>` : `<div style="width:34px"></div>`}
+      <div class="titles"><h2>${title}</h2></div>
+      <div class="search-pill">🔍 Search…</div>
+      <div class="avatar">A</div>
+    </div>
+    <div class="greet-row">
+      <div class="headline">${subtitle}</div>
+    </div>`;
+}
+function shell(inner) { return `<div class="app-shell">${sidebar()}<div class="main">${inner}</div></div>`; }
+
+// ---------------------------------------------------------------------------
+// Screens
+// ---------------------------------------------------------------------------
+function screenWelcome() {
+  return `<div class="welcome-screen">
+    <div class="welcome-eyebrow">Good evening</div>
+    <div class="welcome-title">Everything's steady.<br/>Take a moment first.</div>
+    <div class="welcome-sub">No numbers here — just a quiet start. When you're ready, your pillars are one click away.</div>
+    <button class="continue-btn" onclick="push({screen:'pillars'})">Continue</button>
+  </div>`;
+}
+function screenPillars() {
+  return shell(`
+    ${header("Your pillars", "MVP")}
+    <div class="content">
+      <div class="pillar-tiles">
+        <button class="pillar-tile health" onclick="push({screen:'healthDashboard'})"><div class="name">Health</div><div class="hint">2 of 7 areas active today</div></button>
+        <button class="pillar-tile finance" onclick="push({screen:'financeDashboard'})"><div class="name">Finances</div><div class="hint">On track for House deposit</div></button>
+      </div>
+    </div>`);
+}
+function mindmapWidget() {
+  const R = 100;
+  const nodes = HEALTH_AREAS.map(a => {
+    const rad = (a.angle * Math.PI) / 180;
+    const x = 50 + (Math.cos(rad) * R) / 2.6, y = 50 + (Math.sin(rad) * R) / 3.6;
+    return { ...a, x, y, active: a.actions.length > 0 };
+  });
+  const links = nodes.map(n => `<div class="mm-link" style="width:${R/2.6}px; left:50%; top:50%; transform: rotate(${n.angle}deg)"></div>`).join("");
+  const leaves = nodes.map(n => `<button class="mm-node leaf ${n.active ? 'active' : ''}" style="left:${n.x}%; top:${n.y}%" onclick="push({screen:'area', areaKey:'${n.key}'})">${n.name}</button>`).join("");
+  return `<div class="mindmap-wrap"><div class="mm-node core">Health</div>${links}${leaves}</div>`;
+}
+function screenHealthDashboard() {
+  return shell(`
+    ${topbar("Health", "Two areas need you today 🌿")}
+    <div class="content">
+      <div class="bento-grid">
+        <div class="bento-card span-2 row-2">${mindmapWidget()}</div>
+        <div class="bento-card">
+          <div class="bento-label">Stretch routine</div>
+          <div class="bento-big-num">12</div>
+          <div class="bento-sub">day streak</div>
+          <div class="streak-grid">${[1,1,1,0,1,1,1].map(h => `<div class="streak-cell ${h ? 'hit':''}"></div>`).join("")}</div>
+        </div>
+        <div class="bento-card tint">
+          <div class="bento-label">Sleep</div>
+          <div class="bento-big-num" style="font-size:20px">Phone out<br/>of bedroom</div>
+          <div class="pill-row"><span class="pill-chip active">Minimum today</span></div>
+        </div>
+        <div class="bento-card span-2">
+          <div class="bento-label">Today</div>
+          ${HEALTH_AREAS.filter(a => a.actions.length).flatMap(a => a.actions.map(act => `
+            <div class="system-row"><div><div class="name">${act.name}</div><div class="next">${a.name}</div></div><div class="dot ${act.state}"></div></div>`)).join("")}
+        </div>
+        <div class="bento-card span-2">
+          <div class="bento-label">Log meals</div>
+          <div class="bento-big-num">5</div>
+          <div class="bento-sub">day streak · protein's a relative strength</div>
+        </div>
+      </div>
+    </div>`);
+}
+function screenFinanceDashboard() {
+  const { accessible, total, northStar, goals, systems } = FINANCE;
+  const pct = Math.round((accessible / northStar.target) * 100);
+  const C = 2 * Math.PI * 46;
+  const dash = (pct / 100) * C;
+  return shell(`
+    ${topbar("Finances", "On track for the house deposit 🏡")}
+    <div class="content">
+      <div class="bento-grid">
+        <div class="bento-card span-2">
+          <div class="bento-label">Accessible net worth</div>
+          <div class="bento-big-num" style="font-size:34px">£${accessible.toLocaleString()}</div>
+          <div class="bento-sub">£${total.toLocaleString()} total, pension excluded</div>
+          <div class="pill-row">
+            <button class="pill-btn primary">View breakdown</button>
+            <button class="pill-btn ghost">Add contribution</button>
+          </div>
+        </div>
+        <div class="bento-card dark ring-wrap">
+          <div class="bento-label">${northStar.label}</div>
+          <div class="ring-center">
+            <svg width="112" height="112" class="ring-svg">
+              <circle cx="56" cy="56" r="46" stroke="rgba(244,239,231,.15)" stroke-width="10" fill="none" />
+              <circle cx="56" cy="56" r="46" stroke="#D9714B" stroke-width="10" fill="none"
+                stroke-dasharray="${dash} ${C}" stroke-linecap="round" />
+            </svg>
+            <div class="ring-num"><span class="pct">${pct}%</span><span class="lbl">to target</span></div>
+          </div>
+        </div>
+        <div class="bento-card span-2">
+          <div class="bento-label">Goals</div>
+          <div class="bubbles-row">
+            ${goals.map(g => {
+              const outer = 60 + Math.min(g.target / 20000, 1) * 40;
+              const inner = outer * Math.max(0.28, g.saved / g.target);
+              return `
+              <div class="bubble-item">
+                <div class="bubble-stack">
+                  <div class="bubble outer" style="width:${outer}px;height:${outer}px"></div>
+                  <div class="bubble inner" style="width:${inner}px;height:${inner}px">£${Math.round(g.saved/1000)}k</div>
+                </div>
+                <div class="bubble-name">${g.name}</div>
+                <div class="bubble-meta">of £${g.target.toLocaleString()}</div>
+              </div>`;
+            }).join("")}
+          </div>
+        </div>
+        <div class="bento-card">
+          <div class="bento-label">Trend</div>
+          <div class="spark-num"><span class="bento-big-num" style="font-size:22px">£${accessible.toLocaleString()}</span><span class="spark-badge">↑ 4.2%</span></div>
+          <svg width="100%" height="46" viewBox="0 0 200 46" preserveAspectRatio="none" style="margin-top:10px">
+            <polyline points="0,36 25,30 50,34 75,20 100,26 125,14 150,18 175,8 200,12" fill="none" stroke="#D9714B" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </div>
+        <div class="bento-card span-4">
+          <div class="bento-label">Systems</div>
+          <div class="pill-row" style="margin-top:0">
+            <span class="pill-chip active">Active</span><span class="pill-chip">All</span>
+          </div>
+          ${systems.map(s => `<div class="system-row"><div><div class="name">${s.name}</div><div class="next">${s.next}</div></div><span class="status-dot"></span></div>`).join("")}
+        </div>
+      </div>
+    </div>`);
+}
+function screenArea(s) {
+  const area = HEALTH_AREAS.find(a => a.key === s.areaKey);
+  return shell(`${header(area.name, "Health · Area")}
+    <div class="content"><div class="area-list">
+      ${area.actions.length ? area.actions.map(act => `
+        <div class="action-row" onclick='push({screen:"action", name:${JSON.stringify(act.name)}, desc:${JSON.stringify(act.desc)}, state:"${act.state}", streak:${act.streak}})'>
+          <div><div class="name">${act.name}</div><div class="streak">${act.state === 'none' ? 'not started' : act.state + ' · ' + act.streak + ' day streak'}</div></div>
+          <div class="dot ${act.state}"></div>
+        </div>`).join("") : `<div class="crumb">Nothing tracked in this area yet.</div>`}
+    </div></div>`);
+}
+function screenAction(s) {
+  return shell(`${header(null, "Action")}
+    <div class="content"><div class="action-hero">
+      <div class="name">${s.name}</div><div class="desc">${s.desc}</div>
+      <button class="checkin-btn" id="checkin-btn">${s.state === 'none' ? 'Check in' : s.state === 'full' ? 'Full ✓' : 'Minimum'}</button>
+      <div class="streak-badge">${s.streak} day streak</div>
+    </div></div>`);
+}
+
+function render(animate) {
+  const app = document.getElementById("app");
+  const doRender = () => {
+    const s = current();
+    const map = { welcome: screenWelcome, pillars: screenPillars, healthDashboard: screenHealthDashboard, financeDashboard: screenFinanceDashboard, area: screenArea, action: screenAction };
+    app.innerHTML = map[s.screen](s);
+    window.scrollTo(0, 0);
+    app.classList.remove("fading");
+    const btn = document.getElementById("checkin-btn");
+    if (btn) btn.addEventListener("click", () => {
+      const order = ["none", "min", "full"];
+      current().state = order[(order.indexOf(current().state) + 1) % order.length];
+      render(false);
+    });
+  };
+  if (animate) { app.classList.add("fading"); setTimeout(doRender, 120); } else { doRender(); }
+}
+
+function setPreview(mode) {
+  document.getElementById("stage").classList.toggle("force-mobile", mode === "mobile");
+  document.getElementById("btn-mobile").classList.toggle("active", mode === "mobile");
+  document.getElementById("btn-desktop").classList.toggle("active", mode === "desktop");
+}
+document.getElementById("btn-mobile").addEventListener("click", () => setPreview("mobile"));
+document.getElementById("btn-desktop").addEventListener("click", () => setPreview("desktop"));
+document.addEventListener("keydown", (e) => { if (e.key === "Backspace" || e.key === "Escape") back(); });
+
+setPreview(window.innerWidth < 860 ? "mobile" : "desktop");
+render(false);
+</script>
+</body>
+</html>
