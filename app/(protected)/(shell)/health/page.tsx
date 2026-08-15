@@ -1,5 +1,30 @@
-import { PillarPlaceholder } from "@/components/pillar-placeholder";
+import { PageHeader } from "@/components/page-header";
+import pageStyles from "@/components/page-header.module.css";
+import { Card } from "@/components/card";
+import { HealthMindmap } from "@/components/health-mindmap";
+import { EditableText } from "@/components/editable-text";
+import { getHealthPillarWithAreas } from "@/lib/health/data";
+import { updateHealthPillarNorthStar } from "@/lib/health/actions";
 
-export default function HealthPage() {
-  return <PillarPlaceholder title="Health" subtitle="Health dashboard coming soon." />;
+export default async function HealthPage() {
+  const pillar = await getHealthPillarWithAreas();
+
+  return (
+    <>
+      <PageHeader title="Health" />
+      <div className={pageStyles.content}>
+        <Card title="Areas">
+          <HealthMindmap areas={pillar.areas} />
+        </Card>
+        <Card title="North Star">
+          <EditableText
+            label="Health"
+            initialValue={pillar.northStar}
+            placeholder="No North Star set yet"
+            onSave={updateHealthPillarNorthStar}
+          />
+        </Card>
+      </div>
+    </>
+  );
 }
