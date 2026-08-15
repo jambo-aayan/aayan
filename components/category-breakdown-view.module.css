@@ -1,0 +1,42 @@
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.row {
+  padding: 10px 0;
+}
+
+.top {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  margin-bottom: 6px;
+}
+
+.category {
+  font-weight: 600;
+}
+
+.total {
+  color: var(--muted);
+}
+
+.bar {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--bg2);
+  overflow: hidden;
+}
+
+.barFill {
+  height: 100%;
+  background: var(--coral);
+  border-radius: 999px;
+}
+
+.empty {
+  color: var(--muted);
+  font-size: 13px;
+}

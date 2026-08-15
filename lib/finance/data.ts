@@ -42,3 +42,8 @@ export async function getFinanceNorthStar() {
     deadline: northStar.deadline,
   };
 }
+
+export async function getTransactions() {
+  const transactions = await prisma.transaction.findMany({ orderBy: { date: "desc" } });
+  return transactions.map((t) => ({ ...t, amount: t.amount.toNumber() }));
+}

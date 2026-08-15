@@ -142,3 +142,58 @@ export async function updateFinanceNorthStar(
   revalidatePath("/finances");
   return { ok: true };
 }
+
+export type TransactionInput = {
+  date: Date;
+  amount: number;
+  direction: "IN" | "OUT";
+  category: string;
+  source: string | null;
+};
+
+export type TransactionResult =
+  | { ok: true; item: TransactionInput & { id: string } }
+  | { ok: false; error: string };
+
+export async function createTransaction(input: TransactionInput): Promise<TransactionResult> {
+  try {
+    const transaction = await prisma.transaction.create({ data: input });
+    revalidatePath("/finances");
+    return { ok: true, item: { ...input, id: transaction.id } };
+  } catch {
+    return { ok: false, error: SAVE_ERROR };
+  }
+}
+
+export async function updateTransaction(id: string, input: TransactionInput): Promise<ActionResult> {
+  try {
+    await prisma.transaction.update({ where: { id }, data: input });
+  } catch {
+    return { ok: false, error: SAVE_ERROR };
+  }
+  revalidatePath("/finances");
+  return { ok: true };
+}
+
+export async function deleteTransaction(id: string): Promise<ActionResult> {
+  try {
+    await prisma.transaction.delete({ where: { id } });
+  } catch {
+    return { ok: false, error: "Couldn't delete — try again." };
+  }
+  revalidatePath("/finances");
+  return { ok: true };
+}
+
+/** Recreates a just-deleted transaction with its original id, for the delete-undo toast. */
+export async function restoreTransaction(
+  transaction: TransactionInput & { id: string }
+): Promise<ActionResult> {
+  try {
+    await prisma.transaction.create({ data: transaction });
+  } catch {
+    return { ok: false, error: "Couldn't undo — the transaction may already be back." };
+  }
+  revalidatePath("/finances");
+  return { ok: true };
+}
