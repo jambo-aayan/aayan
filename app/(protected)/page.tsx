@@ -1,16 +1,22 @@
-export default function Home() {
+import Link from "next/link";
+import styles from "./welcome.module.css";
+
+export default function WelcomePage() {
   return (
-    <main
-      style={{
-        minHeight: "100dvh",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        background: "#fbf7f1",
-        color: "#2b2622",
-      }}
-    >
-      <p>You&rsquo;re in.</p>
+    <main className={styles.welcome}>
+      <div className={styles.eyebrow}>Welcome back</div>
+      <h1 className={styles.title}>
+        Take a moment first.
+        <br />
+        Your pillars can wait.
+      </h1>
+      <p className={styles.sub}>
+        No numbers here — just a quiet start. When you&rsquo;re ready, Health and
+        Finances are one click away.
+      </p>
+      <Link href="/pillars" className={styles.continue}>
+        Continue
+      </Link>
     </main>
   );
 }

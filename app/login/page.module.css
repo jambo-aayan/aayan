@@ -4,7 +4,7 @@
   align-items: center;
   justify-content: center;
   padding: 1.5rem;
-  background: #fbf7f1;
+  background: var(--bg);
 }
 
 .form {
@@ -19,13 +19,14 @@
   font-size: 1.25rem;
   font-weight: 600;
   margin: 0 0 0.5rem;
-  color: #2b2622;
+  color: var(--ink);
+  font-family: var(--font-serif), Georgia, serif;
 }
 
 .input {
   padding: 0.75rem 1rem;
   border-radius: 0.5rem;
-  border: 1px solid #ddd2c4;
+  border: 1px solid var(--bg2);
   font-size: 1rem;
 }
 
@@ -33,7 +34,7 @@
   padding: 0.75rem 1rem;
   border-radius: 0.5rem;
   border: none;
-  background: #d9714b;
+  background: var(--coral);
   color: white;
   font-size: 1rem;
   font-weight: 600;
