@@ -40,7 +40,11 @@ export async function getValidSession(): Promise<boolean> {
   if (!token) return false;
 
   const session = await prisma.session.findUnique({ where: { id: token } });
-  if (!session || isSessionExpired(session.expiresAt, new Date())) {
+  if (!session) return false;
+
+  if (isSessionExpired(session.expiresAt, new Date())) {
+    // Lazily prune expired rows on read so the table doesn't grow unbounded.
+    await prisma.session.delete({ where: { id: token } }).catch(() => {});
     return false;
   }
   return true;
