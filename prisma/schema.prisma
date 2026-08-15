@@ -12,3 +12,30 @@ model Session {
   createdAt DateTime @default(now())
   expiresAt DateTime
 }
+
+/// A top-level life domain (Health, Finances, ...). id is a stable slug,
+/// not a cuid, so seeding can upsert by a human-readable, idempotent key.
+model Pillar {
+  id        String   @id
+  name      String
+  northStar String?
+  areas     Area[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+/// A sub-topic within a Pillar (e.g. Sleep within Health). id is a stable
+/// slug for the same idempotent-seeding reason as Pillar.id.
+model Area {
+  id           String   @id
+  pillarId     String
+  pillar       Pillar   @relation(fields: [pillarId], references: [id])
+  name         String
+  currentState String?
+  northStar    String?
+  sortOrder    Int
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([pillarId])
+}
