@@ -20,13 +20,13 @@ const serif = Fraunces({
 });
 
 export const metadata: Metadata = {
-  title: "Life",
+  title: "aayan",
   description: "Personal life-management app",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "Life",
+    title: "aayan",
   },
   icons: {
     icon: "/icons/icon-512.png",
