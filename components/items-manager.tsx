@@ -20,6 +20,7 @@ export function ItemsManager({ initialItems }: { initialItems: Item[] }) {
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [listError, setListError] = useState<string | null>(null);
   const [undo, setUndo] = useState<Item | null>(null);
   const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -47,8 +48,15 @@ export function ItemsManager({ initialItems }: { initialItems: Item[] }) {
   }
 
   async function handleDelete(item: Item) {
+    setListError(null);
     setItems((prev) => prev.filter((i) => i.id !== item.id));
-    await deleteItem(item.id);
+    const result = await deleteItem(item.id);
+    if (!result.ok) {
+      // Roll back the optimistic removal — the row is still there server-side.
+      setItems((prev) => [...prev, item]);
+      setListError(result.error);
+      return;
+    }
     setUndo(item);
     if (undoTimer.current) clearTimeout(undoTimer.current);
     undoTimer.current = setTimeout(() => setUndo(null), UNDO_WINDOW_MS);
@@ -60,7 +68,11 @@ export function ItemsManager({ initialItems }: { initialItems: Item[] }) {
     const item = undo;
     setUndo(null);
     const result = await restoreItem(item);
-    if (result.ok) setItems((prev) => [...prev, item]);
+    if (!result.ok) {
+      setListError(result.error);
+      return;
+    }
+    setItems((prev) => [...prev, item]);
   }
 
   return (
@@ -101,46 +113,10 @@ export function ItemsManager({ initialItems }: { initialItems: Item[] }) {
         )}
         {items.length === 0 && <li className={styles.empty}>No items yet.</li>}
       </ul>
+      {listError && <p className={styles.error}>{listError}</p>}
 
       <div className={styles.addForm}>
-        <input
-          className={styles.input}
-          placeholder="Name"
-          value={form.name}
-          onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-        />
-        <select
-          className={styles.input}
-          value={form.type}
-          onChange={(e) => setForm((f) => ({ ...f, type: e.target.value as ItemInput["type"] }))}
-        >
-          <option value="ASSET">Asset</option>
-          <option value="LIABILITY">Liability</option>
-        </select>
-        <input
-          className={styles.input}
-          type="number"
-          step="0.01"
-          placeholder="Value"
-          value={form.value}
-          onChange={(e) => setForm((f) => ({ ...f, value: Number(e.target.value) }))}
-        />
-        <label className={styles.checkbox}>
-          <input
-            type="checkbox"
-            checked={form.liquid}
-            onChange={(e) => setForm((f) => ({ ...f, liquid: e.target.checked }))}
-          />
-          Liquid
-        </label>
-        <label className={styles.checkbox}>
-          <input
-            type="checkbox"
-            checked={form.excluded}
-            onChange={(e) => setForm((f) => ({ ...f, excluded: e.target.checked }))}
-          />
-          Excluded
-        </label>
+        <ItemFields form={form} onChange={setForm} />
         <button type="button" className={styles.add} onClick={handleAdd} disabled={adding}>
           {adding ? "Adding…" : "Add item"}
         </button>
@@ -156,6 +132,51 @@ export function ItemsManager({ initialItems }: { initialItems: Item[] }) {
         </div>
       )}
     </div>
+  );
+}
+
+function ItemFields({ form, onChange }: { form: ItemInput; onChange: (update: ItemInput) => void }) {
+  return (
+    <>
+      <input
+        className={styles.input}
+        placeholder="Name"
+        value={form.name}
+        onChange={(e) => onChange({ ...form, name: e.target.value })}
+      />
+      <select
+        className={styles.input}
+        value={form.type}
+        onChange={(e) => onChange({ ...form, type: e.target.value as ItemInput["type"] })}
+      >
+        <option value="ASSET">Asset</option>
+        <option value="LIABILITY">Liability</option>
+      </select>
+      <input
+        className={styles.input}
+        type="number"
+        step="0.01"
+        placeholder="Value"
+        value={form.value}
+        onChange={(e) => onChange({ ...form, value: Number(e.target.value) })}
+      />
+      <label className={styles.checkbox}>
+        <input
+          type="checkbox"
+          checked={form.liquid}
+          onChange={(e) => onChange({ ...form, liquid: e.target.checked })}
+        />
+        Liquid
+      </label>
+      <label className={styles.checkbox}>
+        <input
+          type="checkbox"
+          checked={form.excluded}
+          onChange={(e) => onChange({ ...form, excluded: e.target.checked })}
+        />
+        Excluded
+      </label>
+    </>
   );
 }
 
@@ -186,42 +207,7 @@ function ItemEditRow({
 
   return (
     <li className={styles.addForm}>
-      <input
-        className={styles.input}
-        value={form.name}
-        onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-      />
-      <select
-        className={styles.input}
-        value={form.type}
-        onChange={(e) => setForm((f) => ({ ...f, type: e.target.value as ItemInput["type"] }))}
-      >
-        <option value="ASSET">Asset</option>
-        <option value="LIABILITY">Liability</option>
-      </select>
-      <input
-        className={styles.input}
-        type="number"
-        step="0.01"
-        value={form.value}
-        onChange={(e) => setForm((f) => ({ ...f, value: Number(e.target.value) }))}
-      />
-      <label className={styles.checkbox}>
-        <input
-          type="checkbox"
-          checked={form.liquid}
-          onChange={(e) => setForm((f) => ({ ...f, liquid: e.target.checked }))}
-        />
-        Liquid
-      </label>
-      <label className={styles.checkbox}>
-        <input
-          type="checkbox"
-          checked={form.excluded}
-          onChange={(e) => setForm((f) => ({ ...f, excluded: e.target.checked }))}
-        />
-        Excluded
-      </label>
+      <ItemFields form={form} onChange={setForm} />
       <button type="button" className={styles.add} onClick={handleSave} disabled={saving}>
         {saving ? "Saving…" : "Save"}
       </button>
