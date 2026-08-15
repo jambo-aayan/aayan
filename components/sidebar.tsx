@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import styles from "./sidebar.module.css";
@@ -16,7 +17,7 @@ export function Sidebar() {
   return (
     <nav className={styles.sidebar} aria-label="Main">
       <div className={styles.brand}>
-        <span className={styles.brandMark}>L</span> Life
+        <Image src="/brand/aayan-wordmark.png" alt="aayan" width={116} height={34} priority />
       </div>
       {NAV_ITEMS.map((item) => {
         const active = pathname === item.href;
