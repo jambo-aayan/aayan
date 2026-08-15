@@ -1,0 +1,27 @@
+.select {
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--bg2);
+  font-size: 13px;
+  background: var(--bg);
+  color: var(--ink);
+  margin-bottom: 12px;
+}
+
+.notice {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink);
+}
+
+.disclaimer {
+  font-size: 11.5px;
+  color: var(--muted);
+  margin-top: 10px;
+  font-style: italic;
+}
+
+.empty {
+  color: var(--muted);
+  font-size: 13px;
+}
