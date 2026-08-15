@@ -4,12 +4,14 @@ import { useState } from "react";
 import { cycleTodayCheckIn } from "@/lib/habits/actions";
 import { withRetry } from "@/lib/with-retry";
 import { useToast } from "@/components/toast/toast-provider";
+import { ThoughtPrompt } from "@/components/thoughts/thought-prompt";
 import styles from "./my-day-habits.module.css";
 
 type CheckInLevel = "FULL" | "MINIMUM" | null;
 
 export type MyDayHabit = {
   id: string;
+  areaId: string;
   name: string;
   areaName: string;
   todayLevel: CheckInLevel;
@@ -27,6 +29,7 @@ export function MyDayHabits({ initialHabits }: { initialHabits: MyDayHabit[] }) 
   // Blocks re-entrant clicks while a toggle's withRetry backoff is in
   // flight, so a slow first request's revert can't clobber a second toggle.
   const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
+  const [promptHabitId, setPromptHabitId] = useState<string | null>(null);
   const { notifyError } = useToast();
 
   async function handleToggle(habit: MyDayHabit) {
@@ -39,6 +42,8 @@ export function MyDayHabits({ initialHabits }: { initialHabits: MyDayHabit[] }) 
       setHabits((prev) => prev.map((h) => (h.id === habit.id ? habit : h)));
       setError(result.error);
       notifyError(result.error, { onRetry: () => handleToggle(habit) });
+    } else if (habit.todayLevel === null && newLevel !== null) {
+      setPromptHabitId(habit.id);
     }
     setPendingIds((prev) => {
       const next = new Set(prev);
@@ -59,6 +64,9 @@ export function MyDayHabits({ initialHabits }: { initialHabits: MyDayHabit[] }) 
             <div>
               <div className={styles.name}>{habit.name}</div>
               <div className={styles.meta}>{habit.areaName}</div>
+              {promptHabitId === habit.id && (
+                <ThoughtPrompt areaId={habit.areaId} onDone={() => setPromptHabitId(null)} />
+              )}
             </div>
             <button
               type="button"

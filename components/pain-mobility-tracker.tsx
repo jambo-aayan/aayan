@@ -6,24 +6,13 @@ import { weeklyAverage, weekTrend, type Trend } from "@/lib/pain-mobility/trend"
 import { mondayOf } from "@/lib/habits/streak";
 import { withRetry } from "@/lib/with-retry";
 import { useToast } from "@/components/toast/toast-provider";
+import { todayLocalDateString } from "@/lib/local-date";
 import styles from "./pain-mobility-tracker.module.css";
 
 type Log = { id: string; date: Date; pain: number; mobility: number };
 
 function toDateInputValue(date: Date): string {
   return date.toISOString().slice(0, 10);
-}
-
-/** The user's local calendar "today", not UTC — a browser west of UTC could
- * otherwise default the log form to tomorrow's date in the evening. Stored
- * log dates stay UTC-midnight; only "what does today default to" cares
- * about the local clock. */
-function todayLocalDateString(): string {
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(2, "0");
-  const d = String(now.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
 }
 
 function trendLabel(trend: Trend | null): string {

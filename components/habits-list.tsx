@@ -14,6 +14,7 @@ import {
 import { utcMidnight } from "@/lib/habits/date-utils";
 import { withRetry } from "@/lib/with-retry";
 import { useToast } from "@/components/toast/toast-provider";
+import { ThoughtPrompt } from "@/components/thoughts/thought-prompt";
 import styles from "./habits-list.module.css";
 
 const UNDO_WINDOW_MS = 5000;
@@ -58,6 +59,9 @@ export function HabitsList({
   // backoff — block re-entrant clicks on the same habit so a slow, later-
   // reverting first request can't clobber a second toggle's optimistic state.
   const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
+  // Which habit, if any, just got a fresh check-in and should show the
+  // "add a thought?" prompt — never shown on turning a check-in back off.
+  const [promptHabitId, setPromptHabitId] = useState<string | null>(null);
   const { notifyError, notifyUndo } = useToast();
 
   function withPending(id: string, fn: () => Promise<void>): () => void {
@@ -115,6 +119,10 @@ export function HabitsList({
       setHabits((prev) => prev.map((h) => (h.id === habit.id ? habit : h)));
       setError(result.error);
       notifyError(result.error, { onRetry: () => handleToggleCheckIn(habit) });
+      return;
+    }
+    if (habit.todayLevel === null && newLevel !== null) {
+      setPromptHabitId(habit.id);
     }
   }
 
@@ -220,6 +228,9 @@ export function HabitsList({
                   Delete
                 </button>
               </div>
+              {promptHabitId === habit.id && (
+                <ThoughtPrompt areaId={areaId} onDone={() => setPromptHabitId(null)} />
+              )}
             </li>
           )
         )}
