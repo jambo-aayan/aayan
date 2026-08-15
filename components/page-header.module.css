@@ -1,0 +1,51 @@
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 20px 20px 4px;
+  flex-wrap: wrap;
+}
+
+.title {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.greetRow {
+  padding: 6px 20px 16px;
+}
+
+.headline {
+  font-size: 21px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--muted);
+}
+
+.content {
+  padding: 6px 20px 40px;
+}
+
+@media (min-width: 860px) {
+  .topbar,
+  .greetRow {
+    padding-left: 28px;
+    padding-right: 28px;
+  }
+
+  .content {
+    padding: 0 28px 48px;
+  }
+}
+
+@media (min-width: 1240px) {
+  .topbar,
+  .greetRow {
+    padding-left: 40px;
+    padding-right: 40px;
+  }
+
+  .content {
+    padding: 0 40px 56px;
+  }
+}
