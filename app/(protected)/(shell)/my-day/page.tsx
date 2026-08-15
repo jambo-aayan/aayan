@@ -10,7 +10,7 @@ export default async function MyDayPage() {
 
   return (
     <>
-      <PageHeader title="My Day" backHref="/pillars" />
+      <PageHeader title="My Day" backHref="/today" />
       <div className={pageStyles.content}>
         <Card title="Habits">
           <MyDayHabits initialHabits={habits} />

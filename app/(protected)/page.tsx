@@ -14,7 +14,7 @@ export default function WelcomePage() {
         No numbers here — just a quiet start. When you&rsquo;re ready, Health and
         Finances are one click away.
       </p>
-      <Link href="/pillars" className={styles.continue}>
+      <Link href="/today" className={styles.continue}>
         Continue
       </Link>
     </main>

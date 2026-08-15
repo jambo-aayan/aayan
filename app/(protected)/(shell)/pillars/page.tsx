@@ -1,17 +1,12 @@
 import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
 import pageStyles from "@/components/page-header.module.css";
-import { Card } from "@/components/card";
-import { ThoughtQuickAdd } from "@/components/thoughts/thought-quick-add";
-import { getTagOptions } from "@/lib/thoughts/data";
 import styles from "./pillars.module.css";
 
-export default async function PillarsPage() {
-  const tagOptions = await getTagOptions();
-
+export default function PillarsPage() {
   return (
     <>
-      <PageHeader title="Your pillars" />
+      <PageHeader title="Your pillars" backHref="/today" />
       <div className={pageStyles.content}>
         <div className={styles.tiles}>
           <Link href="/health" className={`${styles.tile} ${styles.health}`}>
@@ -24,6 +19,9 @@ export default async function PillarsPage() {
           </Link>
         </div>
         <div className={styles.crossCutting}>
+          <Link href="/today" className={styles.crossLink}>
+            Today
+          </Link>
           <Link href="/my-day" className={styles.crossLink}>
             My Day
           </Link>
@@ -34,9 +32,6 @@ export default async function PillarsPage() {
             Thoughts
           </Link>
         </div>
-        <Card title="Quick thought">
-          <ThoughtQuickAdd tagOptions={tagOptions} />
-        </Card>
       </div>
     </>
   );
