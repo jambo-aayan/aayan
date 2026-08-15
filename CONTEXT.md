@@ -16,8 +16,8 @@ _Avoid_: Bucket (the original prototype's term — replaced for being too inform
 A sub-topic within a Pillar, e.g. Sleep or Diet within Health. Carries over the original prototype's "buckets" one level down. Not every Pillar needs Areas — Finances' existing shape (Items, Baseline, Goals, Expenses, North Star) doesn't need them.
 _Avoid_: Sub-bucket, Topic.
 
-**System**:
-A process within a single Pillar that can target one Area or several Areas in that same Pillar at once — e.g. a stretch routine that improves both the Spine & Pain and Body Composition Areas within Health. Systems don't cross Pillars.
+**System** (deferred — not required for Health+Finances MVP):
+A process within a single Pillar that can target one Area or several Areas in that same Pillar at once — e.g. a stretch routine that improves both the Ankylosing Spondylitis and Body Composition Areas within Health. Systems don't cross Pillars. Concept kept for later — build a real System only once a concrete one earns a dedicated screen (e.g. "Payday routine"); for MVP a System can just be an informal label rather than a managed object.
 _Avoid_: The original prototype's "layer above buckets" framing — that's now inverted; Systems live inside a Pillar, not above all of them.
 
 **Action**:
@@ -27,13 +27,22 @@ _Avoid_: Task (reserved for wayfinder's own ticket type — don't reuse it for i
 **Cross-Pillar link**:
 When something genuinely spans two Pillars (e.g. "buy a house" touches both Finances and Relationship), it lives in exactly one Pillar as its source of truth, with a visible link from the other — never duplicated as two independent copies. Extends the cross-links the original prototype's mind-map view already drew between buckets.
 
+**North Star**:
+Every Pillar has one, and every Area has one — a single headline goal that Actions within it work toward, always visible when you open that Pillar or Area. Originally a Finances-only concept (see "Finance" below); generalized to the whole hierarchy.
+_Avoid_: Don't confuse with an ordinary Goal — a North Star is the *one* headline target for its Pillar/Area, not one of potentially several Goals.
+
+**Current state**:
+A short free-text status field on an Area — where things stand right now (e.g. "Mild, well-managed"), editable anytime, shown prominently alongside the Area's North Star. Distinct from the North Star (the target) and from Actions (the day-to-day work). Free text rather than a fixed severity scale — a scale that fits a health condition wouldn't fit every Area, and a free field needs no upfront taxonomy design.
+
 ## Pillars
 
 ### Health (MVP)
-Areas: Spine & Pain, Sleep, Diet, Body Composition, Blood Pressure, Looks, Healthcare Navigation. See "Existing content, tuned to this user" below — these Areas carry their prior detail forward unchanged, just renested under Health.
+Areas: Ankylosing Spondylitis, Sleep, Diet, Body Composition, Blood Pressure, Looks, Healthcare Navigation. See "Existing content, tuned to this user" below — these Areas carry their prior detail forward unchanged, just renested under Health. Health itself has a Pillar-level North Star (not yet chosen); each Area has its own North Star plus a free-text Current state (see "Language").
+
+**Area naming convention**: Areas are named for the user's actual, specific issue or focus — not a generic category. "Spine & Pain" became "Ankylosing Spondylitis" for this reason. Apply the same lens to any new Area; existing Areas with already-specific names (Sleep, Diet, ...) don't need renaming.
 
 ### Finances (MVP)
-Keeps its existing shape from the original prototype (see "Finance" below) — Items, Baseline, Goals, Expenses, North Star. No Area layer needed; Systems (e.g. "Payday routine") and Actions attach directly.
+Keeps its existing shape from the original prototype (see "Finance" below) — Items, Baseline, Goals, Expenses, North Star. No Area layer needed; Systems (e.g. "Payday routine") and Actions attach directly. Its existing North Star (house deposit) is the Pillar-level one.
 
 ### Religion (deferred)
 Carries forward Jumma (Friday prayer) and Quran reading from the original prototype. Not yet re-examined under the Pillar/Area/System model — revisit when this Pillar's turn comes.
@@ -62,7 +71,7 @@ Two parts: the user's day job (e.g. sample-apps work) and Jumbo Labs (his startu
 One-off, has `status` (not-started / in-progress / done), optional `dueDate`. Goals added via the "My Day" quick-add get a `myday: true` flag. **Only `myday`-flagged goals (plus habits) surface in the My Day view** — ordinary backlog goals deliberately stay out of the daily view, living in their Area/Pillar and in an "All Actions" cross-cutting list instead. This distinction was added after the user found the daily view cluttered with non-daily backlog items — don't merge them back together.
 
 ## Thoughts
-Free-text, dated journal entries attached to an Area or Pillar. Optionally prompted (dismissible, never forced) after a habit check-in or goal status change.
+Free-text, dated journal entries. **Cross-cutting, not Pillar-bound** — a quick-add reachable from the homepage (same pattern as the old "My Day" quick-add), for a general daily journal that can be about anything. Tagging a Thought to a specific Pillar or Area is *optional*, not mandatory — use it when a Thought is actually about Health, or Finances specifically; leave it untagged for a general entry. Optionally prompted (dismissible, never forced) after a habit check-in or goal status change. In MVP scope.
 
 ## Finance
 Separate net-worth tracker, living inside the Finances Pillar:
@@ -72,11 +81,11 @@ Separate net-worth tracker, living inside the Finances Pillar:
 - **Expenses**: dated one-off known costs, separate from recurring baseline items.
 - **North Star**: one headline target + deadline, tracked against *accessible* net worth specifically, with a live on-track/behind verdict based on required vs actual monthly rate.
 
-## Symptoms
-Simple daily log: headache (none/mild/bad), sleep (poor/ok/good). Feeds a correlation view (habit-done days vs headache days), scoped to the Health Pillar. **Deliberately conservative** — requires a minimum sample (~6 logged days, ~3 days on each side of a habit) before showing any comparison, and is always framed as "something to raise with a clinician," never as a diagnosis or conclusion. Don't remove these guardrails to make the feature feel more "finished."
+## Symptoms (deferred — not in Health+Finances MVP)
+Simple daily log: headache (none/mild/bad), sleep (poor/ok/good). Feeds a correlation view (habit-done days vs headache days), scoped to the Health Pillar. **Deliberately conservative** — requires a minimum sample (~6 logged days, ~3 days on each side of a habit) before showing any comparison, and is always framed as "something to raise with a clinician," never as a diagnosis or conclusion. Don't remove these guardrails to make the feature feel more "finished." Fully designed already, from the original prototype — just not part of this MVP; revisit post-launch.
 
-## Appointments
-Name + date, scoped to the Health Pillar. Generates a "prep sheet" beforehand (symptom summary, habit adherence, background context, blank space for the user's own questions) and prompts for outcome notes afterward. The follow-up half matters as much as the prep half — the thing that gets lost with multiple clinicians over months is what the last one actually said.
+## Appointments (deferred — not in Health+Finances MVP)
+Name + date, scoped to the Health Pillar. Generates a "prep sheet" beforehand (symptom summary, habit adherence, background context, blank space for the user's own questions) and prompts for outcome notes afterward. The follow-up half matters as much as the prep half — the thing that gets lost with multiple clinicians over months is what the last one actually said. Fully designed already, from the original prototype — just not part of this MVP; revisit post-launch.
 
 ## Behavioural principles (learned by hitting them — keep these)
 1. **Low-maintenance is a hard constraint**, stated explicitly and repeatedly by the user. Features that add friction to routine daily input have been rejected before (e.g. a frequency picker on every habit add, tags on every task). Any new recurring-input feature should have a sensible default and *not* ask a question every time it's used.
@@ -87,7 +96,7 @@ Name + date, scoped to the Health Pillar. Generates a "prep sheet" beforehand (s
 6. **Ask before big architectural additions**, propose a concrete design, and let the user redirect — this user engages well with a clear proposal plus 1-3 tightly-scoped questions, not open-ended "what do you want" prompts.
 
 ## Existing content, tuned to this user (reuse, don't regenerate)
-- **Spine & Pain** (Health Area): ankylosing spondylitis (mild), cervicogenic headaches, rounded shoulders. Cascade: lumbar stiffness → desk-to-bed slouch → neck flexion → headache. No heavy axial loading, no barbell squats/deadlifts — spine-safe exercise selection throughout.
+- **Ankylosing Spondylitis** (Health Area): ankylosing spondylitis (mild), cervicogenic headaches, rounded shoulders. Cascade: lumbar stiffness → desk-to-bed slouch → neck flexion → headache. No heavy axial loading, no barbell squats/deadlifts — spine-safe exercise selection throughout.
 - **Sleep** (Health Area): possible OSA under investigation (witnessed pauses, daytime sleepiness); phone-in-bed flagged as highest-leverage change.
 - **Diet** (Health Area): dislikes most fruit/veg plus separate anxiety around trying new foods — build from what already works, never push unfamiliar produce. Protein is a relative strength.
 - **Body Composition** (Health Area): reframed from a weight target to muscle-to-fat ratio; track waist + photos over scale weight.
