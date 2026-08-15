@@ -27,17 +27,18 @@ model Pillar {
 /// A sub-topic within a Pillar (e.g. Sleep within Health). id is a stable
 /// slug for the same idempotent-seeding reason as Pillar.id.
 model Area {
-  id           String   @id
-  pillarId     String
-  pillar       Pillar   @relation(fields: [pillarId], references: [id])
-  name         String
-  currentState String?
-  northStar    String?
-  sortOrder    Int
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  habits       Habit[]
-  actionGoals  ActionGoal[]
+  id               String            @id
+  pillarId         String
+  pillar           Pillar            @relation(fields: [pillarId], references: [id])
+  name             String
+  currentState     String?
+  northStar        String?
+  sortOrder        Int
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  habits           Habit[]
+  actionGoals      ActionGoal[]
+  painMobilityLogs PainMobilityLog[]
 
   @@index([pillarId])
 }
@@ -103,6 +104,25 @@ model ActionGoal {
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
 
+  @@index([areaId])
+}
+
+/// One row per (Area, date) log of Pain and Mobility scores (each 0-10).
+/// Keyed by area_id + date deliberately, not a fixed Ankylosing-Spondylitis
+/// FK, so this extends to other Areas later with no schema change — only
+/// Ankylosing Spondylitis is populated at MVP, enforced in the UI layer,
+/// not the schema.
+model PainMobilityLog {
+  id        String   @id @default(cuid())
+  areaId    String
+  area      Area     @relation(fields: [areaId], references: [id])
+  date      DateTime @db.Date
+  pain      Int
+  mobility  Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([areaId, date])
   @@index([areaId])
 }
 

@@ -5,10 +5,14 @@ import { Card } from "@/components/card";
 import { EditableText } from "@/components/editable-text";
 import { HabitsList } from "@/components/habits-list";
 import { ActionGoalsList } from "@/components/action-goals-list";
+import { PainMobilityTracker } from "@/components/pain-mobility-tracker";
+import { CorrelationView } from "@/components/correlation-view";
 import { getArea } from "@/lib/health/data";
 import { updateAreaCurrentState, updateAreaNorthStar } from "@/lib/health/actions";
 import { getHabitsForArea } from "@/lib/habits/data";
 import { getActionGoalsForArea } from "@/lib/action-goals/data";
+import { getPainMobilityLogs } from "@/lib/pain-mobility/data";
+import { PAIN_MOBILITY_AREA_ID } from "@/lib/pain-mobility/scope";
 
 export default async function AreaPage({
   params,
@@ -20,6 +24,8 @@ export default async function AreaPage({
   if (!area) notFound();
 
   const [habits, goals] = await Promise.all([getHabitsForArea(areaId), getActionGoalsForArea(areaId)]);
+  const isPainMobilityArea = areaId === PAIN_MOBILITY_AREA_ID;
+  const painLogs = isPainMobilityArea ? await getPainMobilityLogs(areaId) : [];
 
   return (
     <>
@@ -45,6 +51,19 @@ export default async function AreaPage({
         <Card title="Goals">
           <ActionGoalsList areaId={area.id} initialGoals={goals} />
         </Card>
+        {isPainMobilityArea && (
+          <>
+            <Card title="Pain & Mobility">
+              <PainMobilityTracker areaId={area.id} initialLogs={painLogs} />
+            </Card>
+            <Card title="Correlation with habits">
+              <CorrelationView
+                habits={habits.filter((h) => h.active)}
+                painLogs={painLogs.map((l) => ({ date: l.date, pain: l.pain }))}
+              />
+            </Card>
+          </>
+        )}
       </div>
     </>
   );
