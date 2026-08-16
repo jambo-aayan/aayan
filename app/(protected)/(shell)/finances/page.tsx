@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
 import pageStyles from "@/components/page-header.module.css";
 import { Card } from "@/components/card";
@@ -58,6 +59,10 @@ export default async function FinancesPage() {
         </div>
 
         <div className={dashboardStyles.divider}>Manage</div>
+
+        <Card>
+          <Link href="/finances/link-bank">Link a bank →</Link>
+        </Card>
 
         <Card title="North Star">
           <FinanceNorthStarCard

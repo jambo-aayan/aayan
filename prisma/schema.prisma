@@ -202,6 +202,22 @@ model Transaction {
   @@index([date])
 }
 
+/// A live Enable Banking authorization — the result of one `POST /sessions`
+/// call, tied to one ASPSP (bank). accounts is stored as raw JSON (an array
+/// of {uid, ...}) rather than a separate table: Enable Banking's exact
+/// per-account field shape beyond `uid` isn't fully confirmed yet (see
+/// docs/research/enable-banking-api.md), and storing the raw response keeps
+/// us from losing data to an over-narrow schema while that's still settling.
+model EnableBankingLink {
+  id           String   @id @default(cuid())
+  aspspName    String
+  aspspCountry String
+  sessionId    String   @unique
+  accounts     Json
+  validUntil   DateTime
+  createdAt    DateTime @default(now())
+}
+
 /// A dated, free-text journal entry, cross-cutting rather than owned by one
 /// feature — pillarId/areaId are both optional and mutually exclusive in
 /// practice (the UI offers one tag, not both): an untagged entry is a
