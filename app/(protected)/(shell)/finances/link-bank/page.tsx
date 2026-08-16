@@ -23,8 +23,12 @@ export default async function LinkBankPage({
   let loadError: string | null = null;
   try {
     aspsps = await listAspsps("GB");
-  } catch {
-    loadError = "Couldn't load the bank list from Enable Banking — check ENABLE_BANKING_APPLICATION_ID / ENABLE_BANKING_PRIVATE_KEY_B64 are set correctly.";
+  } catch (error) {
+    // Logged (not just swallowed into the generic UI message) so the real
+    // cause — misconfigured env vars vs. an actual Enable Banking API
+    // error — shows up in Vercel's runtime logs instead of staying opaque.
+    console.error("Enable Banking: failed to list GB ASPSPs", error);
+    loadError = `Couldn't load the bank list from Enable Banking: ${error instanceof Error ? error.message : String(error)}`;
   }
 
   const linkedBanks = await getLinkedBanks();
