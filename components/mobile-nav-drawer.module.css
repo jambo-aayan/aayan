@@ -1,13 +1,63 @@
-.sidebar {
-  display: none;
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(33, 29, 25, 0.32);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--duration-base) var(--ease);
+  z-index: 30;
+}
+
+.overlayOpen {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.drawer {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: min(280px, 82vw);
+  background: var(--bg-sidebar);
+  border-right: 1px solid var(--border-soft);
+  display: flex;
+  flex-direction: column;
+  padding: 18px 16px 20px;
+  transform: translateX(-100%);
+  transition: transform var(--duration-base) var(--ease);
+  z-index: 31;
+}
+
+.drawerOpen {
+  transform: translateX(0);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 4px 22px;
 }
 
 .brand {
   font-family: var(--font-serif), Georgia, serif;
-  font-size: 22px;
+  font-size: 21px;
   font-weight: 600;
-  color: var(--ink);
-  padding: 6px 12px 26px;
+}
+
+.close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  color: var(--muted);
+}
+
+.close:hover {
+  background: var(--surface-hover);
 }
 
 .nav {
@@ -19,19 +69,17 @@
 .item {
   display: flex;
   align-items: center;
-  gap: 11px;
-  padding: 10px 12px;
+  gap: 12px;
+  padding: 12px;
   border-radius: var(--radius-md);
-  width: 100%;
   color: var(--muted);
-  font-size: 13.5px;
+  font-size: 14.5px;
   font-weight: 500;
-  transition: background var(--duration-fast) var(--ease), color var(--duration-fast) var(--ease);
+  min-height: 44px;
 }
 
 .item:hover {
   background: var(--surface-hover);
-  color: var(--ink);
 }
 
 .icon {
@@ -94,23 +142,9 @@
   transition: width var(--duration-base) var(--ease);
 }
 
-.focusHint {
-  font-size: 11px;
-  color: var(--muted);
-  margin-top: 8px;
-}
-
 @media (min-width: 860px) {
-  .sidebar {
-    display: flex;
-    flex-direction: column;
-    width: 232px;
-    flex-shrink: 0;
-    padding: 24px 16px;
-    background: var(--bg-sidebar);
-    border-right: 1px solid var(--border-soft);
-    min-height: 100vh;
-    position: sticky;
-    top: 0;
+  .overlay,
+  .drawer {
+    display: none;
   }
 }

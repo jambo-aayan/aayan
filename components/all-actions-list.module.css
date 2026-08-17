@@ -6,7 +6,7 @@
 
 .row {
   padding: 10px 0;
-  border-top: 1px solid rgba(33, 29, 25, 0.06);
+  border-top: 1px solid var(--border);
 }
 
 .row:first-child {

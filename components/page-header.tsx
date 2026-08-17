@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 import styles from "./page-header.module.css";
 
 /**
@@ -11,7 +12,7 @@ export function PageHeader({ title, backHref }: { title: string; backHref?: stri
     <div className={styles.topbar}>
       {backHref && (
         <Link href={backHref} className={styles.back} aria-label="Back">
-          ←
+          <ArrowLeft size={17} strokeWidth={2} />
         </Link>
       )}
       <h2 className={styles.title}>{title}</h2>

@@ -3,25 +3,31 @@
   flex-direction: column;
   gap: 12px;
   margin-top: 6px;
+  margin-bottom: 20px;
 }
 
 .tile {
   text-align: left;
-  padding: 22px;
-  border-radius: 22px;
+  padding: 20px;
+  border-radius: var(--radius-lg);
   display: flex;
-  flex-direction: column;
-  gap: 5px;
+  align-items: center;
+  gap: 14px;
   width: 100%;
   background: var(--card);
-  box-shadow:
-    0 1px 2px rgba(33, 29, 25, 0.04),
-    0 8px 22px rgba(33, 29, 25, 0.05);
+  border: 1px solid var(--border-soft);
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow var(--duration-fast) var(--ease), transform var(--duration-fast) var(--ease);
+}
+
+.tile:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
 }
 
 .name {
-  font-size: 17px;
-  font-weight: 700;
+  font-size: 16.5px;
+  font-weight: 600;
   font-family: var(--font-serif), Georgia, serif;
 }
 
@@ -36,28 +42,15 @@
 .hint {
   font-size: 12.5px;
   color: var(--muted);
+  margin-top: 3px;
+}
+
+.pillsWrap {
+  margin-bottom: 8px;
 }
 
 @media (min-width: 860px) {
   .tiles {
     flex-direction: row;
   }
-}
-
-.crossCutting {
-  display: flex;
-  gap: 10px;
-  margin-top: 16px;
-}
-
-.crossLink {
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--muted);
-  background: var(--card);
-  padding: 8px 16px;
-  border-radius: 999px;
-  box-shadow:
-    0 1px 2px rgba(33, 29, 25, 0.04),
-    0 8px 22px rgba(33, 29, 25, 0.05);
 }

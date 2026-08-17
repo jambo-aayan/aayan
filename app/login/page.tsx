@@ -37,6 +37,7 @@ export default function LoginPage() {
 
   return (
     <main className={styles.main}>
+      <div className={styles.brand}>aayan</div>
       <form className={styles.form} onSubmit={handleSubmit}>
         <h1 className={styles.title}>Enter password</h1>
         <input

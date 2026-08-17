@@ -1,0 +1,56 @@
+.header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 20px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border-soft);
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+
+.iconButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  margin-left: -8px;
+  border-radius: var(--radius-md);
+  color: var(--ink);
+  flex-shrink: 0;
+  transition: background var(--duration-fast) var(--ease);
+}
+
+.iconButton:hover {
+  background: var(--surface-hover);
+}
+
+.brand {
+  font-family: var(--font-serif), Georgia, serif;
+  font-size: 21px;
+  font-weight: 600;
+  color: var(--ink);
+  flex: 1;
+}
+
+.avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--ink);
+  color: var(--bg);
+  font-size: 13px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+@media (min-width: 860px) {
+  .header {
+    display: none;
+  }
+}

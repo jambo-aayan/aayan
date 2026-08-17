@@ -1,14 +1,14 @@
-import { Sidebar } from "@/components/sidebar";
+import { AppShell } from "@/components/app-shell";
 import { ToastProvider } from "@/components/toast/toast-provider";
-import styles from "./shell.module.css";
+import { getMyDayHabits } from "@/lib/action-goals/data";
+import { dailyFocusPercent } from "@/lib/home/daily-focus";
 
-export default function ShellLayout({ children }: { children: React.ReactNode }) {
+export default async function ShellLayout({ children }: { children: React.ReactNode }) {
+  const habits = await getMyDayHabits();
+
   return (
     <ToastProvider>
-      <div className={styles.shell}>
-        <Sidebar />
-        <main className={styles.main}>{children}</main>
-      </div>
+      <AppShell dailyFocusPercent={dailyFocusPercent(habits)}>{children}</AppShell>
     </ToastProvider>
   );
 }

@@ -7,11 +7,10 @@
 
 .statCard {
   background: var(--card);
-  border-radius: 18px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-lg);
   padding: 16px 18px;
-  box-shadow:
-    0 1px 2px rgba(33, 29, 25, 0.04),
-    0 8px 22px rgba(33, 29, 25, 0.05);
+  box-shadow: var(--shadow-sm);
 }
 
 .statTop {
@@ -54,16 +53,16 @@
 
 .bentoCard {
   background: var(--card);
-  border-radius: 20px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-lg);
   padding: 18px;
-  box-shadow:
-    0 1px 2px rgba(33, 29, 25, 0.04),
-    0 8px 22px rgba(33, 29, 25, 0.05);
+  box-shadow: var(--shadow-sm);
 }
 
 .bentoCard.dark {
-  background: #1e1b17;
-  color: #f4efe7;
+  background: var(--ink);
+  color: var(--bg);
+  border-color: var(--ink);
 }
 
 .cardHead {
@@ -89,12 +88,12 @@
 .divider {
   margin: 28px 0 16px;
   padding-top: 16px;
-  border-top: 1px solid rgba(33, 29, 25, 0.08);
-  font-size: 13px;
+  border-top: 1px solid var(--border);
+  font-size: 12px;
   font-weight: 600;
   color: var(--muted);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.07em;
 }
 
 @media (min-width: 860px) {

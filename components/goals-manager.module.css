@@ -19,7 +19,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 12px 0;
-  border-top: 1px solid rgba(33, 29, 25, 0.06);
+  border-top: 1px solid var(--border);
   gap: 12px;
 }
 
@@ -85,7 +85,7 @@
   gap: 8px;
   align-items: center;
   padding-top: 12px;
-  border-top: 1px solid rgba(33, 29, 25, 0.06);
+  border-top: 1px solid var(--border);
 }
 
 .input {
@@ -115,7 +115,7 @@
 }
 
 .error {
-  color: #b3261e;
+  color: var(--danger);
   font-size: 12px;
   margin-top: 6px;
   width: 100%;
