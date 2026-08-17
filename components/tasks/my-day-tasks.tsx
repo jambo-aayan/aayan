@@ -1,0 +1,327 @@
+"use client";
+
+import { useState } from "react";
+import { ListChecks, ChevronDown, ChevronUp, Plus } from "lucide-react";
+import { TaskQuickAdd, type QuickAddSubmission } from "./task-quick-add";
+import { TaskList } from "./task-list";
+import type { TaskMenuItem } from "./task-menu";
+import { TaskComposer, type TaskFormInput } from "./task-composer";
+import { useToast } from "@/components/toast/toast-provider";
+import { withRetry } from "@/lib/with-retry";
+import {
+  createTask,
+  updateTask,
+  completeTask,
+  uncompleteTask,
+  setTaskImportant,
+  archiveTask,
+  deleteTask,
+  removeTaskFromMyDay,
+  addYesterdayTasksToToday,
+} from "@/lib/tasks/actions";
+import type { Task } from "@/lib/tasks/types";
+import type { TaskListSummary } from "@/lib/tasks/data";
+import styles from "./my-day-tasks.module.css";
+
+export function MyDayTasks({
+  initialTasks,
+  initialCompletedTasks,
+  initialYesterdayUnfinished,
+  lists,
+  pillars,
+  tagSuggestions,
+}: {
+  initialTasks: Task[];
+  initialCompletedTasks: Task[];
+  initialYesterdayUnfinished: Task[];
+  lists: TaskListSummary[];
+  pillars: { id: string; name: string }[];
+  tagSuggestions: string[];
+}) {
+  const [tasks, setTasks] = useState(initialTasks);
+  const [completedTasks, setCompletedTasks] = useState(initialCompletedTasks);
+  const [yesterdayUnfinished, setYesterdayUnfinished] = useState(initialYesterdayUnfinished);
+  const [showCompleted, setShowCompleted] = useState(false);
+  const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
+  const [composer, setComposer] = useState<{ mode: "create" | "edit"; task?: Task } | null>(null);
+  const { notifyError } = useToast();
+  const today = new Date();
+
+  function setPending(id: string, pending: boolean) {
+    setPendingIds((prev) => {
+      const next = new Set(prev);
+      if (pending) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }
+
+  async function handleQuickAdd(submission: QuickAddSubmission) {
+    const optimisticId = `pending-${Date.now()}`;
+    const optimisticTask: Task = {
+      id: optimisticId,
+      title: submission.title,
+      notes: null,
+      status: "ACTIVE",
+      important: false,
+      listId: null,
+      listName: null,
+      pillarId: null,
+      pillarName: null,
+      dueDate: submission.dueDate,
+      dueTime: submission.dueTime,
+      reminderOffset: null,
+      repeatRule: null,
+      completedAt: null,
+      archivedAt: null,
+      createdAt: today,
+      updatedAt: today,
+      tags: [],
+    };
+    setTasks((prev) => [...prev, optimisticTask]);
+
+    const result = await withRetry(() =>
+      createTask(
+        {
+          title: submission.title,
+          notes: null,
+          listId: null,
+          pillarId: null,
+          tagNames: [],
+          dueDate: submission.dueDate,
+          dueTime: submission.dueTime,
+          reminderOffset: null,
+          repeatRule: null,
+          important: false,
+        },
+        true
+      )
+    );
+    if (!result.ok) {
+      setTasks((prev) => prev.filter((t) => t.id !== optimisticId));
+      notifyError(result.error, { onRetry: () => handleQuickAdd(submission) });
+      return;
+    }
+    setTasks((prev) => prev.map((t) => (t.id === optimisticId ? { ...t, id: result.id } : t)));
+  }
+
+  async function handleToggleComplete(task: Task) {
+    if (pendingIds.has(task.id)) return;
+    setPending(task.id, true);
+    const wasActive = task.status === "ACTIVE";
+
+    if (wasActive) {
+      setTasks((prev) => prev.filter((t) => t.id !== task.id));
+      setCompletedTasks((prev) => [{ ...task, status: "COMPLETED", completedAt: today }, ...prev]);
+    } else {
+      setCompletedTasks((prev) => prev.filter((t) => t.id !== task.id));
+      setTasks((prev) => [...prev, { ...task, status: "ACTIVE", completedAt: null }]);
+    }
+
+    const result = await withRetry(() => (wasActive ? completeTask(task.id) : uncompleteTask(task.id)));
+    setPending(task.id, false);
+    if (!result.ok) {
+      // Revert on failure.
+      if (wasActive) {
+        setCompletedTasks((prev) => prev.filter((t) => t.id !== task.id));
+        setTasks((prev) => [...prev, task]);
+      } else {
+        setTasks((prev) => prev.filter((t) => t.id !== task.id));
+        setCompletedTasks((prev) => [task, ...prev]);
+      }
+      notifyError(result.error, { onRetry: () => handleToggleComplete(task) });
+    }
+  }
+
+  async function handleToggleImportant(task: Task) {
+    const next = !task.important;
+    const apply = (list: Task[]) => list.map((t) => (t.id === task.id ? { ...t, important: next } : t));
+    setTasks(apply);
+    setCompletedTasks(apply);
+    const result = await withRetry(() => setTaskImportant(task.id, next));
+    if (!result.ok) {
+      const revert = (list: Task[]) => list.map((t) => (t.id === task.id ? { ...t, important: !next } : t));
+      setTasks(revert);
+      setCompletedTasks(revert);
+      notifyError(result.error, { onRetry: () => handleToggleImportant(task) });
+    }
+  }
+
+  async function handleRemoveFromMyDay(task: Task) {
+    setTasks((prev) => prev.filter((t) => t.id !== task.id));
+    const result = await withRetry(() => removeTaskFromMyDay(task.id));
+    if (!result.ok) {
+      setTasks((prev) => [...prev, task]);
+      notifyError(result.error, { onRetry: () => handleRemoveFromMyDay(task) });
+    }
+  }
+
+  async function handleArchive(task: Task) {
+    setTasks((prev) => prev.filter((t) => t.id !== task.id));
+    setCompletedTasks((prev) => prev.filter((t) => t.id !== task.id));
+    const result = await withRetry(() => archiveTask(task.id));
+    if (!result.ok) {
+      notifyError(result.error, { onRetry: () => handleArchive(task) });
+    }
+  }
+
+  async function handleDelete(task: Task) {
+    setTasks((prev) => prev.filter((t) => t.id !== task.id));
+    setCompletedTasks((prev) => prev.filter((t) => t.id !== task.id));
+    const result = await withRetry(() => deleteTask(task.id));
+    if (!result.ok) {
+      notifyError(result.error, { onRetry: () => handleDelete(task) });
+    }
+  }
+
+  async function handleAddYesterday() {
+    const ids = yesterdayUnfinished.map((t) => t.id);
+    setTasks((prev) => [...prev, ...yesterdayUnfinished]);
+    setYesterdayUnfinished([]);
+    const result = await withRetry(() => addYesterdayTasksToToday(ids));
+    if (!result.ok) {
+      notifyError(result.error);
+    }
+  }
+
+  async function handleComposerSubmit(input: TaskFormInput) {
+    if (composer?.mode === "edit" && composer.task) {
+      const result = await updateTask(composer.task.id, input);
+      if (result.ok) {
+        const merged: Task = {
+          ...composer.task,
+          ...input,
+          listName: lists.find((l) => l.id === input.listId)?.name ?? null,
+          pillarName: pillars.find((p) => p.id === input.pillarId)?.name ?? null,
+          tags: input.tagNames.map((name) => ({ id: name, name })),
+        };
+        const apply = (list: Task[]) => list.map((t) => (t.id === merged.id ? merged : t));
+        setTasks(apply);
+        setCompletedTasks(apply);
+      }
+      return result;
+    }
+
+    const result = await createTask(input, true);
+    if (result.ok) {
+      const created: Task = {
+        id: result.id,
+        title: input.title,
+        notes: input.notes,
+        status: "ACTIVE",
+        important: input.important,
+        listId: input.listId,
+        listName: lists.find((l) => l.id === input.listId)?.name ?? null,
+        pillarId: input.pillarId,
+        pillarName: pillars.find((p) => p.id === input.pillarId)?.name ?? null,
+        dueDate: input.dueDate,
+        dueTime: input.dueTime,
+        reminderOffset: input.reminderOffset,
+        repeatRule: input.repeatRule,
+        completedAt: null,
+        archivedAt: null,
+        createdAt: today,
+        updatedAt: today,
+        tags: input.tagNames.map((name) => ({ id: name, name })),
+      };
+      setTasks((prev) => [...prev, created]);
+      return { ok: true as const };
+    }
+    return result;
+  }
+
+  const totalCount = tasks.length + completedTasks.length;
+
+  function menuItemsFor(task: Task, isCompleted: boolean): TaskMenuItem[] {
+    const items: TaskMenuItem[] = [{ label: "Edit", onSelect: () => setComposer({ mode: "edit", task }) }];
+    if (!isCompleted) {
+      items.push({ label: "Remove from My Day", onSelect: () => handleRemoveFromMyDay(task) });
+    }
+    items.push({ label: "Archive", onSelect: () => handleArchive(task) });
+    items.push({ label: "Delete", onSelect: () => handleDelete(task), danger: true });
+    return items;
+  }
+
+  return (
+    <div className={styles.wrap}>
+      <div className={styles.header}>
+        <h3 className={styles.heading}>
+          My Day{totalCount > 0 && <span className={styles.count}>{totalCount}</span>}
+        </h3>
+        {totalCount > 0 && (
+          <span className={styles.progress}>
+            {completedTasks.length}/{totalCount} completed
+          </span>
+        )}
+      </div>
+
+      <TaskQuickAdd onAdd={handleQuickAdd} />
+
+      {yesterdayUnfinished.length > 0 && (
+        <div className={styles.banner}>
+          <span>
+            {yesterdayUnfinished.length} unfinished task{yesterdayUnfinished.length === 1 ? "" : "s"} from yesterday
+          </span>
+          <button type="button" className={styles.bannerAction} onClick={handleAddYesterday}>
+            Add to today
+          </button>
+        </div>
+      )}
+
+      <TaskList
+        tasks={tasks}
+        today={today}
+        pendingIds={pendingIds}
+        onToggleComplete={handleToggleComplete}
+        onToggleImportant={handleToggleImportant}
+        onOpen={(task) => setComposer({ mode: "edit", task })}
+        menuItemsFor={(task) => menuItemsFor(task, false)}
+        emptyIcon={ListChecks}
+        emptyMessage="Nothing planned yet."
+      />
+
+      {completedTasks.length > 0 && (
+        <div className={styles.completedSection}>
+          <button type="button" className={styles.completedToggle} onClick={() => setShowCompleted((v) => !v)}>
+            {showCompleted ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+            Show completed ({completedTasks.length})
+          </button>
+          {showCompleted && (
+            <TaskList
+              tasks={completedTasks}
+              today={today}
+              pendingIds={pendingIds}
+              onToggleComplete={handleToggleComplete}
+              onToggleImportant={handleToggleImportant}
+              onOpen={(task) => setComposer({ mode: "edit", task })}
+              menuItemsFor={(task) => menuItemsFor(task, true)}
+              emptyIcon={ListChecks}
+              emptyMessage="No completed tasks yet."
+            />
+          )}
+        </div>
+      )}
+
+      <button
+        type="button"
+        className={styles.fab}
+        onClick={() => setComposer({ mode: "create" })}
+        aria-label="New task"
+      >
+        <Plus size={22} strokeWidth={2.25} />
+      </button>
+
+      {composer && (
+        <TaskComposer
+          mode={composer.mode}
+          task={composer.task}
+          lists={lists}
+          pillars={pillars}
+          tagSuggestions={tagSuggestions}
+          onClose={() => setComposer(null)}
+          onSubmit={handleComposerSubmit}
+        />
+      )}
+    </div>
+  );
+}
