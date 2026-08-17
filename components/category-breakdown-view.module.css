@@ -25,7 +25,7 @@
 
 .bar {
   height: 6px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--bg2);
   overflow: hidden;
 }
@@ -33,10 +33,5 @@
 .barFill {
   height: 100%;
   background: var(--coral);
-  border-radius: 999px;
-}
-
-.empty {
-  color: var(--muted);
-  font-size: 13px;
+  border-radius: var(--radius-pill);
 }

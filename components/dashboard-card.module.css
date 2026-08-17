@@ -10,6 +10,7 @@
   transition: box-shadow var(--duration-fast) var(--ease), transform var(--duration-fast) var(--ease);
   flex: 1;
   min-width: 0;
+  margin-bottom: 12px;
 }
 
 .card:hover {

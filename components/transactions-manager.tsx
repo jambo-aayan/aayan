@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Receipt } from "lucide-react";
 import {
   createTransaction,
   deleteTransaction,
@@ -10,6 +11,8 @@ import {
 } from "@/lib/finance/actions";
 import { useUndoableCrudList, type ActionResult } from "@/lib/hooks/use-undoable-crud-list";
 import { DEFAULT_CATEGORIES } from "@/lib/finance/categories";
+import { PrimaryButton } from "@/components/primary-button";
+import { EmptyState } from "@/components/empty-state";
 import styles from "./transactions-manager.module.css";
 
 type Transaction = TransactionInput & { id: string };
@@ -102,15 +105,15 @@ export function TransactionsManager({ initialTransactions }: { initialTransactio
             </li>
           )
         )}
-        {transactions.length === 0 && <li className={styles.empty}>No transactions yet.</li>}
       </ul>
+      {transactions.length === 0 && <EmptyState icon={Receipt} message="No transactions yet." />}
       {error && <p className={styles.error}>{error}</p>}
 
       <div className={styles.addForm}>
         <TransactionFields form={form} onChange={setForm} />
-        <button type="button" className={styles.add} onClick={handleAdd} disabled={adding}>
+        <PrimaryButton onClick={handleAdd} disabled={adding}>
           {adding ? "Adding…" : "Add transaction"}
-        </button>
+        </PrimaryButton>
       </div>
       {addError && <p className={styles.error}>{addError}</p>}
 
@@ -208,9 +211,9 @@ function TransactionEditRow({
   return (
     <li className={styles.addForm}>
       <TransactionFields form={form} onChange={setForm} />
-      <button type="button" className={styles.add} onClick={handleSave} disabled={saving}>
+      <PrimaryButton onClick={handleSave} disabled={saving}>
         {saving ? "Saving…" : "Save"}
-      </button>
+      </PrimaryButton>
       <button type="button" className={styles.link} onClick={onCancel}>
         Cancel
       </button>

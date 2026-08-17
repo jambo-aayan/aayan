@@ -1,3 +1,5 @@
+import { PieChart } from "lucide-react";
+import { EmptyState } from "@/components/empty-state";
 import styles from "./category-breakdown-view.module.css";
 
 function formatGBP(value: number): string {
@@ -10,7 +12,7 @@ export function CategoryBreakdownView({
   breakdown: { category: string; total: number }[];
 }) {
   if (breakdown.length === 0) {
-    return <p className={styles.empty}>No spending recorded this month yet.</p>;
+    return <EmptyState icon={PieChart} message="No spending recorded this month yet." />;
   }
 
   const max = Math.max(1, ...breakdown.map((b) => b.total));
