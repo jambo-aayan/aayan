@@ -21,6 +21,7 @@ model Pillar {
   northStar String?
   areas     Area[]
   thoughts  Thought[]
+  tasks     Task[]
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 }
@@ -234,4 +235,119 @@ model Thought {
 
   @@index([pillarId])
   @@index([areaId])
+}
+
+/// A practical task grouping (e.g. "Work", "Groceries") — distinct from a
+/// Pillar (area of life) and a Tag (flexible metadata). Deleting a list
+/// nulls out `listId` on its tasks (see Task.list's onDelete) rather than
+/// destroying them; archiving is the softer "stop using, keep the tasks
+/// labeled" alternative to deleting one outright.
+model TaskList {
+  id         String    @id @default(cuid())
+  name       String
+  sortOrder  Int       @default(0)
+  archivedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  tasks      Task[]
+}
+
+/// Lightweight, freeform metadata — created on first use from the task
+/// composer's tag input rather than managed on a separate admin screen.
+model TaskTag {
+  id        String          @id @default(cuid())
+  name      String          @unique
+  createdAt DateTime        @default(now())
+  tasks     TaskTagOnTask[]
+}
+
+model TaskTagOnTask {
+  taskId String
+  task   Task    @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  tagId  String
+  tag    TaskTag @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([taskId, tagId])
+  @@index([tagId])
+}
+
+enum TaskStatus {
+  ACTIVE
+  COMPLETED
+}
+
+enum TaskReminderOffset {
+  AT_DUE
+  MIN_15_BEFORE
+  HOUR_1_BEFORE
+  DAY_1_BEFORE
+  CUSTOM
+}
+
+enum TaskRepeatRule {
+  DAILY
+  WEEKDAYS
+  WEEKLY
+  MONTHLY
+  CUSTOM
+}
+
+/// The Task lifecycle is three independent nullable timestamps rather than a
+/// pile of booleans: completedAt/archivedAt/deletedAt can't contradict each
+/// other because callers only ever set one at a time, and each is
+/// independently meaningful for history (e.g. a task can be both completed
+/// *and* later archived, keeping both timestamps). Query-time precedence is
+/// deletedAt > archivedAt > completedAt > active, enforced in lib/tasks, not
+/// the schema. dueDate is @db.Date (UTC midnight) matching ActionGoal's
+/// convention; dueTime is a separate "HH:mm" string rather than folding time
+/// into dueDate, so a date-only task never has to fake a time component.
+model Task {
+  id        String     @id @default(cuid())
+  title     String
+  notes     String?
+  status    TaskStatus @default(ACTIVE)
+  important Boolean    @default(false)
+
+  listId String?
+  list   TaskList? @relation(fields: [listId], references: [id], onDelete: SetNull)
+
+  pillarId String?
+  pillar   Pillar? @relation(fields: [pillarId], references: [id], onDelete: SetNull)
+
+  dueDate DateTime? @db.Date
+  dueTime String?
+
+  reminderOffset TaskReminderOffset?
+  repeatRule     TaskRepeatRule?
+
+  completedAt DateTime?
+  archivedAt  DateTime?
+  deletedAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tags         TaskTagOnTask[]
+  myDayEntries MyDayEntry[]
+
+  @@index([listId])
+  @@index([pillarId])
+  @@index([dueDate])
+  @@index([status])
+}
+
+/// One row per (task, date) it was part of My Day — never a boolean reset
+/// each morning, so which tasks were planned on any past date stays
+/// reconstructable. A task can appear in My Day either via a row here
+/// (manually added) or because its dueDate is that date (automatic); see
+/// lib/tasks/data.ts for how the two are combined.
+model MyDayEntry {
+  id      String   @id @default(cuid())
+  taskId  String
+  task    Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  date    DateTime @db.Date
+  addedAt DateTime @default(now())
+
+  @@unique([taskId, date])
+  @@index([date])
 }

@@ -1,0 +1,22 @@
+.bar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+
+.select {
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  font-size: 12.5px;
+  font-weight: 500;
+  background: var(--card);
+  color: var(--ink);
+  min-height: 36px;
+}
+
+.select:focus-visible {
+  outline: none;
+  border-color: var(--ink);
+}

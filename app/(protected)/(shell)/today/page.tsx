@@ -6,9 +6,18 @@ import { DashboardCard } from "@/components/dashboard-card";
 import { TodaySectionPills } from "@/components/nav-pills";
 import { Card } from "@/components/card";
 import { ThoughtQuickAdd } from "@/components/thoughts/thought-quick-add";
+import { MyDayTasks } from "@/components/tasks/my-day-tasks";
 import { getMyDayHabits, getEveryGoal } from "@/lib/action-goals/data";
 import { getTagOptions } from "@/lib/thoughts/data";
 import { habitsNotCheckedIn, todaysGoals } from "@/lib/home/today";
+import {
+  getMyDayTasks,
+  getTodayCompletedTasks,
+  getYesterdayUnfinishedTasks,
+  getTaskLists,
+  getPillarOptions,
+  getTaskTags,
+} from "@/lib/tasks/data";
 import styles from "./today.module.css";
 
 function habitsStatus(allCount: number, dueCount: number): string {
@@ -25,14 +34,35 @@ function goalsStatus(dueGoals: { status: string }[]): string {
 }
 
 export default async function TodayPage() {
-  const [allHabits, goals, tagOptions] = await Promise.all([getMyDayHabits(), getEveryGoal(), getTagOptions()]);
+  const now = new Date();
+  const [
+    allHabits,
+    goals,
+    tagOptions,
+    myDayTasks,
+    completedTasks,
+    yesterdayUnfinished,
+    taskLists,
+    pillarOptions,
+    taskTags,
+  ] = await Promise.all([
+    getMyDayHabits(),
+    getEveryGoal(),
+    getTagOptions(),
+    getMyDayTasks(now),
+    getTodayCompletedTasks(now),
+    getYesterdayUnfinishedTasks(now),
+    getTaskLists(),
+    getPillarOptions(),
+    getTaskTags(),
+  ]);
 
   const dueHabits = habitsNotCheckedIn(allHabits);
-  const dueGoals = todaysGoals(goals, new Date());
+  const dueGoals = todaysGoals(goals, now);
 
   return (
     <>
-      <TodayHeader name="Aayan" now={new Date()} />
+      <TodayHeader name="Aayan" now={now} />
       <div className={pageStyles.content}>
         <SectionHeader>Your day</SectionHeader>
         <div className={styles.summaryRow}>
@@ -55,6 +85,17 @@ export default async function TodayPage() {
         <div className={styles.pillsWrap}>
           <TodaySectionPills />
         </div>
+
+        <Card>
+          <MyDayTasks
+            initialTasks={myDayTasks}
+            initialCompletedTasks={completedTasks}
+            initialYesterdayUnfinished={yesterdayUnfinished}
+            lists={taskLists}
+            pillars={pillarOptions}
+            tagSuggestions={taskTags.map((t) => t.name)}
+          />
+        </Card>
 
         <Card>
           <ThoughtQuickAdd tagOptions={tagOptions} />
