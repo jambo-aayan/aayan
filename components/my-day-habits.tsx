@@ -1,10 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import { CheckCircle2 } from "lucide-react";
 import { cycleTodayCheckIn } from "@/lib/habits/actions";
 import { withRetry } from "@/lib/with-retry";
 import { useToast } from "@/components/toast/toast-provider";
 import { ThoughtPrompt } from "@/components/thoughts/thought-prompt";
+import { EmptyState } from "@/components/empty-state";
 import styles from "./my-day-habits.module.css";
 
 type CheckInLevel = "FULL" | "MINIMUM" | null;
@@ -53,7 +55,7 @@ export function MyDayHabits({ initialHabits }: { initialHabits: MyDayHabit[] }) 
   }
 
   if (habits.length === 0) {
-    return <p className={styles.empty}>No active habits yet.</p>;
+    return <EmptyState icon={CheckCircle2} message="No active habits yet." />;
   }
 
   return (

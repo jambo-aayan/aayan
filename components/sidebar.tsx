@@ -1,39 +1,59 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Settings } from "lucide-react";
+import { NAV_ITEMS } from "./nav-config";
 import styles from "./sidebar.module.css";
 
-const NAV_ITEMS = [
-  { href: "/today", label: "Home", swatch: null },
-  { href: "/health", label: "Health", swatch: "var(--health)" },
-  { href: "/finances", label: "Finances", swatch: "var(--coral)" },
-] as const;
-
-export function Sidebar() {
+export function Sidebar({ dailyFocusPercent }: { dailyFocusPercent: number | null }) {
   const pathname = usePathname();
 
   return (
     <nav className={styles.sidebar} aria-label="Main">
-      <div className={styles.brand}>
-        <Image src="/brand/aayan-wordmark.png" alt="aayan" width={116} height={34} priority />
+      <div className={styles.brand}>aayan</div>
+
+      <div className={styles.nav}>
+        {NAV_ITEMS.map((item) => {
+          const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+          const Icon = item.icon;
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`${styles.item} ${active ? styles.active : ""}`}
+              style={item.accent ? ({ "--nav-accent": item.accent } as React.CSSProperties) : undefined}
+            >
+              <Icon size={17} strokeWidth={2} className={styles.icon} />
+              {item.label}
+            </Link>
+          );
+        })}
       </div>
-      {NAV_ITEMS.map((item) => {
-        const active = pathname === item.href;
-        return (
-          <Link
-            key={item.href}
-            href={item.href}
-            className={`${styles.item} ${active ? styles.active : ""}`}
-          >
-            {item.swatch && (
-              <span className={styles.swatch} style={{ background: item.swatch }} />
-            )}
-            {item.label}
-          </Link>
-        );
-      })}
+
+      <div className={styles.footer}>
+        {dailyFocusPercent !== null && (
+          <div className={styles.focus}>
+            <div className={styles.focusHead}>
+              <span>Daily focus</span>
+              <span className={styles.focusPercent}>{dailyFocusPercent}%</span>
+            </div>
+            <div className={styles.focusTrack}>
+              <div className={styles.focusFill} style={{ width: `${dailyFocusPercent}%` }} />
+            </div>
+            <div className={styles.focusHint}>
+              {dailyFocusPercent >= 100 ? "All habits checked in" : "Keep going, every day counts."}
+            </div>
+          </div>
+        )}
+        <Link
+          href="/settings"
+          className={`${styles.item} ${pathname === "/settings" ? styles.active : ""}`}
+        >
+          <Settings size={17} strokeWidth={2} className={styles.icon} />
+          Settings
+        </Link>
+      </div>
     </nav>
   );
 }

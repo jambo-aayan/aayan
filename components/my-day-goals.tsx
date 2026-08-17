@@ -1,11 +1,13 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { Flag } from "lucide-react";
 import { setActionGoalStatus } from "@/lib/action-goals/actions";
 import type { GoalStatus } from "@/lib/action-goals/status";
 import { withRetry } from "@/lib/with-retry";
 import { useToast } from "@/components/toast/toast-provider";
 import { ThoughtPrompt } from "@/components/thoughts/thought-prompt";
+import { EmptyState } from "@/components/empty-state";
 import styles from "./my-day-goals.module.css";
 
 export type MyDayGoal = {
@@ -63,7 +65,7 @@ export function MyDayGoals({ initialGoals }: { initialGoals: MyDayGoal[] }) {
   }
 
   if (goals.length === 0) {
-    return <p className={styles.empty}>No goals flagged for My Day.</p>;
+    return <EmptyState icon={Flag} message="No goals flagged for My Day." />;
   }
 
   return (

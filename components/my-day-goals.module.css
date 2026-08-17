@@ -6,7 +6,7 @@
 
 .row {
   padding: 10px 0;
-  border-top: 1px solid rgba(33, 29, 25, 0.06);
+  border-top: 1px solid var(--border);
 }
 
 .row:first-child {
@@ -38,13 +38,8 @@
   margin-top: 2px;
 }
 
-.empty {
-  color: var(--muted);
-  font-size: 13px;
-}
-
 .error {
-  color: #b3261e;
+  color: var(--danger);
   font-size: 12px;
   margin-top: 6px;
 }

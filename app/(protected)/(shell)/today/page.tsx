@@ -1,14 +1,28 @@
-import Link from "next/link";
-import { PageHeader } from "@/components/page-header";
+import { CheckCircle2, Flag } from "lucide-react";
 import pageStyles from "@/components/page-header.module.css";
+import { TodayHeader } from "@/components/today-header";
+import { SectionHeader } from "@/components/section-header";
+import { DashboardCard } from "@/components/dashboard-card";
+import { TodaySectionPills } from "@/components/nav-pills";
 import { Card } from "@/components/card";
-import { MyDayHabits } from "@/components/my-day-habits";
-import { MyDayGoals } from "@/components/my-day-goals";
 import { ThoughtQuickAdd } from "@/components/thoughts/thought-quick-add";
 import { getMyDayHabits, getEveryGoal } from "@/lib/action-goals/data";
 import { getTagOptions } from "@/lib/thoughts/data";
 import { habitsNotCheckedIn, todaysGoals } from "@/lib/home/today";
 import styles from "./today.module.css";
+
+function habitsStatus(allCount: number, dueCount: number): string {
+  if (allCount === 0) return "No active habits yet.";
+  if (dueCount === 0) return "All checked in for today.";
+  return `${dueCount} left to check in`;
+}
+
+function goalsStatus(dueGoals: { status: string }[]): string {
+  if (dueGoals.length === 0) return "Nothing flagged for today.";
+  const remaining = dueGoals.filter((g) => g.status !== "DONE").length;
+  if (remaining === 0) return "All done for today.";
+  return `${remaining} of ${dueGoals.length} flagged for today`;
+}
 
 export default async function TodayPage() {
   const [allHabits, goals, tagOptions] = await Promise.all([getMyDayHabits(), getEveryGoal(), getTagOptions()]);
@@ -18,42 +32,31 @@ export default async function TodayPage() {
 
   return (
     <>
-      <PageHeader title="Today" />
+      <TodayHeader name="Aayan" now={new Date()} />
       <div className={pageStyles.content}>
-        <Card title="Habits">
-          {dueHabits.length === 0 ? (
-            <p className={styles.empty}>
-              {allHabits.length === 0 ? "No active habits yet." : "All habits checked in for today."}
-            </p>
-          ) : (
-            <MyDayHabits initialHabits={dueHabits} />
-          )}
-        </Card>
-        <Card title="Goals">
-          {dueGoals.length === 0 ? (
-            <p className={styles.empty}>Nothing flagged for today.</p>
-          ) : (
-            <MyDayGoals initialGoals={dueGoals} />
-          )}
-        </Card>
-        <div className={styles.crossCutting}>
-          <Link href="/pillars" className={styles.crossLink}>
-            Pillars
-          </Link>
-          <Link href="/my-day" className={styles.crossLink}>
-            My Day
-          </Link>
-          <Link href="/all-actions" className={styles.crossLink}>
-            All Actions
-          </Link>
-          <Link href="/by-date" className={styles.crossLink}>
-            By Date
-          </Link>
-          <Link href="/thoughts" className={styles.crossLink}>
-            Thoughts
-          </Link>
+        <SectionHeader>Your day</SectionHeader>
+        <div className={styles.summaryRow}>
+          <DashboardCard
+            href="/my-day"
+            icon={CheckCircle2}
+            accent="health"
+            title="Habits"
+            status={habitsStatus(allHabits.length, dueHabits.length)}
+          />
+          <DashboardCard
+            href="/my-day"
+            icon={Flag}
+            accent="finance"
+            title="Goals"
+            status={goalsStatus(dueGoals)}
+          />
         </div>
-        <Card title="Quick thought">
+
+        <div className={styles.pillsWrap}>
+          <TodaySectionPills />
+        </div>
+
+        <Card>
           <ThoughtQuickAdd tagOptions={tagOptions} />
         </Card>
       </div>

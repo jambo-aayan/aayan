@@ -1,0 +1,29 @@
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: none;
+  border-radius: var(--radius-pill);
+  padding: 10px 20px;
+  min-height: 40px;
+  font-size: 13px;
+  font-weight: 600;
+  background: var(--ink);
+  color: var(--bg);
+  cursor: pointer;
+  transition: opacity var(--duration-fast) var(--ease), transform var(--duration-fast) var(--ease);
+}
+
+.button:hover:not(:disabled) {
+  opacity: 0.88;
+}
+
+.button:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
