@@ -1,7 +1,8 @@
-import Link from "next/link";
+import { Landmark } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import pageStyles from "@/components/page-header.module.css";
 import { Card } from "@/components/card";
+import { DashboardCard } from "@/components/dashboard-card";
 import { BaselineForm } from "@/components/baseline-form";
 import { ItemsManager } from "@/components/items-manager";
 import { GoalsManager } from "@/components/goals-manager";
@@ -22,6 +23,7 @@ import {
   getFinanceNorthStar,
   getTransactions,
 } from "@/lib/finance/data";
+import { getLinkedBanks } from "@/lib/enable-banking/data";
 import { netWorth } from "@/lib/finance/net-worth";
 import { surplus } from "@/lib/finance/baseline-math";
 import { categoryBreakdown } from "@/lib/finance/category-breakdown";
@@ -30,12 +32,13 @@ import { cashFlowTrend } from "@/lib/finance/cash-flow-trend";
 import { netWorthBreakdown } from "@/lib/finance/net-worth-breakdown";
 
 export default async function FinancesPage() {
-  const [items, baseline, goals, financeNorthStar, transactions] = await Promise.all([
+  const [items, baseline, goals, financeNorthStar, transactions, linkedBanks] = await Promise.all([
     getItems(),
     getBaseline(),
     getGoals(),
     getFinanceNorthStar(),
     getTransactions(),
+    getLinkedBanks(),
   ]);
   const { accessible, total } = netWorth(items);
   const monthlySurplus = surplus(baseline.monthlyIncome, baseline.fixedOutgoings);
@@ -60,9 +63,13 @@ export default async function FinancesPage() {
 
         <div className={dashboardStyles.divider}>Manage</div>
 
-        <Card>
-          <Link href="/finances/link-bank">Link a bank →</Link>
-        </Card>
+        <DashboardCard
+          href="/finances/link-bank"
+          icon={Landmark}
+          accent="finance"
+          title="Link a bank"
+          status={linkedBanks.length === 0 ? "None linked yet" : `${linkedBanks.length} linked`}
+        />
 
         <Card title="North Star">
           <FinanceNorthStarCard

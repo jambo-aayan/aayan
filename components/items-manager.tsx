@@ -1,8 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import { Wallet } from "lucide-react";
 import { createItem, deleteItem, restoreItem, updateItem, type ItemInput } from "@/lib/finance/actions";
 import { useUndoableCrudList, type ActionResult } from "@/lib/hooks/use-undoable-crud-list";
+import { PrimaryButton } from "@/components/primary-button";
+import { EmptyState } from "@/components/empty-state";
 import styles from "./items-manager.module.css";
 
 type Item = ItemInput & { id: string };
@@ -72,15 +75,15 @@ export function ItemsManager({ initialItems }: { initialItems: Item[] }) {
             </li>
           )
         )}
-        {items.length === 0 && <li className={styles.empty}>No items yet.</li>}
       </ul>
+      {items.length === 0 && <EmptyState icon={Wallet} message="No items yet." />}
       {error && <p className={styles.error}>{error}</p>}
 
       <div className={styles.addForm}>
         <ItemFields form={form} onChange={setForm} />
-        <button type="button" className={styles.add} onClick={handleAdd} disabled={adding}>
+        <PrimaryButton onClick={handleAdd} disabled={adding}>
           {adding ? "Adding…" : "Add item"}
-        </button>
+        </PrimaryButton>
       </div>
       {addError && <p className={styles.error}>{addError}</p>}
 
@@ -165,9 +168,9 @@ function ItemEditRow({
   return (
     <li className={styles.addForm}>
       <ItemFields form={form} onChange={setForm} />
-      <button type="button" className={styles.add} onClick={handleSave} disabled={saving}>
+      <PrimaryButton onClick={handleSave} disabled={saving}>
         {saving ? "Saving…" : "Save"}
-      </button>
+      </PrimaryButton>
       <button type="button" className={styles.link} onClick={onCancel}>
         Cancel
       </button>

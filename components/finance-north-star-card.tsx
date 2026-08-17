@@ -5,6 +5,7 @@ import { requiredMonthlyRate, verdict, projectedValue } from "@/lib/finance/nort
 import { updateFinanceNorthStar } from "@/lib/finance/actions";
 import { withRetry } from "@/lib/with-retry";
 import { useToast } from "@/components/toast/toast-provider";
+import { PrimaryButton } from "@/components/primary-button";
 import styles from "./finance-north-star-card.module.css";
 
 const PROJECTION_YEARS = 5;
@@ -98,9 +99,9 @@ export function FinanceNorthStarCard({
         </label>
       </div>
       {error && <p className={styles.error}>{error}</p>}
-      <button type="button" className={styles.save} onClick={handleSave} disabled={saving}>
+      <PrimaryButton onClick={handleSave} disabled={saving} className={styles.save}>
         {saving ? "Saving…" : "Save"}
-      </button>
+      </PrimaryButton>
     </div>
   );
 }

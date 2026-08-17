@@ -5,6 +5,7 @@ import { surplus } from "@/lib/finance/baseline-math";
 import { updateBaseline } from "@/lib/finance/actions";
 import { withRetry } from "@/lib/with-retry";
 import { useToast } from "@/components/toast/toast-provider";
+import { PrimaryButton } from "@/components/primary-button";
 import styles from "./baseline-form.module.css";
 
 function formatGBP(value: number): string {
@@ -71,9 +72,9 @@ export function BaselineForm({
         Surplus: <strong>{valid ? formatGBP(surplus(incomeNum, outgoingsNum)) : "—"}</strong>
       </div>
       {error && <p className={styles.error}>{error}</p>}
-      <button type="button" className={styles.save} onClick={handleSave} disabled={saving}>
+      <PrimaryButton onClick={handleSave} disabled={saving} className={styles.save}>
         {saving ? "Saving…" : "Save"}
-      </button>
+      </PrimaryButton>
     </div>
   );
 }
