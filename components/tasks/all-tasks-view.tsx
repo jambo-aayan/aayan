@@ -18,6 +18,7 @@ import {
   archiveTask,
   unarchiveTask,
   deleteTask,
+  restoreTask,
   addTaskToMyDay,
   reorderListTasks,
 } from "@/lib/tasks/actions";
@@ -47,7 +48,7 @@ export function AllTasksView({
   const [tasks, setTasks] = useState(initialTasks);
   const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
   const [composer, setComposer] = useState<{ mode: "create" | "edit"; task?: Task } | null>(null);
-  const { notifyError } = useToast();
+  const { notifyError, notifyUndo } = useToast();
   const today = new Date();
 
   async function handleToggleComplete(task: Task) {
@@ -105,7 +106,18 @@ export function AllTasksView({
     if (!result.ok) {
       setTasks((prev) => [...prev, task]);
       notifyError(result.error, { onRetry: () => handleDelete(task) });
+      return;
     }
+    notifyUndo(`Deleted "${task.title}".`, () => handleUndoDelete(task));
+  }
+
+  async function handleUndoDelete(task: Task) {
+    const result = await withRetry(() => restoreTask(task.id));
+    if (!result.ok) {
+      notifyError(result.error, { onRetry: () => handleUndoDelete(task) });
+      return;
+    }
+    setTasks((prev) => [...prev, task]);
   }
 
   /** Manual List order — independent of My Day's ordering (see Task's schema

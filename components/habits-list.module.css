@@ -65,7 +65,7 @@
 }
 
 .dot.full {
-  background: var(--health);
+  background: var(--pillar-accent, var(--health));
 }
 
 .dot.minimum {

@@ -11,7 +11,7 @@
   width: 56px;
   height: 56px;
   border-radius: 50%;
-  background: var(--ink);
+  background: var(--pillar-accent, var(--ink));
   color: var(--bg);
   display: flex;
   align-items: center;
@@ -51,7 +51,7 @@
 }
 
 .leaf:hover {
-  background: var(--health);
+  background: var(--pillar-accent, var(--health));
   color: white;
 }
 

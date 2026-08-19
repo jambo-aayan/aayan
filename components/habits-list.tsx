@@ -55,10 +55,15 @@ export function HabitsList({
   areaId,
   pillarId,
   initialHabits,
+  pillarColor,
 }: {
   areaId: string;
   pillarId: string;
   initialHabits: AreaHabit[];
+  /** The Pillar's chosen color (resolved hex) — the check-in dot's "full"
+   * state uses it instead of the default green, one of the color system's
+   * "checkbox/accent state" propagation points. */
+  pillarColor?: string | null;
 }) {
   const [habits, setHabits] = useState(initialHabits);
   const [form, setForm] = useState(EMPTY_FORM);
@@ -203,7 +208,7 @@ export function HabitsList({
   }
 
   return (
-    <div>
+    <div style={pillarColor ? ({ "--pillar-accent": pillarColor } as React.CSSProperties) : undefined}>
       <ul className={styles.list}>
         {habits.map((habit) =>
           editingId === habit.id ? (

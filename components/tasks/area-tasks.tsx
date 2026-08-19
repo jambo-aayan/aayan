@@ -16,6 +16,7 @@ import {
   setTaskImportant,
   archiveTask,
   deleteTask,
+  restoreTask,
 } from "@/lib/tasks/actions";
 import type { Task } from "@/lib/tasks/types";
 import type { TaskListSummary } from "@/lib/tasks/data";
@@ -47,7 +48,7 @@ export function AreaTasks({
   const [tasks, setTasks] = useState(initialTasks);
   const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
   const [composer, setComposer] = useState<{ mode: "create" | "edit"; task?: Task } | null>(null);
-  const { notifyError } = useToast();
+  const { notifyError, notifyUndo } = useToast();
   const today = new Date();
 
   async function handleQuickAdd(submission: QuickAddSubmission) {
@@ -151,7 +152,21 @@ export function AreaTasks({
   async function handleDelete(task: Task) {
     setTasks((prev) => prev.filter((t) => t.id !== task.id));
     const result = await withRetry(() => deleteTask(task.id));
-    if (!result.ok) notifyError(result.error, { onRetry: () => handleDelete(task) });
+    if (!result.ok) {
+      setTasks((prev) => [...prev, task]);
+      notifyError(result.error, { onRetry: () => handleDelete(task) });
+      return;
+    }
+    notifyUndo(`Deleted "${task.title}".`, () => handleUndoDelete(task));
+  }
+
+  async function handleUndoDelete(task: Task) {
+    const result = await withRetry(() => restoreTask(task.id));
+    if (!result.ok) {
+      notifyError(result.error, { onRetry: () => handleUndoDelete(task) });
+      return;
+    }
+    setTasks((prev) => [...prev, task]);
   }
 
   async function handleComposerSubmit(input: TaskFormInput) {

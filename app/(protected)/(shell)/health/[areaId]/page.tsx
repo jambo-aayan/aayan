@@ -14,6 +14,7 @@ import { getTasksForArea, getTaskLists, getPillarOptions, getAreaOptions, getTas
 import { getGoalOptions } from "@/lib/goals/data";
 import { getPainMobilityLogs } from "@/lib/pain-mobility/data";
 import { PAIN_MOBILITY_AREA_ID } from "@/lib/pain-mobility/scope";
+import { resolveColorHex, type ColorKey } from "@/lib/colors";
 
 export default async function AreaPage({
   params,
@@ -35,10 +36,11 @@ export default async function AreaPage({
   ]);
   const isPainMobilityArea = areaId === PAIN_MOBILITY_AREA_ID;
   const painLogs = isPainMobilityArea ? await getPainMobilityLogs(areaId) : [];
+  const accentColor = resolveColorHex(pillars.find((p) => p.id === area.pillarId)?.color as ColorKey | null);
 
   return (
     <>
-      <PageHeader title={area.name} backHref="/health" />
+      <PageHeader title={area.name} backHref="/health" accentColor={accentColor} />
       <div className={pageStyles.content}>
         <Card>
           <EditableText
@@ -55,7 +57,7 @@ export default async function AreaPage({
           />
         </Card>
         <Card title="Habits">
-          <HabitsList areaId={area.id} pillarId={area.pillarId} initialHabits={habits} />
+          <HabitsList areaId={area.id} pillarId={area.pillarId} initialHabits={habits} pillarColor={accentColor} />
         </Card>
         <Card title="Tasks">
           <AreaTasks

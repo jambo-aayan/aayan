@@ -5,16 +5,18 @@ import { HealthMindmap } from "@/components/health-mindmap";
 import { EditableText } from "@/components/editable-text";
 import { getHealthPillarWithAreas } from "@/lib/health/data";
 import { updateHealthPillarNorthStar } from "@/lib/health/actions";
+import { resolveColorHex, type ColorKey } from "@/lib/colors";
 
 export default async function HealthPage() {
   const pillar = await getHealthPillarWithAreas();
+  const accentColor = resolveColorHex(pillar.color as ColorKey | null);
 
   return (
     <>
-      <PageHeader title="Health" />
+      <PageHeader title="Health" accentColor={accentColor} />
       <div className={pageStyles.content}>
         <Card title="Areas">
-          <HealthMindmap areas={pillar.areas} />
+          <HealthMindmap areas={pillar.areas} accentColor={accentColor} />
         </Card>
         <Card title="North Star">
           <EditableText

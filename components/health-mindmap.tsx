@@ -11,7 +11,16 @@ const RADIUS = 100;
 const X_SCALE = 2.6;
 const Y_SCALE = 3.6;
 
-export function HealthMindmap({ areas }: { areas: { id: string; name: string }[] }) {
+export function HealthMindmap({
+  areas,
+  accentColor,
+}: {
+  areas: { id: string; name: string }[];
+  /** The Health Pillar's chosen color (resolved hex) — the center node's
+   * "icon background" and the leaf hover state use it instead of the
+   * default ink/green, one of the color system's propagation points. */
+  accentColor?: string | null;
+}) {
   const nodes = areas.map((area, i) => {
     const angleDeg = START_ANGLE + i * ANGLE_STEP;
     const rad = (angleDeg * Math.PI) / 180;
@@ -24,7 +33,7 @@ export function HealthMindmap({ areas }: { areas: { id: string; name: string }[]
   });
 
   return (
-    <div className={styles.wrap}>
+    <div className={styles.wrap} style={accentColor ? ({ "--pillar-accent": accentColor } as React.CSSProperties) : undefined}>
       <div className={styles.core}>Health</div>
       {nodes.map((n) => (
         <span
