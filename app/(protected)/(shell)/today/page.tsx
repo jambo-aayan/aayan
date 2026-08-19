@@ -7,58 +7,59 @@ import { TodaySectionPills } from "@/components/nav-pills";
 import { Card } from "@/components/card";
 import { ThoughtQuickAdd } from "@/components/thoughts/thought-quick-add";
 import { MyDayTasks } from "@/components/tasks/my-day-tasks";
-import { getMyDayHabits, getEveryGoal } from "@/lib/action-goals/data";
+import { getHabitOccurrencesForDate } from "@/lib/habits/data";
+import { getAllGoals } from "@/lib/goals/data";
 import { getTagOptions } from "@/lib/thoughts/data";
-import { habitsNotCheckedIn, todaysGoals } from "@/lib/home/today";
+import { habitsNotCheckedIn } from "@/lib/home/today";
 import {
   getMyDayTasks,
   getTodayCompletedTasks,
   getYesterdayUnfinishedTasks,
   getTaskLists,
   getPillarOptions,
+  getAreaOptions,
   getTaskTags,
 } from "@/lib/tasks/data";
 import styles from "./today.module.css";
 
-function habitsStatus(allCount: number, dueCount: number): string {
-  if (allCount === 0) return "No active habits yet.";
+function habitsStatus(occurringCount: number, dueCount: number): string {
+  if (occurringCount === 0) return "Nothing scheduled today.";
   if (dueCount === 0) return "All checked in for today.";
-  return `${dueCount} left to check in`;
+  return `${dueCount} left to check in today`;
 }
 
-function goalsStatus(dueGoals: { status: string }[]): string {
-  if (dueGoals.length === 0) return "Nothing flagged for today.";
-  const remaining = dueGoals.filter((g) => g.status !== "DONE").length;
-  if (remaining === 0) return "All done for today.";
-  return `${remaining} of ${dueGoals.length} flagged for today`;
+function goalsStatus(activeCount: number): string {
+  if (activeCount === 0) return "No active goals yet.";
+  return `${activeCount} active`;
 }
 
 export default async function TodayPage() {
   const now = new Date();
   const [
-    allHabits,
-    goals,
+    todaysHabits,
+    activeGoals,
     tagOptions,
     myDayTasks,
     completedTasks,
     yesterdayUnfinished,
     taskLists,
     pillarOptions,
+    areaOptions,
     taskTags,
   ] = await Promise.all([
-    getMyDayHabits(),
-    getEveryGoal(),
+    getHabitOccurrencesForDate(now),
+    getAllGoals({ status: "ACTIVE" }),
     getTagOptions(),
     getMyDayTasks(now),
     getTodayCompletedTasks(now),
     getYesterdayUnfinishedTasks(now),
     getTaskLists(),
     getPillarOptions(),
+    getAreaOptions(),
     getTaskTags(),
   ]);
 
-  const dueHabits = habitsNotCheckedIn(allHabits);
-  const dueGoals = todaysGoals(goals, now);
+  const dueHabits = habitsNotCheckedIn(todaysHabits);
 
   return (
     <>
@@ -67,18 +68,18 @@ export default async function TodayPage() {
         <SectionHeader>Your day</SectionHeader>
         <div className={styles.summaryRow}>
           <DashboardCard
-            href="/my-day"
+            href="/habits"
             icon={CheckCircle2}
             accent="health"
             title="Habits"
-            status={habitsStatus(allHabits.length, dueHabits.length)}
+            status={habitsStatus(todaysHabits.length, dueHabits.length)}
           />
           <DashboardCard
-            href="/my-day"
+            href="/goals"
             icon={Flag}
             accent="finance"
             title="Goals"
-            status={goalsStatus(dueGoals)}
+            status={goalsStatus(activeGoals.length)}
           />
         </div>
 
@@ -93,6 +94,7 @@ export default async function TodayPage() {
             initialYesterdayUnfinished={yesterdayUnfinished}
             lists={taskLists}
             pillars={pillarOptions}
+            areas={areaOptions}
             tagSuggestions={taskTags.map((t) => t.name)}
           />
         </Card>

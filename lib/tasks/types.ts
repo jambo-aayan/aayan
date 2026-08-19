@@ -20,16 +20,30 @@ export const REPEAT_LABEL: Record<TaskRepeatRule, string> = {
   CUSTOM: "Custom",
 };
 
+export type TaskStep = {
+  id: string;
+  title: string;
+  completed: boolean;
+  sortOrder: number;
+};
+
 export type Task = {
   id: string;
   title: string;
   notes: string | null;
   status: TaskStatus;
   important: boolean;
+  sortOrder: number;
   listId: string | null;
   listName: string | null;
+  listColor: string | null;
   pillarId: string | null;
   pillarName: string | null;
+  pillarColor: string | null;
+  areaId: string | null;
+  areaName: string | null;
+  goalId: string | null;
+  goalName: string | null;
   dueDate: Date | null;
   dueTime: string | null;
   reminderOffset: TaskReminderOffset | null;
@@ -39,4 +53,5 @@ export type Task = {
   createdAt: Date;
   updatedAt: Date;
   tags: { id: string; name: string }[];
+  steps: TaskStep[];
 };

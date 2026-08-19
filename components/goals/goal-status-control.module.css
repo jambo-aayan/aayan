@@ -1,0 +1,23 @@
+.group {
+  display: flex;
+  gap: 4px;
+  background: var(--bg2);
+  border-radius: var(--radius-pill);
+  padding: 3px;
+  width: fit-content;
+}
+
+.btn {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+  padding: 6px 12px;
+  border-radius: var(--radius-pill);
+}
+
+.btnActive {
+  background: var(--card);
+  color: var(--ink);
+  font-weight: 600;
+  box-shadow: var(--shadow-sm);
+}

@@ -3,25 +3,26 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { LucideIcon } from "lucide-react";
-import { House, LayoutGrid, Calendar, List, CalendarDays, Lightbulb, ListChecks } from "lucide-react";
+import { House, LayoutGrid, Calendar, CalendarDays, Lightbulb, ListChecks, Repeat, Flag } from "lucide-react";
 import styles from "./nav-pills.module.css";
 
 type NavPillItem = { href: string; label: string; icon: LucideIcon };
 
 const TODAY_PILLS: NavPillItem[] = [
   { href: "/pillars", label: "Pillars", icon: LayoutGrid },
-  { href: "/my-day", label: "My Day", icon: Calendar },
-  { href: "/all-actions", label: "All Actions", icon: List },
-  { href: "/all-tasks", label: "All Tasks", icon: ListChecks },
+  { href: "/tasks", label: "Tasks", icon: ListChecks },
+  { href: "/habits", label: "Habits", icon: Repeat },
+  { href: "/goals", label: "Goals", icon: Flag },
+  { href: "/my-day", label: "My Day habits", icon: Calendar },
   { href: "/by-date", label: "By Date", icon: CalendarDays },
   { href: "/thoughts", label: "Thoughts", icon: Lightbulb },
 ];
 
 const PILLARS_PILLS: NavPillItem[] = [
   { href: "/today", label: "Today", icon: House },
-  { href: "/my-day", label: "My Day", icon: Calendar },
-  { href: "/all-actions", label: "All Actions", icon: List },
-  { href: "/all-tasks", label: "All Tasks", icon: ListChecks },
+  { href: "/tasks", label: "Tasks", icon: ListChecks },
+  { href: "/habits", label: "Habits", icon: Repeat },
+  { href: "/goals", label: "Goals", icon: Flag },
   { href: "/thoughts", label: "Thoughts", icon: Lightbulb },
 ];
 

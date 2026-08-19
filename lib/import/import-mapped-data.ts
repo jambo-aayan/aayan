@@ -31,16 +31,22 @@ export type ImportSummary = {
 export async function importMappedData(mapped: MappedImport): Promise<ImportSummary> {
   let checkInsImported = 0;
 
+  const areaPillarIds = new Map((await prisma.area.findMany({ select: { id: true, pillarId: true } })).map((a) => [a.id, a.pillarId]));
+
   for (const habit of mapped.habits) {
+    const pillarId = areaPillarIds.get(habit.areaId);
+    if (!pillarId) continue; // an area this import references doesn't exist yet — skip rather than fail the whole import
+    const status = habit.active ? "ACTIVE" : "PAUSED";
     await prisma.habit.upsert({
       where: { id: habit.id },
-      update: { areaId: habit.areaId, name: habit.name, frequency: habit.frequency, active: habit.active },
+      update: { areaId: habit.areaId, pillarId, name: habit.name, frequency: habit.frequency, status },
       create: {
         id: habit.id,
         areaId: habit.areaId,
+        pillarId,
         name: habit.name,
         frequency: habit.frequency,
-        active: habit.active,
+        status,
       },
     });
     if (habit.checkIns.length > 0) {

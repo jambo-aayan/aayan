@@ -1,0 +1,28 @@
+.layout {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.sidebarCol {
+  width: 100%;
+}
+
+@media (min-width: 720px) {
+  .layout {
+    flex-direction: row;
+    align-items: flex-start;
+  }
+
+  .sidebarCol {
+    width: 240px;
+    flex-shrink: 0;
+    position: sticky;
+    top: 20px;
+  }
+
+  .mainCol {
+    flex: 1;
+    min-width: 0;
+  }
+}

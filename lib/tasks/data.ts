@@ -11,9 +11,12 @@ import type { Task } from "./types";
 const SAFETY_LIMIT = 500;
 
 const TASK_INCLUDE = {
-  list: { select: { id: true, name: true } },
-  pillar: { select: { id: true, name: true } },
+  list: { select: { id: true, name: true, color: true } },
+  pillar: { select: { id: true, name: true, color: true } },
+  area: { select: { id: true, name: true } },
+  goal: { select: { id: true, name: true } },
   tags: { include: { tag: { select: { id: true, name: true } } } },
+  steps: { orderBy: { sortOrder: "asc" as const } },
 } as const;
 
 type TaskRow = {
@@ -22,10 +25,15 @@ type TaskRow = {
   notes: string | null;
   status: Task["status"];
   important: boolean;
+  sortOrder: number;
   listId: string | null;
-  list: { id: string; name: string } | null;
+  list: { id: string; name: string; color: string | null } | null;
   pillarId: string | null;
-  pillar: { id: string; name: string } | null;
+  pillar: { id: string; name: string; color: string | null } | null;
+  areaId: string | null;
+  area: { id: string; name: string } | null;
+  goalId: string | null;
+  goal: { id: string; name: string } | null;
   dueDate: Date | null;
   dueTime: string | null;
   reminderOffset: Task["reminderOffset"];
@@ -35,6 +43,7 @@ type TaskRow = {
   createdAt: Date;
   updatedAt: Date;
   tags: { tag: { id: string; name: string } }[];
+  steps: { id: string; title: string; completed: boolean; sortOrder: number }[];
 };
 
 function mapTask(row: TaskRow): Task {
@@ -44,10 +53,17 @@ function mapTask(row: TaskRow): Task {
     notes: row.notes,
     status: row.status,
     important: row.important,
+    sortOrder: row.sortOrder,
     listId: row.listId,
     listName: row.list?.name ?? null,
+    listColor: row.list?.color ?? null,
     pillarId: row.pillarId,
     pillarName: row.pillar?.name ?? null,
+    pillarColor: row.pillar?.color ?? null,
+    areaId: row.areaId,
+    areaName: row.area?.name ?? null,
+    goalId: row.goalId,
+    goalName: row.goal?.name ?? null,
     dueDate: row.dueDate,
     dueTime: row.dueTime,
     reminderOffset: row.reminderOffset,
@@ -57,6 +73,7 @@ function mapTask(row: TaskRow): Task {
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     tags: row.tags.map((t) => t.tag),
+    steps: row.steps,
   };
 }
 
@@ -66,7 +83,10 @@ function dateOnly(date: Date): Date {
 
 /** Tasks that belong in My Day for `date` — manually added (a MyDayEntry row
  * for that date) or automatically due that day. See MyDayEntry's schema
- * comment: never a boolean, so this is a query, not a stored flag. */
+ * comment: never a boolean, so this is a query, not a stored flag. Ordered
+ * by each task's MyDayEntry.sortOrder where one exists (manually reordered
+ * within My Day), falling back to creation order for due-today tasks that
+ * were never dragged — independent of the task's List-level sortOrder. */
 export async function getMyDayTasks(date: Date): Promise<Task[]> {
   const day = dateOnly(date);
   const rows = await prisma.task.findMany({
@@ -76,10 +96,15 @@ export async function getMyDayTasks(date: Date): Promise<Task[]> {
       status: "ACTIVE",
       OR: [{ dueDate: day }, { myDayEntries: { some: { date: day } } }],
     },
-    include: TASK_INCLUDE,
+    include: { ...TASK_INCLUDE, myDayEntries: { where: { date: day } } },
     orderBy: [{ important: "desc" }, { createdAt: "asc" }],
   });
-  return rows.map(mapTask);
+  const withOrder = rows.map((row) => ({
+    task: mapTask(row),
+    myDaySort: row.myDayEntries[0]?.sortOrder ?? Number.POSITIVE_INFINITY,
+  }));
+  withOrder.sort((a, b) => a.myDaySort - b.myDaySort);
+  return withOrder.map((w) => w.task);
 }
 
 /** Tasks manually added to My Day yesterday that are still unfinished and
@@ -138,6 +163,8 @@ export type TaskFilter = {
   view?: TaskView;
   listId?: string;
   pillarId?: string;
+  areaId?: string;
+  goalId?: string;
   tagId?: string;
   search?: string;
 };
@@ -183,6 +210,8 @@ export async function getAllTasks(filter: TaskFilter): Promise<Task[]> {
 
   if (filter.listId) where.listId = filter.listId;
   if (filter.pillarId) where.pillarId = filter.pillarId;
+  if (filter.areaId) where.areaId = filter.areaId;
+  if (filter.goalId) where.goalId = filter.goalId;
   if (filter.tagId) where.tags = { some: { tagId: filter.tagId } };
   if (filter.search?.trim()) {
     const q = filter.search.trim();
@@ -192,12 +221,11 @@ export async function getAllTasks(filter: TaskFilter): Promise<Task[]> {
     ];
   }
 
-  const rows = await prisma.task.findMany({
-    where,
-    include: TASK_INCLUDE,
-    orderBy: [{ important: "desc" }, { createdAt: "desc" }],
-    take: SAFETY_LIMIT,
-  });
+  const orderBy = filter.listId
+    ? [{ important: "desc" as const }, { sortOrder: "asc" as const }]
+    : [{ important: "desc" as const }, { createdAt: "desc" as const }];
+
+  const rows = await prisma.task.findMany({ where, include: TASK_INCLUDE, orderBy, take: SAFETY_LIMIT });
   return rows.map(mapTask);
 }
 
@@ -213,16 +241,32 @@ export async function getActiveTasksForByDate(): Promise<Task[]> {
   return rows.map(mapTask);
 }
 
+/** Open (active, non-archived, non-deleted) tasks for one Area — the Area
+ * page's Tasks card, queried live through the relationship rather than
+ * duplicated onto the Area. */
+export async function getTasksForArea(areaId: string): Promise<Task[]> {
+  const rows = await prisma.task.findMany({
+    where: { ...baseActiveWhere(), areaId },
+    include: TASK_INCLUDE,
+    orderBy: [{ important: "desc" }, { createdAt: "asc" }],
+  });
+  return rows.map(mapTask);
+}
+
 export async function getTaskById(id: string): Promise<Task | null> {
   const row = await prisma.task.findUnique({ where: { id }, include: TASK_INCLUDE });
   return row ? mapTask(row) : null;
 }
 
-export async function getPillarOptions(): Promise<{ id: string; name: string }[]> {
-  return prisma.pillar.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } });
+export async function getPillarOptions(): Promise<{ id: string; name: string; color: string | null }[]> {
+  return prisma.pillar.findMany({ select: { id: true, name: true, color: true }, orderBy: { name: "asc" } });
 }
 
-export type TaskListSummary = { id: string; name: string; taskCount: number };
+export async function getAreaOptions(): Promise<{ id: string; name: string; pillarId: string }[]> {
+  return prisma.area.findMany({ select: { id: true, name: true, pillarId: true }, orderBy: { sortOrder: "asc" } });
+}
+
+export type TaskListSummary = { id: string; name: string; color: string | null; taskCount: number };
 
 export async function getTaskLists(): Promise<TaskListSummary[]> {
   const lists = await prisma.taskList.findMany({
@@ -230,7 +274,7 @@ export async function getTaskLists(): Promise<TaskListSummary[]> {
     include: { _count: { select: { tasks: { where: baseActiveWhere() } } } },
     orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
   });
-  return lists.map((l) => ({ id: l.id, name: l.name, taskCount: l._count.tasks }));
+  return lists.map((l) => ({ id: l.id, name: l.name, color: l.color, taskCount: l._count.tasks }));
 }
 
 export type TaskTagSummary = { id: string; name: string; taskCount: number };

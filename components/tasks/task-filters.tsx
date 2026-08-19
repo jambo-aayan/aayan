@@ -17,10 +17,14 @@ const VIEWS: { value: string; label: string }[] = [
 export function TaskFilters({
   lists,
   pillars,
+  areas = [],
+  goals = [],
   tags,
 }: {
   lists: { id: string; name: string }[];
   pillars: { id: string; name: string }[];
+  areas?: { id: string; name: string }[];
+  goals?: { id: string; name: string }[];
   tags: { id: string; name: string }[];
 }) {
   const router = useRouter();
@@ -76,6 +80,36 @@ export function TaskFilters({
           </option>
         ))}
       </select>
+      {areas.length > 0 && (
+        <select
+          className={styles.select}
+          value={searchParams.get("areaId") ?? ""}
+          onChange={(e) => setParam("areaId", e.target.value)}
+          aria-label="Area"
+        >
+          <option value="">All areas</option>
+          {areas.map((a) => (
+            <option key={a.id} value={a.id}>
+              {a.name}
+            </option>
+          ))}
+        </select>
+      )}
+      {goals.length > 0 && (
+        <select
+          className={styles.select}
+          value={searchParams.get("goalId") ?? ""}
+          onChange={(e) => setParam("goalId", e.target.value)}
+          aria-label="Goal"
+        >
+          <option value="">All goals</option>
+          {goals.map((g) => (
+            <option key={g.id} value={g.id}>
+              {g.name}
+            </option>
+          ))}
+        </select>
+      )}
       {tags.length > 0 && (
         <select
           className={styles.select}

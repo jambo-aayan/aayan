@@ -1,20 +1,9 @@
-import { PageHeader } from "@/components/page-header";
-import pageStyles from "@/components/page-header.module.css";
-import { Card } from "@/components/card";
-import { AllActionsList } from "@/components/all-actions-list";
-import { getAllActionsGoals } from "@/lib/action-goals/data";
+import { redirect } from "next/navigation";
 
-export default async function AllActionsPage() {
-  const goals = await getAllActionsGoals();
-
-  return (
-    <>
-      <PageHeader title="All Actions" backHref="/today" />
-      <div className={pageStyles.content}>
-        <Card title="Backlog goals">
-          <AllActionsList goals={goals} />
-        </Card>
-      </div>
-    </>
-  );
+/** All Actions (the old ActionGoal-backed backlog) is superseded by All
+ * Tasks — every ActionGoal row was migrated into Task (see migration
+ * 20260819115616_tasks_v2_habits_goals). Kept as a redirect rather than a
+ * 404 so any old bookmark/link still lands somewhere useful. */
+export default function AllActionsPage() {
+  redirect("/tasks");
 }

@@ -18,6 +18,7 @@ import {
   deleteTask,
   removeTaskFromMyDay,
   addYesterdayTasksToToday,
+  reorderMyDayTasks,
 } from "@/lib/tasks/actions";
 import type { Task } from "@/lib/tasks/types";
 import type { TaskListSummary } from "@/lib/tasks/data";
@@ -29,13 +30,17 @@ export function MyDayTasks({
   initialYesterdayUnfinished,
   lists,
   pillars,
+  areas,
+  goals = [],
   tagSuggestions,
 }: {
   initialTasks: Task[];
   initialCompletedTasks: Task[];
   initialYesterdayUnfinished: Task[];
   lists: TaskListSummary[];
-  pillars: { id: string; name: string }[];
+  pillars: { id: string; name: string; color?: string | null }[];
+  areas: { id: string; name: string; pillarId: string }[];
+  goals?: { id: string; name: string; areaId: string | null; pillarId?: string }[];
   tagSuggestions: string[];
 }) {
   const [tasks, setTasks] = useState(initialTasks);
@@ -64,10 +69,17 @@ export function MyDayTasks({
       notes: null,
       status: "ACTIVE",
       important: false,
+      sortOrder: 0,
       listId: null,
       listName: null,
+      listColor: null,
       pillarId: null,
       pillarName: null,
+      pillarColor: null,
+      areaId: null,
+      areaName: null,
+      goalId: null,
+      goalName: null,
       dueDate: submission.dueDate,
       dueTime: submission.dueTime,
       reminderOffset: null,
@@ -77,6 +89,7 @@ export function MyDayTasks({
       createdAt: today,
       updatedAt: today,
       tags: [],
+      steps: [],
     };
     setTasks((prev) => [...prev, optimisticTask]);
 
@@ -87,6 +100,8 @@ export function MyDayTasks({
           notes: null,
           listId: null,
           pillarId: null,
+          areaId: null,
+          goalId: null,
           tagNames: [],
           dueDate: submission.dueDate,
           dueTime: submission.dueTime,
@@ -184,6 +199,23 @@ export function MyDayTasks({
     }
   }
 
+  /** My Day's own manual order — independent of each task's List order (see
+   * Task's schema comment). Move up/down rather than pointer drag, so this
+   * behaves identically on touch and desktop. */
+  async function handleMove(task: Task, direction: -1 | 1) {
+    const index = tasks.findIndex((t) => t.id === task.id);
+    const swapWith = index + direction;
+    if (index < 0 || swapWith < 0 || swapWith >= tasks.length) return;
+    const reordered = [...tasks];
+    [reordered[index], reordered[swapWith]] = [reordered[swapWith], reordered[index]];
+    setTasks(reordered);
+    const result = await withRetry(() => reorderMyDayTasks(reordered.map((t) => t.id)));
+    if (!result.ok) {
+      setTasks(tasks);
+      notifyError(result.error, { onRetry: () => handleMove(task, direction) });
+    }
+  }
+
   async function handleComposerSubmit(input: TaskFormInput) {
     if (composer?.mode === "edit" && composer.task) {
       const result = await updateTask(composer.task.id, input);
@@ -193,6 +225,8 @@ export function MyDayTasks({
           ...input,
           listName: lists.find((l) => l.id === input.listId)?.name ?? null,
           pillarName: pillars.find((p) => p.id === input.pillarId)?.name ?? null,
+          areaName: areas.find((a) => a.id === input.areaId)?.name ?? null,
+          goalName: goals.find((g) => g.id === input.goalId)?.name ?? null,
           tags: input.tagNames.map((name) => ({ id: name, name })),
         };
         const apply = (list: Task[]) => list.map((t) => (t.id === merged.id ? merged : t));
@@ -210,10 +244,17 @@ export function MyDayTasks({
         notes: input.notes,
         status: "ACTIVE",
         important: input.important,
+        sortOrder: 0,
         listId: input.listId,
         listName: lists.find((l) => l.id === input.listId)?.name ?? null,
+        listColor: null,
         pillarId: input.pillarId,
         pillarName: pillars.find((p) => p.id === input.pillarId)?.name ?? null,
+        pillarColor: null,
+        areaId: input.areaId,
+        areaName: areas.find((a) => a.id === input.areaId)?.name ?? null,
+        goalId: input.goalId,
+        goalName: goals.find((g) => g.id === input.goalId)?.name ?? null,
         dueDate: input.dueDate,
         dueTime: input.dueTime,
         reminderOffset: input.reminderOffset,
@@ -223,6 +264,7 @@ export function MyDayTasks({
         createdAt: today,
         updatedAt: today,
         tags: input.tagNames.map((name) => ({ id: name, name })),
+        steps: [],
       };
       setTasks((prev) => [...prev, created]);
       return { ok: true as const };
@@ -235,6 +277,8 @@ export function MyDayTasks({
   function menuItemsFor(task: Task, isCompleted: boolean): TaskMenuItem[] {
     const items: TaskMenuItem[] = [{ label: "Edit", onSelect: () => setComposer({ mode: "edit", task }) }];
     if (!isCompleted) {
+      items.push({ label: "Move up", onSelect: () => handleMove(task, -1) });
+      items.push({ label: "Move down", onSelect: () => handleMove(task, 1) });
       items.push({ label: "Remove from My Day", onSelect: () => handleRemoveFromMyDay(task) });
     }
     items.push({ label: "Archive", onSelect: () => handleArchive(task) });
@@ -317,6 +361,8 @@ export function MyDayTasks({
           task={composer.task}
           lists={lists}
           pillars={pillars}
+          areas={areas}
+          goals={goals}
           tagSuggestions={tagSuggestions}
           onClose={() => setComposer(null)}
           onSubmit={handleComposerSubmit}

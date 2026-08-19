@@ -3,13 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { todayUtcMidnight } from "./today";
-import type { Frequency } from "./streak";
+import type { HabitScheduleType } from "./schedule";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
-
-export type CreateHabitResult =
-  | { ok: true; habit: { id: string; areaId: string; name: string; frequency: Frequency; active: boolean } }
-  | { ok: false; error: string };
 
 const SAVE_ERROR = "Couldn't save — try again.";
 
@@ -17,42 +13,102 @@ function isUniqueConstraintError(error: unknown): boolean {
   return typeof error === "object" && error !== null && "code" in error && error.code === "P2002";
 }
 
-export async function createHabit(
-  areaId: string,
-  name: string,
-  frequency: Frequency
-): Promise<CreateHabitResult> {
-  let habit;
-  try {
-    habit = await prisma.habit.create({ data: { areaId, name, frequency, active: false } });
-  } catch {
-    return { ok: false, error: SAVE_ERROR };
-  }
-  revalidatePath(`/health/${areaId}`);
-  return { ok: true, habit };
+function revalidateHabitPaths(areaId: string | null, pillarId: string) {
+  if (areaId) revalidatePath(`/health/${areaId}`);
+  revalidatePath("/habits");
+  revalidatePath("/today");
+  revalidatePath(`/pillars/${pillarId}`);
 }
 
-export async function updateHabit(
-  habitId: string,
-  name: string,
-  frequency: Frequency
-): Promise<ActionResult> {
-  let habit;
+export type HabitScheduleInput = {
+  scheduleType: HabitScheduleType;
+  scheduleWeekdays: number[];
+  scheduleIntervalN: number | null;
+};
+
+export type CreateHabitInput = {
+  name: string;
+  pillarId: string;
+  areaId: string | null;
+  schedule: HabitScheduleInput;
+  goalIds: string[];
+  primaryGoalId: string | null;
+};
+
+export type CreateHabitResult = { ok: true; id: string } | { ok: false; error: string };
+
+/** Every interval-based schedule (EVERY_N_DAYS/EVERY_N_WEEKS) and MONTHLY
+ * anchors on the creation date — the day the user set the schedule up is a
+ * sensible, unsurprising start point, and it's editable later by recreating
+ * the schedule if the user wants a different anchor. */
+export async function createHabit(input: CreateHabitInput): Promise<CreateHabitResult> {
+  const name = input.name.trim();
+  if (!name) return { ok: false, error: "Give the habit a name first." };
+
   try {
-    habit = await prisma.habit.update({ where: { id: habitId }, data: { name, frequency } });
+    const habit = await prisma.habit.create({
+      data: {
+        name,
+        pillarId: input.pillarId,
+        areaId: input.areaId,
+        status: "PAUSED",
+        scheduleType: input.schedule.scheduleType,
+        scheduleWeekdays: input.schedule.scheduleWeekdays,
+        scheduleIntervalN: input.schedule.scheduleIntervalN,
+        scheduleAnchorDate: todayUtcMidnight(),
+        goals: {
+          create: input.goalIds.map((goalId) => ({ goalId, isPrimary: goalId === input.primaryGoalId })),
+        },
+      },
+    });
+    revalidateHabitPaths(input.areaId, input.pillarId);
+    return { ok: true, id: habit.id };
   } catch {
     return { ok: false, error: SAVE_ERROR };
   }
-  revalidatePath(`/health/${habit.areaId}`);
+}
+
+export type UpdateHabitInput = CreateHabitInput;
+
+export async function updateHabit(habitId: string, input: UpdateHabitInput): Promise<ActionResult> {
+  const name = input.name.trim();
+  if (!name) return { ok: false, error: "Give the habit a name first." };
+
+  try {
+    await prisma.$transaction([
+      prisma.habitGoal.deleteMany({ where: { habitId } }),
+      prisma.habit.update({
+        where: { id: habitId },
+        data: {
+          name,
+          pillarId: input.pillarId,
+          areaId: input.areaId,
+          scheduleType: input.schedule.scheduleType,
+          scheduleWeekdays: input.schedule.scheduleWeekdays,
+          scheduleIntervalN: input.schedule.scheduleIntervalN,
+          goals: {
+            create: input.goalIds.map((goalId) => ({ goalId, isPrimary: goalId === input.primaryGoalId })),
+          },
+        },
+      }),
+    ]);
+  } catch {
+    return { ok: false, error: SAVE_ERROR };
+  }
+  revalidateHabitPaths(input.areaId, input.pillarId);
   return { ok: true };
 }
 
 export type DeletedHabit = {
   id: string;
-  areaId: string;
   name: string;
-  frequency: Frequency;
-  active: boolean;
+  pillarId: string;
+  areaId: string | null;
+  status: "ACTIVE" | "PAUSED" | "ARCHIVED";
+  scheduleType: HabitScheduleType;
+  scheduleWeekdays: number[];
+  scheduleIntervalN: number | null;
+  scheduleAnchorDate: Date | null;
   checkIns: { date: Date; level: "FULL" | "MINIMUM" }[];
 };
 
@@ -75,11 +131,19 @@ export async function deleteHabit(habitId: string): Promise<DeleteHabitResult> {
   } catch {
     return { ok: false, error: "Couldn't delete — try again." };
   }
-  revalidatePath(`/health/${result.habit.areaId}`);
+  revalidateHabitPaths(result.habit.areaId, result.habit.pillarId);
   return {
     ok: true,
     deleted: {
-      ...result.habit,
+      id: result.habit.id,
+      name: result.habit.name,
+      pillarId: result.habit.pillarId,
+      areaId: result.habit.areaId,
+      status: result.habit.status,
+      scheduleType: result.habit.scheduleType,
+      scheduleWeekdays: result.habit.scheduleWeekdays,
+      scheduleIntervalN: result.habit.scheduleIntervalN,
+      scheduleAnchorDate: result.habit.scheduleAnchorDate,
       checkIns: result.checkIns.map((c) => ({ date: c.date, level: c.level })),
     },
   };
@@ -92,10 +156,14 @@ export async function restoreHabit(deleted: DeletedHabit): Promise<ActionResult>
       await tx.habit.create({
         data: {
           id: deleted.id,
-          areaId: deleted.areaId,
           name: deleted.name,
-          frequency: deleted.frequency,
-          active: deleted.active,
+          pillarId: deleted.pillarId,
+          areaId: deleted.areaId,
+          status: deleted.status,
+          scheduleType: deleted.scheduleType,
+          scheduleWeekdays: deleted.scheduleWeekdays,
+          scheduleIntervalN: deleted.scheduleIntervalN,
+          scheduleAnchorDate: deleted.scheduleAnchorDate,
         },
       });
       if (deleted.checkIns.length > 0) {
@@ -107,18 +175,21 @@ export async function restoreHabit(deleted: DeletedHabit): Promise<ActionResult>
   } catch {
     return { ok: false, error: "Couldn't undo — the habit may already be back." };
   }
-  revalidatePath(`/health/${deleted.areaId}`);
+  revalidateHabitPaths(deleted.areaId, deleted.pillarId);
   return { ok: true };
 }
 
-export async function setHabitActive(habitId: string, active: boolean): Promise<ActionResult> {
+export async function setHabitStatus(
+  habitId: string,
+  status: "ACTIVE" | "PAUSED" | "ARCHIVED"
+): Promise<ActionResult> {
   let habit;
   try {
-    habit = await prisma.habit.update({ where: { id: habitId }, data: { active } });
+    habit = await prisma.habit.update({ where: { id: habitId }, data: { status } });
   } catch {
     return { ok: false, error: SAVE_ERROR };
   }
-  revalidatePath(`/health/${habit.areaId}`);
+  revalidateHabitPaths(habit.areaId, habit.pillarId);
   return { ok: true };
 }
 
@@ -132,11 +203,13 @@ export async function setHabitActive(habitId: string, active: boolean): Promise<
  */
 export async function cycleTodayCheckIn(habitId: string): Promise<ActionResult> {
   const date = todayUtcMidnight();
-  let areaId: string;
+  let areaId: string | null;
+  let pillarId: string;
 
   try {
     const habit = await prisma.habit.findUniqueOrThrow({ where: { id: habitId } });
     areaId = habit.areaId;
+    pillarId = habit.pillarId;
 
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
@@ -159,6 +232,6 @@ export async function cycleTodayCheckIn(habitId: string): Promise<ActionResult> 
     return { ok: false, error: SAVE_ERROR };
   }
 
-  revalidatePath(`/health/${areaId}`);
+  revalidateHabitPaths(areaId, pillarId);
   return { ok: true };
 }

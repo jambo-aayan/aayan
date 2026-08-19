@@ -15,15 +15,20 @@ model Session {
 
 /// A top-level life domain (Health, Finances, ...). id is a stable slug,
 /// not a cuid, so seeding can upsert by a human-readable, idempotent key.
+/// color propagates to every Area/Goal/Habit/Task under it (see lib/colors.ts)
+/// — a subtle accent, never a strongly saturated fill.
 model Pillar {
-  id        String    @id
+  id        String     @id
   name      String
+  color     String?
   northStar String?
   areas     Area[]
   thoughts  Thought[]
   tasks     Task[]
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  goals     LifeGoal[]
+  habits    Habit[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
 }
 
 /// A sub-topic within a Pillar (e.g. Sleep within Health). id is a stable
@@ -39,13 +44,21 @@ model Area {
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
   habits           Habit[]
+  /// Legacy one-off-action records, superseded by Task.areaId — kept only so
+  /// existing rows aren't orphaned; no app code writes here anymore (see
+  /// Task's schema comment for where this data actually lives now).
   actionGoals      ActionGoal[]
+  goals            LifeGoal[]
+  tasks            Task[]
   painMobilityLogs PainMobilityLog[]
   thoughts         Thought[]
 
   @@index([pillarId])
 }
 
+/// Kept only as the historical record of what `frequency` used to mean —
+/// still stored on old CheckIn-adjacent code paths' types, but Habit itself
+/// now uses the richer `scheduleType` below.
 enum HabitFrequency {
   DAILY
   WEEKLY
@@ -56,19 +69,81 @@ enum CheckInLevel {
   MINIMUM
 }
 
-/// New Habits default to inactive (active: false) — opt-in, not opt-out.
+/// New Habits default to PAUSED — opt-in, not opt-out (the same principle
+/// the old `active: false` default encoded).
+enum HabitStatus {
+  ACTIVE
+  PAUSED
+  ARCHIVED
+}
+
+/// DAILY/WEEKDAYS/WEEKLY/EVERY_N_DAYS/EVERY_N_WEEKS/MONTHLY don't need every
+/// field below — see lib/habits/schedule.ts's isScheduledForDate for which
+/// fields each type actually reads. CUSTOM stores only scheduleCustomText
+/// and never auto-generates an occurrence (same documented limitation as
+/// Task.repeatRule's CUSTOM — see lib/tasks/recurrence.ts).
+enum HabitScheduleType {
+  DAILY
+  WEEKDAYS
+  SELECTED_WEEKDAYS
+  WEEKLY
+  EVERY_N_DAYS
+  EVERY_N_WEEKS
+  MONTHLY
+  CUSTOM
+}
+
+/// A recurring behaviour. Restricted to one Pillar (areaId is the optional
+/// "primary Area" within it); Goal links live in HabitGoal, not here, since
+/// a Habit can support several Goals within its Pillar. There is no separate
+/// "Habit occurrence" table — whether a Habit occurs on a given date is
+/// computed from its schedule (lib/habits/schedule.ts), and completing an
+/// occurrence is exactly the existing CheckIn row for that date. That's the
+/// whole "occurrence" concept: computed presence + a completion record,
+/// never a duplicated Task.
 model Habit {
-  id        String         @id @default(cuid())
-  areaId    String
-  area      Area           @relation(fields: [areaId], references: [id])
-  name      String
-  frequency HabitFrequency
-  active    Boolean        @default(false)
-  createdAt DateTime       @default(now())
-  updatedAt DateTime       @updatedAt
+  id   String @id @default(cuid())
+  name String
+
+  pillarId String
+  pillar   Pillar  @relation(fields: [pillarId], references: [id])
+  areaId   String?
+  area     Area?   @relation(fields: [areaId], references: [id])
+
+  status HabitStatus @default(PAUSED)
+
+  scheduleType       HabitScheduleType @default(DAILY)
+  scheduleWeekdays   Int[]             @default([])
+  scheduleIntervalN  Int?
+  scheduleAnchorDate DateTime?         @db.Date
+  scheduleCustomText String?
+
+  /// Superseded by scheduleType, kept non-null for old rows' sake until a
+  /// future cleanup migration; no app code reads this anymore.
+  frequency HabitFrequency @default(DAILY)
+
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
   checkIns  CheckIn[]
+  goals     HabitGoal[]
 
   @@index([areaId])
+  @@index([pillarId])
+}
+
+/// Many-to-many Habit<->LifeGoal, with at most one isPrimary=true row per
+/// habit (enforced in lib/habits/actions.ts, not the schema — matching the
+/// rest of this app's relaxed-constraint style). All linked goals are
+/// expected to share the habit's pillarId (enforced the same way).
+model HabitGoal {
+  habitId   String
+  habit     Habit    @relation(fields: [habitId], references: [id], onDelete: Cascade)
+  goalId    String
+  goal      LifeGoal @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  isPrimary Boolean  @default(false)
+
+  @@id([habitId, goalId])
+  @@index([goalId])
 }
 
 /// One row per (habit, date) actually checked in — "none" is the absence of
@@ -90,12 +165,44 @@ enum GoalStatus {
   DONE
 }
 
-/// The general "Action" Goal — a one-off task scoped to an Area, sibling to
-/// Habit under CONTEXT.md's Action concept. Deliberately NOT the same thing
-/// as the `Goal` model below (a Finance savings target) — CONTEXT.md uses
-/// "Goal" for both, but they're unrelated domain concepts that happen to
-/// share a name; this one is renamed ActionGoal only to avoid the Prisma
-/// model-name clash, not because the product language distinguishes them.
+enum LifeGoalStatus {
+  ACTIVE
+  PAUSED
+  COMPLETED
+  ARCHIVED
+}
+
+/// An outcome, e.g. "Improve Body Composition" — distinct from a Task
+/// (one-off action) and a Habit (recurring behaviour), and NOT the same
+/// thing as the `Goal` model below (a Finance savings target — an unrelated
+/// concept that happens to share the word "Goal"; this one is named
+/// LifeGoal only to dodge that Prisma clash, same reasoning as ActionGoal
+/// below). Pillar-scoped like Habit; areaId is optional — a goal can sit
+/// directly under a Pillar with no single Area.
+model LifeGoal {
+  id     String         @id @default(cuid())
+  name   String
+  status LifeGoalStatus @default(ACTIVE)
+
+  pillarId String
+  pillar   Pillar  @relation(fields: [pillarId], references: [id])
+  areaId   String?
+  area     Area?   @relation(fields: [areaId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tasks  Task[]
+  habits HabitGoal[]
+
+  @@index([pillarId])
+  @@index([areaId])
+}
+
+/// Legacy one-off-action model, superseded by Task (see Task's schema
+/// comment) — kept only so pre-migration rows aren't orphaned. No app code
+/// creates, reads, or writes ActionGoal rows anymore; every row that existed
+/// here was copied forward into Task by migration 20260819_tasks_v2_habits_goals.
 model ActionGoal {
   id        String     @id @default(cuid())
   areaId    String
@@ -245,6 +352,7 @@ model Thought {
 model TaskList {
   id         String    @id @default(cuid())
   name       String
+  color      String?
   sortOrder  Int       @default(0)
   archivedAt DateTime?
   createdAt  DateTime  @default(now())
@@ -298,21 +406,32 @@ enum TaskRepeatRule {
 /// independently meaningful for history (e.g. a task can be both completed
 /// *and* later archived, keeping both timestamps). Query-time precedence is
 /// deletedAt > archivedAt > completedAt > active, enforced in lib/tasks, not
-/// the schema. dueDate is @db.Date (UTC midnight) matching ActionGoal's
-/// convention; dueTime is a separate "HH:mm" string rather than folding time
-/// into dueDate, so a date-only task never has to fake a time component.
+/// the schema. dueDate is @db.Date (UTC midnight) matching the rest of the
+/// app's convention; dueTime is a separate "HH:mm" string rather than
+/// folding time into dueDate, so a date-only task never has to fake a time
+/// component. This is also the single one-off-action model for the whole
+/// app — areaId/pillarId cover what ActionGoal used to (see its schema
+/// comment); goalId is new. sortOrder is this task's position within its
+/// List — independent from MyDayEntry.sortOrder, its position within a
+/// day's My Day, since dragging a Work task to the top of today shouldn't
+/// reorder the Work List itself.
 model Task {
   id        String     @id @default(cuid())
   title     String
   notes     String?
   status    TaskStatus @default(ACTIVE)
   important Boolean    @default(false)
+  sortOrder Int        @default(0)
 
   listId String?
   list   TaskList? @relation(fields: [listId], references: [id], onDelete: SetNull)
 
   pillarId String?
-  pillar   Pillar? @relation(fields: [pillarId], references: [id], onDelete: SetNull)
+  pillar   Pillar?   @relation(fields: [pillarId], references: [id], onDelete: SetNull)
+  areaId   String?
+  area     Area?     @relation(fields: [areaId], references: [id], onDelete: SetNull)
+  goalId   String?
+  goal     LifeGoal? @relation(fields: [goalId], references: [id], onDelete: SetNull)
 
   dueDate DateTime? @db.Date
   dueTime String?
@@ -329,9 +448,12 @@ model Task {
 
   tags         TaskTagOnTask[]
   myDayEntries MyDayEntry[]
+  steps        TaskStep[]
 
   @@index([listId])
   @@index([pillarId])
+  @@index([areaId])
+  @@index([goalId])
   @@index([dueDate])
   @@index([status])
 }
@@ -340,14 +462,32 @@ model Task {
 /// each morning, so which tasks were planned on any past date stays
 /// reconstructable. A task can appear in My Day either via a row here
 /// (manually added) or because its dueDate is that date (automatic); see
-/// lib/tasks/data.ts for how the two are combined.
+/// lib/tasks/data.ts for how the two are combined. sortOrder here is
+/// independent of Task.sortOrder — see Task's schema comment.
 model MyDayEntry {
-  id      String   @id @default(cuid())
-  taskId  String
-  task    Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  date    DateTime @db.Date
-  addedAt DateTime @default(now())
+  id        String   @id @default(cuid())
+  taskId    String
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  date      DateTime @db.Date
+  sortOrder Int      @default(0)
+  addedAt   DateTime @default(now())
 
   @@unique([taskId, date])
   @@index([date])
+}
+
+/// A lightweight sub-item within a Task ("Book holiday" -> "Check flights").
+/// Completing every Step does not complete the parent Task — that's a
+/// deliberate choice, not an oversight (see the Steps section of the spec
+/// this shipped against): a Task's own completion stays an explicit action.
+model TaskStep {
+  id        String   @id @default(cuid())
+  taskId    String
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  title     String
+  completed Boolean  @default(false)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([taskId])
 }

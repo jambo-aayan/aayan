@@ -1,13 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { dailyStreak, weeklyStreak, isEstablished, type Frequency } from "@/lib/habits/streak";
+import Link from "next/link";
+import { dailyStreak, weeklyStreak, isEstablished } from "@/lib/habits/streak";
+import { formatScheduleLabel, type HabitScheduleType } from "@/lib/habits/schedule";
 import {
   createHabit,
   updateHabit,
   deleteHabit,
   restoreHabit,
-  setHabitActive,
+  setHabitStatus,
   cycleTodayCheckIn,
   type DeletedHabit,
 } from "@/lib/habits/actions";
@@ -20,19 +22,25 @@ import styles from "./habits-list.module.css";
 const UNDO_WINDOW_MS = 5000;
 
 type CheckInLevel = "FULL" | "MINIMUM" | null;
+type HabitStatus = "ACTIVE" | "PAUSED" | "ARCHIVED";
 
-export type HabitWithCheckIns = {
+const QUICK_SCHEDULES: HabitScheduleType[] = ["DAILY", "WEEKDAYS", "WEEKLY", "MONTHLY"];
+
+export type AreaHabit = {
   id: string;
-  areaId: string;
+  areaId: string | null;
+  pillarId: string;
   name: string;
-  frequency: Frequency;
-  active: boolean;
+  status: HabitStatus;
+  scheduleType: HabitScheduleType;
+  scheduleWeekdays: number[];
+  scheduleIntervalN: number | null;
   checkInDates: Date[];
   todayLevel: CheckInLevel;
 };
 
-function streakFor(habit: HabitWithCheckIns): number {
-  return habit.frequency === "DAILY" ? dailyStreak(habit.checkInDates) : weeklyStreak(habit.checkInDates);
+function streakFor(habit: AreaHabit): number {
+  return habit.scheduleType === "WEEKLY" ? weeklyStreak(habit.checkInDates) : dailyStreak(habit.checkInDates);
 }
 
 function nextLevel(level: CheckInLevel): CheckInLevel {
@@ -41,26 +49,23 @@ function nextLevel(level: CheckInLevel): CheckInLevel {
   return null;
 }
 
-const EMPTY_FORM = { name: "", frequency: "DAILY" as Frequency };
+const EMPTY_FORM = { name: "", scheduleType: "DAILY" as HabitScheduleType };
 
 export function HabitsList({
   areaId,
+  pillarId,
   initialHabits,
 }: {
   areaId: string;
-  initialHabits: HabitWithCheckIns[];
+  pillarId: string;
+  initialHabits: AreaHabit[];
 }) {
   const [habits, setHabits] = useState(initialHabits);
   const [form, setForm] = useState(EMPTY_FORM);
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
-  // A toggle can now be in flight for over a second across withRetry's
-  // backoff — block re-entrant clicks on the same habit so a slow, later-
-  // reverting first request can't clobber a second toggle's optimistic state.
   const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
-  // Which habit, if any, just got a fresh check-in and should show the
-  // "add a thought?" prompt — never shown on turning a check-in back off.
   const [promptHabitId, setPromptHabitId] = useState<string | null>(null);
   const { notifyError, notifyUndo } = useToast();
 
@@ -85,18 +90,41 @@ export function HabitsList({
     }
     setAdding(true);
     setError(null);
-    const result = await withRetry(() => createHabit(areaId, form.name, form.frequency));
+    const result = await withRetry(() =>
+      createHabit({
+        name: form.name,
+        pillarId,
+        areaId,
+        schedule: { scheduleType: form.scheduleType, scheduleWeekdays: [], scheduleIntervalN: null },
+        goalIds: [],
+        primaryGoalId: null,
+      })
+    );
     setAdding(false);
     if (!result.ok) {
       setError(result.error);
       notifyError(result.error, { onRetry: handleAdd });
       return;
     }
-    setHabits((prev) => [...prev, { ...result.habit, checkInDates: [], todayLevel: null }]);
+    setHabits((prev) => [
+      ...prev,
+      {
+        id: result.id,
+        areaId,
+        pillarId,
+        name: form.name,
+        status: "PAUSED",
+        scheduleType: form.scheduleType,
+        scheduleWeekdays: [],
+        scheduleIntervalN: null,
+        checkInDates: [],
+        todayLevel: null,
+      },
+    ]);
     setForm(EMPTY_FORM);
   }
 
-  async function handleToggleCheckIn(habit: HabitWithCheckIns) {
+  async function handleToggleCheckIn(habit: AreaHabit) {
     const newLevel = nextLevel(habit.todayLevel);
     const todayDate = utcMidnight(new Date());
 
@@ -115,7 +143,6 @@ export function HabitsList({
 
     const result = await withRetry(() => cycleTodayCheckIn(habit.id));
     if (!result.ok) {
-      // Revert on failure.
       setHabits((prev) => prev.map((h) => (h.id === habit.id ? habit : h)));
       setError(result.error);
       notifyError(result.error, { onRetry: () => handleToggleCheckIn(habit) });
@@ -126,17 +153,18 @@ export function HabitsList({
     }
   }
 
-  async function handleToggleActive(habit: HabitWithCheckIns) {
-    setHabits((prev) => prev.map((h) => (h.id === habit.id ? { ...h, active: !h.active } : h)));
-    const result = await withRetry(() => setHabitActive(habit.id, !habit.active));
+  async function handleToggleStatus(habit: AreaHabit) {
+    const next = habit.status === "ACTIVE" ? "PAUSED" : "ACTIVE";
+    setHabits((prev) => prev.map((h) => (h.id === habit.id ? { ...h, status: next } : h)));
+    const result = await withRetry(() => setHabitStatus(habit.id, next));
     if (!result.ok) {
       setHabits((prev) => prev.map((h) => (h.id === habit.id ? habit : h)));
       setError(result.error);
-      notifyError(result.error, { onRetry: () => handleToggleActive(habit) });
+      notifyError(result.error, { onRetry: () => handleToggleStatus(habit) });
     }
   }
 
-  async function handleDelete(habit: HabitWithCheckIns) {
+  async function handleDelete(habit: AreaHabit) {
     setHabits((prev) => prev.filter((h) => h.id !== habit.id));
     const result = await withRetry(() => deleteHabit(habit.id));
     if (!result.ok) {
@@ -161,9 +189,12 @@ export function HabitsList({
       {
         id: deleted.id,
         areaId: deleted.areaId,
+        pillarId: deleted.pillarId,
         name: deleted.name,
-        frequency: deleted.frequency,
-        active: deleted.active,
+        status: deleted.status,
+        scheduleType: deleted.scheduleType,
+        scheduleWeekdays: deleted.scheduleWeekdays,
+        scheduleIntervalN: deleted.scheduleIntervalN,
         checkInDates: deleted.checkIns.map((c) => c.date),
         todayLevel:
           deleted.checkIns.find((c) => c.date.getTime() === utcMidnight(new Date()).getTime())?.level ?? null,
@@ -179,32 +210,31 @@ export function HabitsList({
             <HabitEditRow
               key={habit.id}
               habit={habit}
+              pillarId={pillarId}
+              areaId={areaId}
               onCancel={() => setEditingId(null)}
-              onSaved={(name, frequency) => {
-                setHabits((prev) =>
-                  prev.map((h) => (h.id === habit.id ? { ...h, name, frequency } : h))
-                );
+              onSaved={(name, scheduleType) => {
+                setHabits((prev) => prev.map((h) => (h.id === habit.id ? { ...h, name, scheduleType } : h)));
                 setEditingId(null);
               }}
             />
           ) : (
-            <li key={habit.id} className={`${styles.row} ${!habit.active ? styles.inactive : ""}`}>
+            <li key={habit.id} className={`${styles.row} ${habit.status !== "ACTIVE" ? styles.inactive : ""}`}>
               <div>
                 <div className={styles.name}>{habit.name}</div>
-                {habit.active ? (
+                {habit.status === "ACTIVE" ? (
                   <div className={styles.meta}>
-                    {habit.frequency === "DAILY" ? "Daily" : "Weekly"} · {streakFor(habit)}{" "}
-                    {habit.frequency === "DAILY" ? "day" : "week"} streak
-                    {isEstablished(streakFor(habit), habit.frequency) && (
+                    {formatScheduleLabel({ ...habit, scheduleAnchorDate: null })} · {streakFor(habit)} day streak
+                    {isEstablished(streakFor(habit), habit.scheduleType === "WEEKLY" ? "WEEKLY" : "DAILY") && (
                       <span className={styles.established}>Established</span>
                     )}
                   </div>
                 ) : (
-                  <div className={styles.meta}>Inactive</div>
+                  <div className={styles.meta}>{habit.status === "PAUSED" ? "Paused" : "Archived"}</div>
                 )}
               </div>
               <div className={styles.rowActions}>
-                {habit.active && (
+                {habit.status === "ACTIVE" && (
                   <button
                     type="button"
                     className={`${styles.dot} ${styles[habit.todayLevel?.toLowerCase() ?? "none"]}`}
@@ -217,9 +247,9 @@ export function HabitsList({
                   type="button"
                   className={styles.link}
                   disabled={pendingIds.has(habit.id)}
-                  onClick={withPending(habit.id, () => handleToggleActive(habit))}
+                  onClick={withPending(habit.id, () => handleToggleStatus(habit))}
                 >
-                  {habit.active ? "Deactivate" : "Activate"}
+                  {habit.status === "ACTIVE" ? "Pause" : "Activate"}
                 </button>
                 <button type="button" className={styles.link} onClick={() => setEditingId(habit.id)}>
                   Edit
@@ -228,7 +258,7 @@ export function HabitsList({
                   Delete
                 </button>
               </div>
-              {promptHabitId === habit.id && (
+              {promptHabitId === habit.id && areaId && (
                 <ThoughtPrompt areaId={areaId} onDone={() => setPromptHabitId(null)} />
               )}
             </li>
@@ -246,16 +276,23 @@ export function HabitsList({
         />
         <select
           className={styles.input}
-          value={form.frequency}
-          onChange={(e) => setForm((f) => ({ ...f, frequency: e.target.value as Frequency }))}
+          value={form.scheduleType}
+          onChange={(e) => setForm((f) => ({ ...f, scheduleType: e.target.value as HabitScheduleType }))}
         >
-          <option value="DAILY">Daily</option>
-          <option value="WEEKLY">Weekly</option>
+          {QUICK_SCHEDULES.map((s) => (
+            <option key={s} value={s}>
+              {formatScheduleLabel({ scheduleType: s, scheduleWeekdays: [], scheduleIntervalN: null, scheduleAnchorDate: null })}
+            </option>
+          ))}
         </select>
         <button type="button" className={styles.add} onClick={handleAdd} disabled={adding}>
           {adding ? "Adding…" : "Add habit"}
         </button>
       </div>
+      <p className={styles.hint}>
+        More schedule options (selected weekdays, every N days/weeks, Goals) are available in{" "}
+        <Link href="/habits">Habit Management</Link>.
+      </p>
       {error && <p className={styles.error}>{error}</p>}
     </div>
   );
@@ -263,15 +300,19 @@ export function HabitsList({
 
 function HabitEditRow({
   habit,
+  pillarId,
+  areaId,
   onCancel,
   onSaved,
 }: {
-  habit: HabitWithCheckIns;
+  habit: AreaHabit;
+  pillarId: string;
+  areaId: string;
   onCancel: () => void;
-  onSaved: (name: string, frequency: Frequency) => void;
+  onSaved: (name: string, scheduleType: HabitScheduleType) => void;
 }) {
   const [name, setName] = useState(habit.name);
-  const [frequency, setFrequency] = useState<Frequency>(habit.frequency);
+  const [scheduleType, setScheduleType] = useState<HabitScheduleType>(habit.scheduleType);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { notifyError } = useToast();
@@ -279,26 +320,34 @@ function HabitEditRow({
   async function handleSave() {
     setSaving(true);
     setError(null);
-    const result = await withRetry(() => updateHabit(habit.id, name, frequency));
+    const result = await withRetry(() =>
+      updateHabit(habit.id, {
+        name,
+        pillarId,
+        areaId,
+        schedule: { scheduleType, scheduleWeekdays: habit.scheduleWeekdays, scheduleIntervalN: habit.scheduleIntervalN },
+        goalIds: [],
+        primaryGoalId: null,
+      })
+    );
     setSaving(false);
     if (!result.ok) {
       setError(result.error);
       notifyError(result.error, { onRetry: handleSave });
       return;
     }
-    onSaved(name, frequency);
+    onSaved(name, scheduleType);
   }
 
   return (
     <li className={styles.addForm}>
       <input className={styles.input} value={name} onChange={(e) => setName(e.target.value)} />
-      <select
-        className={styles.input}
-        value={frequency}
-        onChange={(e) => setFrequency(e.target.value as Frequency)}
-      >
-        <option value="DAILY">Daily</option>
-        <option value="WEEKLY">Weekly</option>
+      <select className={styles.input} value={scheduleType} onChange={(e) => setScheduleType(e.target.value as HabitScheduleType)}>
+        {QUICK_SCHEDULES.map((s) => (
+          <option key={s} value={s}>
+            {formatScheduleLabel({ scheduleType: s, scheduleWeekdays: [], scheduleIntervalN: null, scheduleAnchorDate: null })}
+          </option>
+        ))}
       </select>
       <button type="button" className={styles.add} onClick={handleSave} disabled={saving}>
         {saving ? "Saving…" : "Save"}

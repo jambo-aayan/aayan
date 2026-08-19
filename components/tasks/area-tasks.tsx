@@ -1,11 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { ListChecks, Plus } from "lucide-react";
+import { ListChecks } from "lucide-react";
+import { TaskQuickAdd, type QuickAddSubmission } from "./task-quick-add";
 import { TaskList } from "./task-list";
 import type { TaskMenuItem } from "./task-menu";
 import { TaskComposer, type TaskFormInput } from "./task-composer";
-import { PrimaryButton } from "@/components/primary-button";
 import { useToast } from "@/components/toast/toast-provider";
 import { withRetry } from "@/lib/with-retry";
 import {
@@ -15,33 +15,34 @@ import {
   uncompleteTask,
   setTaskImportant,
   archiveTask,
-  unarchiveTask,
   deleteTask,
-  addTaskToMyDay,
-  reorderListTasks,
 } from "@/lib/tasks/actions";
 import type { Task } from "@/lib/tasks/types";
 import type { TaskListSummary } from "@/lib/tasks/data";
-import styles from "./all-tasks-view.module.css";
 
-export function AllTasksView({
-  tasks: initialTasks,
+/** The Area page's Tasks card — every task here is created pre-scoped to
+ * this Area/Pillar, but is otherwise a completely ordinary Task: it shows
+ * up in My Day, All Tasks, and By Date exactly like any other, because it
+ * IS the same Task, not a separate Area-owned copy (see the cross-page
+ * integration requirement this shipped against). */
+export function AreaTasks({
+  areaId,
+  pillarId,
+  initialTasks,
   lists,
   pillars,
   areas,
-  goals = [],
+  goals,
   tagSuggestions,
-  emptyMessage,
-  activeListId,
 }: {
-  tasks: Task[];
+  areaId: string;
+  pillarId: string;
+  initialTasks: Task[];
   lists: TaskListSummary[];
   pillars: { id: string; name: string; color?: string | null }[];
   areas: { id: string; name: string; pillarId: string }[];
-  goals?: { id: string; name: string; areaId: string | null; pillarId?: string }[];
+  goals: { id: string; name: string; areaId: string | null }[];
   tagSuggestions: string[];
-  emptyMessage: string;
-  activeListId?: string;
 }) {
   const [tasks, setTasks] = useState(initialTasks);
   const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
@@ -49,18 +50,76 @@ export function AllTasksView({
   const { notifyError } = useToast();
   const today = new Date();
 
+  async function handleQuickAdd(submission: QuickAddSubmission) {
+    const optimisticId = `pending-${Date.now()}`;
+    const optimisticTask: Task = {
+      id: optimisticId,
+      title: submission.title,
+      notes: null,
+      status: "ACTIVE",
+      important: false,
+      sortOrder: 0,
+      listId: null,
+      listName: null,
+      listColor: null,
+      pillarId,
+      pillarName: pillars.find((p) => p.id === pillarId)?.name ?? null,
+      pillarColor: pillars.find((p) => p.id === pillarId)?.color ?? null,
+      areaId,
+      areaName: areas.find((a) => a.id === areaId)?.name ?? null,
+      goalId: null,
+      goalName: null,
+      dueDate: submission.dueDate,
+      dueTime: submission.dueTime,
+      reminderOffset: null,
+      repeatRule: null,
+      completedAt: null,
+      archivedAt: null,
+      createdAt: today,
+      updatedAt: today,
+      tags: [],
+      steps: [],
+    };
+    setTasks((prev) => [...prev, optimisticTask]);
+
+    const result = await withRetry(() =>
+      createTask(
+        {
+          title: submission.title,
+          notes: null,
+          listId: null,
+          pillarId,
+          areaId,
+          goalId: null,
+          tagNames: [],
+          dueDate: submission.dueDate,
+          dueTime: submission.dueTime,
+          reminderOffset: null,
+          repeatRule: null,
+          important: false,
+        },
+        false
+      )
+    );
+    if (!result.ok) {
+      setTasks((prev) => prev.filter((t) => t.id !== optimisticId));
+      notifyError(result.error, { onRetry: () => handleQuickAdd(submission) });
+      return;
+    }
+    setTasks((prev) => prev.map((t) => (t.id === optimisticId ? { ...t, id: result.id } : t)));
+  }
+
   async function handleToggleComplete(task: Task) {
     if (pendingIds.has(task.id)) return;
     setPendingIds((prev) => new Set(prev).add(task.id));
     const wasActive = task.status === "ACTIVE";
-    const apply = (list: Task[]) =>
-      list.map((t) =>
+    setTasks((prev) =>
+      prev.map((t) =>
         t.id === task.id
           ? { ...t, status: wasActive ? ("COMPLETED" as const) : ("ACTIVE" as const), completedAt: wasActive ? today : null }
           : t
-      );
-    setTasks(apply);
-
+      )
+    );
     const result = await withRetry(() => (wasActive ? completeTask(task.id) : uncompleteTask(task.id)));
     setPendingIds((prev) => {
       const next = new Set(prev);
@@ -83,45 +142,16 @@ export function AllTasksView({
     }
   }
 
-  async function handleAddToMyDay(task: Task) {
-    const result = await withRetry(() => addTaskToMyDay(task.id));
-    if (!result.ok) notifyError(result.error, { onRetry: () => handleAddToMyDay(task) });
-  }
-
-  async function handleArchiveToggle(task: Task) {
-    const archiving = !task.archivedAt;
+  async function handleArchive(task: Task) {
     setTasks((prev) => prev.filter((t) => t.id !== task.id));
-    const result = await withRetry(() => (archiving ? archiveTask(task.id) : unarchiveTask(task.id)));
-    if (!result.ok) {
-      setTasks((prev) => [...prev, task]);
-      notifyError(result.error, { onRetry: () => handleArchiveToggle(task) });
-    }
+    const result = await withRetry(() => archiveTask(task.id));
+    if (!result.ok) notifyError(result.error, { onRetry: () => handleArchive(task) });
   }
 
   async function handleDelete(task: Task) {
     setTasks((prev) => prev.filter((t) => t.id !== task.id));
     const result = await withRetry(() => deleteTask(task.id));
-    if (!result.ok) {
-      setTasks((prev) => [...prev, task]);
-      notifyError(result.error, { onRetry: () => handleDelete(task) });
-    }
-  }
-
-  /** Manual List order — independent of My Day's ordering (see Task's schema
-   * comment). Only meaningful while filtered to a single List, since
-   * sortOrder is scoped per-List. */
-  async function handleMove(task: Task, direction: -1 | 1) {
-    const index = tasks.findIndex((t) => t.id === task.id);
-    const swapWith = index + direction;
-    if (index < 0 || swapWith < 0 || swapWith >= tasks.length) return;
-    const reordered = [...tasks];
-    [reordered[index], reordered[swapWith]] = [reordered[swapWith], reordered[index]];
-    setTasks(reordered);
-    const result = await withRetry(() => reorderListTasks(reordered.map((t) => t.id)));
-    if (!result.ok) {
-      setTasks(tasks);
-      notifyError(result.error, { onRetry: () => handleMove(task, direction) });
-    }
+    if (!result.ok) notifyError(result.error, { onRetry: () => handleDelete(task) });
   }
 
   async function handleComposerSubmit(input: TaskFormInput) {
@@ -134,14 +164,12 @@ export function AllTasksView({
           listName: lists.find((l) => l.id === input.listId)?.name ?? null,
           pillarName: pillars.find((p) => p.id === input.pillarId)?.name ?? null,
           areaName: areas.find((a) => a.id === input.areaId)?.name ?? null,
-          goalName: goals.find((g) => g.id === input.goalId)?.name ?? null,
           tags: input.tagNames.map((name) => ({ id: name, name })),
         };
         setTasks((prev) => prev.map((t) => (t.id === merged.id ? merged : t)));
       }
       return result;
     }
-
     const result = await createTask(input, false);
     if (result.ok) {
       const created: Task = {
@@ -153,14 +181,14 @@ export function AllTasksView({
         sortOrder: 0,
         listId: input.listId,
         listName: lists.find((l) => l.id === input.listId)?.name ?? null,
-        listColor: lists.find((l) => l.id === input.listId)?.color ?? null,
+        listColor: null,
         pillarId: input.pillarId,
         pillarName: pillars.find((p) => p.id === input.pillarId)?.name ?? null,
-        pillarColor: pillars.find((p) => p.id === input.pillarId)?.color ?? null,
+        pillarColor: null,
         areaId: input.areaId,
         areaName: areas.find((a) => a.id === input.areaId)?.name ?? null,
         goalId: input.goalId,
-        goalName: goals.find((g) => g.id === input.goalId)?.name ?? null,
+        goalName: null,
         dueDate: input.dueDate,
         dueTime: input.dueTime,
         reminderOffset: input.reminderOffset,
@@ -172,32 +200,23 @@ export function AllTasksView({
         tags: input.tagNames.map((name) => ({ id: name, name })),
         steps: [],
       };
-      setTasks((prev) => [created, ...prev]);
+      setTasks((prev) => [...prev, created]);
       return { ok: true as const };
     }
     return result;
   }
 
   function menuItemsFor(task: Task): TaskMenuItem[] {
-    const items: TaskMenuItem[] = [{ label: "Edit", onSelect: () => setComposer({ mode: "edit", task }) }];
-    if (activeListId) {
-      items.push({ label: "Move up", onSelect: () => handleMove(task, -1) });
-      items.push({ label: "Move down", onSelect: () => handleMove(task, 1) });
-    }
-    items.push({ label: "Add to My Day", onSelect: () => handleAddToMyDay(task) });
-    items.push({ label: task.archivedAt ? "Unarchive" : "Archive", onSelect: () => handleArchiveToggle(task) });
-    items.push({ label: "Delete", onSelect: () => handleDelete(task), danger: true });
-    return items;
+    return [
+      { label: "Edit", onSelect: () => setComposer({ mode: "edit", task }) },
+      { label: "Archive", onSelect: () => handleArchive(task) },
+      { label: "Delete", onSelect: () => handleDelete(task), danger: true },
+    ];
   }
 
   return (
-    <div className={styles.wrap}>
-      <div className={styles.header}>
-        <PrimaryButton onClick={() => setComposer({ mode: "create" })}>
-          <Plus size={14} strokeWidth={2.5} /> New task
-        </PrimaryButton>
-      </div>
-
+    <div>
+      <TaskQuickAdd onAdd={handleQuickAdd} />
       <TaskList
         tasks={tasks}
         today={today}
@@ -207,9 +226,8 @@ export function AllTasksView({
         onOpen={(task) => setComposer({ mode: "edit", task })}
         menuItemsFor={menuItemsFor}
         emptyIcon={ListChecks}
-        emptyMessage={emptyMessage}
+        emptyMessage="No open tasks for this area."
       />
-
       {composer && (
         <TaskComposer
           mode={composer.mode}

@@ -13,9 +13,9 @@ type CheckInLevel = "FULL" | "MINIMUM" | null;
 
 export type MyDayHabit = {
   id: string;
-  areaId: string;
+  areaId: string | null;
   name: string;
-  areaName: string;
+  areaName: string | null;
   todayLevel: CheckInLevel;
 };
 
@@ -65,8 +65,8 @@ export function MyDayHabits({ initialHabits }: { initialHabits: MyDayHabit[] }) 
           <li key={habit.id} className={styles.row}>
             <div>
               <div className={styles.name}>{habit.name}</div>
-              <div className={styles.meta}>{habit.areaName}</div>
-              {promptHabitId === habit.id && (
+              {habit.areaName && <div className={styles.meta}>{habit.areaName}</div>}
+              {promptHabitId === habit.id && habit.areaId && (
                 <ThoughtPrompt areaId={habit.areaId} onDone={() => setPromptHabitId(null)} />
               )}
             </div>

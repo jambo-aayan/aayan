@@ -6,6 +6,7 @@ import { PrimaryButton } from "@/components/primary-button";
 import { REMINDER_LABEL, REPEAT_LABEL, type TaskReminderOffset, type TaskRepeatRule } from "@/lib/tasks/types";
 import type { Task } from "@/lib/tasks/types";
 import type { TaskListSummary } from "@/lib/tasks/data";
+import { TaskSteps } from "./task-steps";
 import styles from "./task-composer.module.css";
 
 export type TaskFormInput = {
@@ -13,6 +14,8 @@ export type TaskFormInput = {
   notes: string | null;
   listId: string | null;
   pillarId: string | null;
+  areaId: string | null;
+  goalId: string | null;
   tagNames: string[];
   dueDate: Date | null;
   dueTime: string | null;
@@ -52,6 +55,8 @@ export function TaskComposer({
   task,
   lists,
   pillars,
+  areas,
+  goals,
   tagSuggestions,
   onClose,
   onSubmit,
@@ -60,6 +65,8 @@ export function TaskComposer({
   task?: Task;
   lists: TaskListSummary[];
   pillars: { id: string; name: string }[];
+  areas: { id: string; name: string; pillarId: string }[];
+  goals: { id: string; name: string; areaId: string | null; pillarId?: string }[];
   tagSuggestions: string[];
   onClose: () => void;
   onSubmit: (input: TaskFormInput) => Promise<{ ok: true } | { ok: false; error: string }>;
@@ -72,6 +79,8 @@ export function TaskComposer({
   const [notes, setNotes] = useState(task?.notes ?? "");
   const [listId, setListId] = useState(task?.listId ?? "");
   const [pillarId, setPillarId] = useState(task?.pillarId ?? "");
+  const [areaId, setAreaId] = useState(task?.areaId ?? "");
+  const [goalId, setGoalId] = useState(task?.goalId ?? "");
   const [tagsText, setTagsText] = useState(task?.tags.map((t) => t.name).join(", ") ?? "");
   const [dueOption, setDueOption] = useState<DueOption>(initialDueOption(task, today, tomorrow));
   const [customDate, setCustomDate] = useState(task?.dueDate ? toDateInputValue(task.dueDate) : "");
@@ -119,6 +128,8 @@ export function TaskComposer({
       notes: notes.trim() || null,
       listId: listId || null,
       pillarId: pillarId || null,
+      areaId: areaId || null,
+      goalId: goalId || null,
       tagNames: tagsText
         .split(",")
         .map((t) => t.trim())
@@ -184,11 +195,56 @@ export function TaskComposer({
             </label>
             <label className={styles.field}>
               <span className={styles.label}>Pillar</span>
-              <select className={styles.select} value={pillarId} onChange={(e) => setPillarId(e.target.value)}>
+              <select
+                className={styles.select}
+                value={pillarId}
+                onChange={(e) => {
+                  setPillarId(e.target.value);
+                  // Switching Pillar invalidates an Area from a different one.
+                  if (areaId && areas.find((a) => a.id === areaId)?.pillarId !== e.target.value) setAreaId("");
+                }}
+              >
                 <option value="">No pillar</option>
                 {pillars.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          <div className={styles.grid}>
+            <label className={styles.field}>
+              <span className={styles.label}>Area</span>
+              <select className={styles.select} value={areaId} onChange={(e) => setAreaId(e.target.value)}>
+                <option value="">No area</option>
+                {(pillarId ? areas.filter((a) => a.pillarId === pillarId) : areas).map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className={styles.field}>
+              <span className={styles.label}>Goal</span>
+              <select
+                className={styles.select}
+                value={goalId}
+                onChange={(e) => {
+                  const nextGoalId = e.target.value;
+                  setGoalId(nextGoalId);
+                  // Picking a Goal infers Pillar/Area from it where possible,
+                  // rather than leaving them to silently disagree.
+                  const goal = goals.find((g) => g.id === nextGoalId);
+                  if (goal?.pillarId) setPillarId(goal.pillarId);
+                  if (goal?.areaId) setAreaId(goal.areaId);
+                }}
+              >
+                <option value="">No goal</option>
+                {goals.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.name}
                   </option>
                 ))}
               </select>
@@ -295,6 +351,13 @@ export function TaskComposer({
               placeholder="Optional notes"
             />
           </label>
+
+          {mode === "edit" && task && (
+            <div className={styles.field}>
+              <span className={styles.label}>Steps</span>
+              <TaskSteps taskId={task.id} initialSteps={task.steps} />
+            </div>
+          )}
 
           {error && <p className={styles.error}>{error}</p>}
         </div>
