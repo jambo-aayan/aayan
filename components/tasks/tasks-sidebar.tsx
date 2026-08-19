@@ -5,10 +5,11 @@ import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { Plus, Calendar, ListChecks, Star, CheckCircle2 } from "lucide-react";
 import Link from "next/link";
 import { TaskMenu } from "./task-menu";
+import { ColorSwatchPicker } from "@/components/color-swatch-picker";
 import { useToast } from "@/components/toast/toast-provider";
 import { withRetry } from "@/lib/with-retry";
 import { createTaskList, renameTaskList, archiveTaskList, deleteTaskList } from "@/lib/tasks/actions";
-import { COLOR_PALETTE, resolveColorHex, type ColorKey } from "@/lib/colors";
+import { resolveColorHex, type ColorKey } from "@/lib/colors";
 import type { TaskListSummary } from "@/lib/tasks/data";
 import styles from "./tasks-sidebar.module.css";
 
@@ -17,29 +18,6 @@ const SMART_VIEWS = [
   { view: "important", label: "Important", icon: Star },
   { view: "completed", label: "Completed", icon: CheckCircle2 },
 ] as const;
-
-function ColorSwatchPicker({ value, onChange }: { value: string | null; onChange: (key: string | null) => void }) {
-  return (
-    <div className={styles.swatches}>
-      <button
-        type="button"
-        className={`${styles.swatch} ${styles.swatchNone} ${!value ? styles.swatchActive : ""}`}
-        aria-label="No color"
-        onClick={() => onChange(null)}
-      />
-      {COLOR_PALETTE.map((c) => (
-        <button
-          key={c.key}
-          type="button"
-          className={`${styles.swatch} ${value === c.key ? styles.swatchActive : ""}`}
-          style={{ background: c.hex }}
-          aria-label={c.label}
-          onClick={() => onChange(c.key)}
-        />
-      ))}
-    </div>
-  );
-}
 
 export function TasksSidebar({ lists: initialLists }: { lists: TaskListSummary[] }) {
   const router = useRouter();

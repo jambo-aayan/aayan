@@ -205,7 +205,11 @@ export function HabitManager({
           {habits.map((habit) => {
             const hex = resolveColorHex(habit.pillarColor as ColorKey | null);
             return (
-              <li key={habit.id} className={`${styles.row} ${habit.status !== "ACTIVE" ? styles.inactive : ""}`}>
+              <li
+                key={habit.id}
+                className={`${styles.row} ${habit.status !== "ACTIVE" ? styles.inactive : ""}`}
+                style={hex ? { borderLeft: `3px solid ${hex}55` } : undefined}
+              >
                 <button type="button" className={styles.main} onClick={() => setComposer({ mode: "edit", habit })}>
                   <div className={styles.name}>{habit.name}</div>
                   <div className={styles.meta}>

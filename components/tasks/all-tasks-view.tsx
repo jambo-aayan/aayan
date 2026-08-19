@@ -7,6 +7,7 @@ import type { TaskMenuItem } from "./task-menu";
 import { TaskComposer, type TaskFormInput } from "./task-composer";
 import { PrimaryButton } from "@/components/primary-button";
 import { useToast } from "@/components/toast/toast-provider";
+import { useDragReorder } from "@/components/use-drag-reorder";
 import { withRetry } from "@/lib/with-retry";
 import {
   createTask,
@@ -109,20 +110,33 @@ export function AllTasksView({
 
   /** Manual List order — independent of My Day's ordering (see Task's schema
    * comment). Only meaningful while filtered to a single List, since
-   * sortOrder is scoped per-List. */
-  async function handleMove(task: Task, direction: -1 | 1) {
+   * sortOrder is scoped per-List. Backed by the same commit path whether the
+   * user drags a row or uses the Move up/down menu items. */
+  async function commitReorder(reordered: Task[]) {
+    const previous = tasks;
+    setTasks(reordered);
+    const result = await withRetry(() => reorderListTasks(reordered.map((t) => t.id)));
+    if (!result.ok) {
+      setTasks(previous);
+      notifyError(result.error, { onRetry: () => commitReorder(reordered) });
+    }
+  }
+
+  function handleMove(task: Task, direction: -1 | 1) {
     const index = tasks.findIndex((t) => t.id === task.id);
     const swapWith = index + direction;
     if (index < 0 || swapWith < 0 || swapWith >= tasks.length) return;
     const reordered = [...tasks];
     [reordered[index], reordered[swapWith]] = [reordered[swapWith], reordered[index]];
-    setTasks(reordered);
-    const result = await withRetry(() => reorderListTasks(reordered.map((t) => t.id)));
-    if (!result.ok) {
-      setTasks(tasks);
-      notifyError(result.error, { onRetry: () => handleMove(task, direction) });
-    }
+    commitReorder(reordered);
   }
+
+  const dragReorder = useDragReorder({
+    items: tasks,
+    getId: (t) => t.id,
+    onLiveReorder: setTasks,
+    onCommit: commitReorder,
+  });
 
   async function handleComposerSubmit(input: TaskFormInput) {
     if (composer?.mode === "edit" && composer.task) {
@@ -208,6 +222,7 @@ export function AllTasksView({
         menuItemsFor={menuItemsFor}
         emptyIcon={ListChecks}
         emptyMessage={emptyMessage}
+        reorder={activeListId && tasks.length > 1 ? dragReorder : undefined}
       />
 
       {composer && (
@@ -219,6 +234,7 @@ export function AllTasksView({
           areas={areas}
           goals={goals}
           tagSuggestions={tagSuggestions}
+          defaultListId={activeListId}
           onClose={() => setComposer(null)}
           onSubmit={handleComposerSubmit}
         />

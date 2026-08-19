@@ -36,6 +36,7 @@
   padding: 12px 14px;
   border-radius: var(--radius-md);
   border: 1px solid var(--border-soft);
+  border-left: 3px solid transparent;
   background: var(--card);
 }
 

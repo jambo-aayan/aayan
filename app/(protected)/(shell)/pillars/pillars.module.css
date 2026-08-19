@@ -25,6 +25,22 @@
   transform: translateY(-1px);
 }
 
+/* Health's tile also hosts the color picker below its link, so it stacks
+ * instead of being one big clickable row like the still-static Finances
+ * tile. */
+.tile.health {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+}
+
+.tileLink {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+}
+
 .name {
   font-size: 16.5px;
   font-weight: 600;

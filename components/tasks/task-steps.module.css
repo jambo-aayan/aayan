@@ -14,8 +14,32 @@
 .row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 4px;
   padding: 6px 0;
+  background: var(--card);
+}
+
+.dragging {
+  position: relative;
+  z-index: 5;
+  box-shadow: var(--shadow-md);
+  border-radius: var(--radius-sm);
+}
+
+.grip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 26px;
+  flex-shrink: 0;
+  color: var(--border);
+  touch-action: none;
+  cursor: grab;
+}
+
+.grip:hover {
+  color: var(--muted);
 }
 
 .check {

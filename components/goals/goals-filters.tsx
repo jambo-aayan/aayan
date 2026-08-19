@@ -60,6 +60,7 @@ export function GoalsFilters({
               {a.name}
             </option>
           ))}
+          <option value="__none__">No area</option>
         </select>
       )}
       <select

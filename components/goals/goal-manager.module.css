@@ -56,6 +56,20 @@
   text-align: center;
 }
 
+.back {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--muted);
+  width: fit-content;
+}
+
+.back:hover {
+  color: var(--ink);
+}
+
 .pillarGroup {
   display: flex;
   flex-direction: column;
@@ -66,6 +80,45 @@
   font-size: 13px;
   font-weight: 700;
   color: var(--ink);
+}
+
+.tileList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tile {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 14px 16px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-soft);
+  border-left: 3px solid transparent;
+  background: var(--card);
+  text-align: left;
+  transition: box-shadow var(--duration-fast) var(--ease);
+}
+
+.tile:hover {
+  box-shadow: var(--shadow-sm);
+}
+
+.tileName {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.tileMeta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--muted);
+  flex-shrink: 0;
 }
 
 .areaGroup {
@@ -101,6 +154,7 @@
   padding: 10px 12px;
   border-radius: var(--radius-md);
   border: 1px solid var(--border-soft);
+  border-left: 3px solid transparent;
   background: var(--card);
 }
 

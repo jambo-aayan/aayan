@@ -58,6 +58,7 @@ export function TaskComposer({
   areas,
   goals,
   tagSuggestions,
+  defaultListId,
   onClose,
   onSubmit,
 }: {
@@ -68,6 +69,11 @@ export function TaskComposer({
   areas: { id: string; name: string; pillarId: string }[];
   goals: { id: string; name: string; areaId: string | null; pillarId?: string }[];
   tagSuggestions: string[];
+  /** Pre-selects the List in create mode when the composer was opened while
+   * already viewing a specific List — otherwise a "+ New task" from that
+   * view would silently create the task in Inbox instead. Ignored in edit
+   * mode, where the task's own List always wins. */
+  defaultListId?: string;
   onClose: () => void;
   onSubmit: (input: TaskFormInput) => Promise<{ ok: true } | { ok: false; error: string }>;
 }) {
@@ -77,7 +83,7 @@ export function TaskComposer({
 
   const [title, setTitle] = useState(task?.title ?? "");
   const [notes, setNotes] = useState(task?.notes ?? "");
-  const [listId, setListId] = useState(task?.listId ?? "");
+  const [listId, setListId] = useState(task?.listId ?? defaultListId ?? "");
   const [pillarId, setPillarId] = useState(task?.pillarId ?? "");
   const [areaId, setAreaId] = useState(task?.areaId ?? "");
   const [goalId, setGoalId] = useState(task?.goalId ?? "");

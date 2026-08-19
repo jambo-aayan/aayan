@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, X } from "lucide-react";
-import { createTaskStep, toggleTaskStep, deleteTaskStep } from "@/lib/tasks/actions";
+import { Plus, X, GripVertical } from "lucide-react";
+import { createTaskStep, toggleTaskStep, deleteTaskStep, reorderTaskSteps } from "@/lib/tasks/actions";
+import { useDragReorder } from "@/components/use-drag-reorder";
 import { withRetry } from "@/lib/with-retry";
 import type { TaskStep } from "@/lib/tasks/types";
 import styles from "./task-steps.module.css";
@@ -44,6 +45,22 @@ export function TaskSteps({ taskId, initialSteps }: { taskId: string; initialSte
     }
   }
 
+  async function commitReorder(reordered: TaskStep[]) {
+    const previous = steps;
+    setSteps(reordered);
+    const result = await withRetry(() => reorderTaskSteps(reordered.map((s) => s.id)));
+    if (!result.ok) {
+      setSteps(previous);
+    }
+  }
+
+  const dragReorder = useDragReorder({
+    items: steps,
+    getId: (s) => s.id,
+    onLiveReorder: setSteps,
+    onCommit: commitReorder,
+  });
+
   const doneCount = steps.filter((s) => s.completed).length;
 
   return (
@@ -55,7 +72,24 @@ export function TaskSteps({ taskId, initialSteps }: { taskId: string; initialSte
       )}
       <ul className={styles.list}>
         {steps.map((step) => (
-          <li key={step.id} className={styles.row}>
+          <li
+            key={step.id}
+            className={`${styles.row} ${dragReorder.draggingId === step.id ? styles.dragging : ""}`}
+            ref={(el) => dragReorder.registerRow(step.id, el)}
+          >
+            {steps.length > 1 && (
+              <button
+                type="button"
+                className={styles.grip}
+                aria-label={`Reorder "${step.title}"`}
+                onPointerDown={dragReorder.handlePointerDown(step.id)}
+                onPointerMove={dragReorder.handlePointerMove}
+                onPointerUp={dragReorder.handlePointerUp}
+                onPointerCancel={dragReorder.handlePointerUp}
+              >
+                <GripVertical size={13} strokeWidth={2} />
+              </button>
+            )}
             <label className={styles.check}>
               <input type="checkbox" checked={step.completed} onChange={() => handleToggle(step)} />
               <span className={step.completed ? styles.titleDone : styles.title}>{step.title}</span>

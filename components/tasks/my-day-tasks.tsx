@@ -7,6 +7,7 @@ import { TaskList } from "./task-list";
 import type { TaskMenuItem } from "./task-menu";
 import { TaskComposer, type TaskFormInput } from "./task-composer";
 import { useToast } from "@/components/toast/toast-provider";
+import { useDragReorder } from "@/components/use-drag-reorder";
 import { withRetry } from "@/lib/with-retry";
 import {
   createTask,
@@ -200,21 +201,34 @@ export function MyDayTasks({
   }
 
   /** My Day's own manual order — independent of each task's List order (see
-   * Task's schema comment). Move up/down rather than pointer drag, so this
-   * behaves identically on touch and desktop. */
-  async function handleMove(task: Task, direction: -1 | 1) {
+   * Task's schema comment). Backed by the same commit path whether the user
+   * drags a row or uses the Move up/down menu items (kept for keyboard/
+   * no-pointer access). */
+  async function commitReorder(reordered: Task[]) {
+    const previous = tasks;
+    setTasks(reordered);
+    const result = await withRetry(() => reorderMyDayTasks(reordered.map((t) => t.id)));
+    if (!result.ok) {
+      setTasks(previous);
+      notifyError(result.error, { onRetry: () => commitReorder(reordered) });
+    }
+  }
+
+  function handleMove(task: Task, direction: -1 | 1) {
     const index = tasks.findIndex((t) => t.id === task.id);
     const swapWith = index + direction;
     if (index < 0 || swapWith < 0 || swapWith >= tasks.length) return;
     const reordered = [...tasks];
     [reordered[index], reordered[swapWith]] = [reordered[swapWith], reordered[index]];
-    setTasks(reordered);
-    const result = await withRetry(() => reorderMyDayTasks(reordered.map((t) => t.id)));
-    if (!result.ok) {
-      setTasks(tasks);
-      notifyError(result.error, { onRetry: () => handleMove(task, direction) });
-    }
+    commitReorder(reordered);
   }
+
+  const dragReorder = useDragReorder({
+    items: tasks,
+    getId: (t) => t.id,
+    onLiveReorder: setTasks,
+    onCommit: commitReorder,
+  });
 
   async function handleComposerSubmit(input: TaskFormInput) {
     if (composer?.mode === "edit" && composer.task) {
@@ -322,6 +336,7 @@ export function MyDayTasks({
         menuItemsFor={(task) => menuItemsFor(task, false)}
         emptyIcon={ListChecks}
         emptyMessage="Nothing planned yet."
+        reorder={tasks.length > 1 ? dragReorder : undefined}
       />
 
       {completedTasks.length > 0 && (

@@ -126,28 +126,6 @@
   color: var(--ink);
 }
 
-.swatches {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.swatch {
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  border: 2px solid transparent;
-}
-
-.swatchNone {
-  background: var(--bg2);
-  border: 1px solid var(--border-soft);
-}
-
-.swatchActive {
-  border-color: var(--ink);
-}
-
 .editActions {
   display: flex;
   gap: 8px;

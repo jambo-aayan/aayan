@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Plus, Flag } from "lucide-react";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
+import { Plus, Flag, ChevronLeft, ChevronRight } from "lucide-react";
 import { PrimaryButton } from "@/components/primary-button";
 import { useToast } from "@/components/toast/toast-provider";
 import { withRetry } from "@/lib/with-retry";
@@ -13,23 +14,16 @@ import styles from "./goal-manager.module.css";
 
 const STATUS_LABEL: Record<LifeGoalStatus, string> = { ACTIVE: "Active", PAUSED: "Paused", COMPLETED: "Completed", ARCHIVED: "Archived" };
 const STATUS_ORDER: LifeGoalStatus[] = ["ACTIVE", "PAUSED", "COMPLETED", "ARCHIVED"];
+const NO_AREA_KEY = "__none__";
 
-function groupGoals(goals: LifeGoalWithRelations[]) {
-  const byPillar = new Map<string, { pillarName: string; pillarColor: string | null; byArea: Map<string, { areaName: string; goals: LifeGoalWithRelations[] }> }>();
-  for (const goal of goals) {
-    if (!byPillar.has(goal.pillarId)) {
-      byPillar.set(goal.pillarId, { pillarName: goal.pillarName, pillarColor: goal.pillarColor, byArea: new Map() });
-    }
-    const pillarGroup = byPillar.get(goal.pillarId)!;
-    const areaKey = goal.areaId ?? "__none__";
-    if (!pillarGroup.byArea.has(areaKey)) {
-      pillarGroup.byArea.set(areaKey, { areaName: goal.areaName ?? "No area", goals: [] });
-    }
-    pillarGroup.byArea.get(areaKey)!.goals.push(goal);
-  }
-  return byPillar;
-}
-
+/**
+ * Pillar → Area → Goal drill-down (tap through tiles) alongside the
+ * dropdown filters in GoalsFilters, which jump straight to a level (see
+ * spec: "both drill-down and global filtering supported" — they share the
+ * same pillarId/areaId query params, so a filter select and a tile tap are
+ * two ways to reach the same place). `goals` always arrives pre-filtered
+ * by whatever level the URL currently points at.
+ */
 export function GoalManager({
   goals: initialGoals,
   pillars,
@@ -41,14 +35,29 @@ export function GoalManager({
   areas: { id: string; name: string; pillarId: string }[];
   emptyMessage: string;
 }) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [goals, setGoals] = useState(initialGoals);
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState("");
-  const [pillarId, setPillarId] = useState(pillars[0]?.id ?? "");
-  const [areaId, setAreaId] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { notifyError } = useToast();
+
+  const pillarId = searchParams.get("pillarId") ?? "";
+  const areaId = searchParams.get("areaId") ?? "";
+  const [formPillarId, setFormPillarId] = useState(pillarId || pillars[0]?.id || "");
+  const [formAreaId, setFormAreaId] = useState(areaId);
+
+  function navigate(nextPillarId: string, nextAreaId: string) {
+    const next = new URLSearchParams(searchParams.toString());
+    if (nextPillarId) next.set("pillarId", nextPillarId);
+    else next.delete("pillarId");
+    if (nextAreaId) next.set("areaId", nextAreaId);
+    else next.delete("areaId");
+    router.push(`${pathname}?${next.toString()}`);
+  }
 
   async function handleCreate() {
     const trimmed = name.trim();
@@ -56,13 +65,13 @@ export function GoalManager({
       setError("Give the goal a name first.");
       return;
     }
-    if (!pillarId) {
+    if (!formPillarId) {
       setError("Choose a Pillar first.");
       return;
     }
     setSaving(true);
     setError(null);
-    const result = await withRetry(() => createGoal({ name: trimmed, pillarId, areaId: areaId || null }));
+    const result = await withRetry(() => createGoal({ name: trimmed, pillarId: formPillarId, areaId: formAreaId || null }));
     setSaving(false);
     if (!result.ok) {
       setError(result.error);
@@ -74,17 +83,16 @@ export function GoalManager({
         id: result.id,
         name: trimmed,
         status: "ACTIVE",
-        pillarId,
-        pillarName: pillars.find((p) => p.id === pillarId)?.name ?? "",
-        pillarColor: pillars.find((p) => p.id === pillarId)?.color ?? null,
-        areaId: areaId || null,
-        areaName: areas.find((a) => a.id === areaId)?.name ?? null,
+        pillarId: formPillarId,
+        pillarName: pillars.find((p) => p.id === formPillarId)?.name ?? "",
+        pillarColor: pillars.find((p) => p.id === formPillarId)?.color ?? null,
+        areaId: formAreaId || null,
+        areaName: areas.find((a) => a.id === formAreaId)?.name ?? null,
         createdAt: new Date(),
         updatedAt: new Date(),
       },
     ]);
     setName("");
-    setAreaId("");
     setCreating(false);
   }
 
@@ -99,102 +107,205 @@ export function GoalManager({
     }
   }
 
-  const grouped = groupGoals(goals);
+  const createForm = (
+    <div className={styles.createForm}>
+      <input
+        type="text"
+        className={styles.input}
+        placeholder="Goal name"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        autoFocus
+      />
+      <select
+        className={styles.input}
+        value={formPillarId}
+        onChange={(e) => {
+          setFormPillarId(e.target.value);
+          if (formAreaId && areas.find((a) => a.id === formAreaId)?.pillarId !== e.target.value) setFormAreaId("");
+        }}
+      >
+        {pillars.map((p) => (
+          <option key={p.id} value={p.id}>
+            {p.name}
+          </option>
+        ))}
+      </select>
+      <select className={styles.input} value={formAreaId} onChange={(e) => setFormAreaId(e.target.value)}>
+        <option value="">No area</option>
+        {areas.filter((a) => a.pillarId === formPillarId).map((a) => (
+          <option key={a.id} value={a.id}>
+            {a.name}
+          </option>
+        ))}
+      </select>
+      <div className={styles.createActions}>
+        <PrimaryButton onClick={handleCreate} disabled={saving}>
+          {saving ? "Adding…" : "Add goal"}
+        </PrimaryButton>
+        <button type="button" className={styles.cancelBtn} onClick={() => setCreating(false)}>
+          Cancel
+        </button>
+      </div>
+      {error && <p className={styles.error}>{error}</p>}
+    </div>
+  );
+
+  const header = (
+    <div className={styles.header}>
+      <PrimaryButton onClick={() => setCreating((v) => !v)}>
+        <Plus size={14} strokeWidth={2.5} /> New goal
+      </PrimaryButton>
+    </div>
+  );
+
+  // Level 2: a specific Pillar + Area (or "no area") — the Goal list itself.
+  if (pillarId && areaId) {
+    const pillar = pillars.find((p) => p.id === pillarId);
+    const hex = resolveColorHex(pillar?.color as ColorKey | null);
+    const areaName = areaId === NO_AREA_KEY ? "No area" : areas.find((a) => a.id === areaId)?.name ?? "Area";
+    return (
+      <div className={styles.wrap}>
+        {header}
+        {creating && createForm}
+        <button type="button" className={styles.back} onClick={() => navigate(pillarId, "")}>
+          <ChevronLeft size={14} strokeWidth={2.5} /> {pillar?.name ?? "Pillar"}
+        </button>
+        <div className={styles.pillarHead} style={hex ? { color: hex } : undefined}>
+          {areaName}
+        </div>
+        {goals.length === 0 ? (
+          <div className={styles.empty}>
+            <Flag size={22} strokeWidth={1.6} />
+            <p>{emptyMessage}</p>
+          </div>
+        ) : (
+          <ul className={styles.list}>
+            {goals.map((goal) => (
+              <li
+                key={goal.id}
+                className={`${styles.row} ${goal.status !== "ACTIVE" ? styles.inactive : ""}`}
+                style={hex ? { borderLeft: `3px solid ${hex}55` } : undefined}
+              >
+                <Link href={`/goals/${goal.id}`} className={styles.name}>
+                  {goal.name}
+                </Link>
+                <div className={styles.statusGroup} role="group" aria-label="Status">
+                  {STATUS_ORDER.map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      className={`${styles.statusBtn} ${goal.status === s ? styles.statusBtnActive : ""}`}
+                      onClick={() => handleStatus(goal, s)}
+                    >
+                      {STATUS_LABEL[s]}
+                    </button>
+                  ))}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    );
+  }
+
+  // Level 1: a specific Pillar — its Area tiles (+ "No area").
+  if (pillarId) {
+    const pillar = pillars.find((p) => p.id === pillarId);
+    const hex = resolveColorHex(pillar?.color as ColorKey | null);
+    const pillarAreas = areas.filter((a) => a.pillarId === pillarId);
+    const countFor = (key: string) => goals.filter((g) => (key === NO_AREA_KEY ? !g.areaId : g.areaId === key)).length;
+    const noAreaCount = countFor(NO_AREA_KEY);
+
+    return (
+      <div className={styles.wrap}>
+        {header}
+        {creating && createForm}
+        <button type="button" className={styles.back} onClick={() => navigate("", "")}>
+          <ChevronLeft size={14} strokeWidth={2.5} /> All pillars
+        </button>
+        <div className={styles.pillarHead} style={hex ? { color: hex } : undefined}>
+          {pillar?.name ?? "Pillar"}
+        </div>
+        <div className={styles.tileList}>
+          {pillarAreas.map((area) => (
+            <button
+              key={area.id}
+              type="button"
+              className={styles.tile}
+              style={hex ? { borderLeftColor: `${hex}55` } : undefined}
+              onClick={() => navigate(pillarId, area.id)}
+            >
+              <span className={styles.tileName}>{area.name}</span>
+              <span className={styles.tileMeta}>
+                {countFor(area.id)} goal{countFor(area.id) === 1 ? "" : "s"}
+                <ChevronRight size={14} strokeWidth={2} />
+              </span>
+            </button>
+          ))}
+          {noAreaCount > 0 && (
+            <button
+              key={NO_AREA_KEY}
+              type="button"
+              className={styles.tile}
+              style={hex ? { borderLeftColor: `${hex}55` } : undefined}
+              onClick={() => navigate(pillarId, NO_AREA_KEY)}
+            >
+              <span className={styles.tileName}>No area</span>
+              <span className={styles.tileMeta}>
+                {noAreaCount} goal{noAreaCount === 1 ? "" : "s"}
+                <ChevronRight size={14} strokeWidth={2} />
+              </span>
+            </button>
+          )}
+          {pillarAreas.length === 0 && noAreaCount === 0 && (
+            <div className={styles.empty}>
+              <Flag size={22} strokeWidth={1.6} />
+              <p>{emptyMessage}</p>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // Level 0: every Pillar as a tile.
+  const countForPillar = (id: string) => goals.filter((g) => g.pillarId === id).length;
 
   return (
     <div className={styles.wrap}>
-      <div className={styles.header}>
-        <PrimaryButton onClick={() => setCreating((v) => !v)}>
-          <Plus size={14} strokeWidth={2.5} /> New goal
-        </PrimaryButton>
-      </div>
-
-      {creating && (
-        <div className={styles.createForm}>
-          <input
-            type="text"
-            className={styles.input}
-            placeholder="Goal name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            autoFocus
-          />
-          <select
-            className={styles.input}
-            value={pillarId}
-            onChange={(e) => {
-              setPillarId(e.target.value);
-              if (areaId && areas.find((a) => a.id === areaId)?.pillarId !== e.target.value) setAreaId("");
-            }}
-          >
-            {pillars.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
-          <select className={styles.input} value={areaId} onChange={(e) => setAreaId(e.target.value)}>
-            <option value="">No area</option>
-            {areas.filter((a) => a.pillarId === pillarId).map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.name}
-              </option>
-            ))}
-          </select>
-          <div className={styles.createActions}>
-            <PrimaryButton onClick={handleCreate} disabled={saving}>
-              {saving ? "Adding…" : "Add goal"}
-            </PrimaryButton>
-            <button type="button" className={styles.cancelBtn} onClick={() => setCreating(false)}>
-              Cancel
-            </button>
-          </div>
-          {error && <p className={styles.error}>{error}</p>}
-        </div>
-      )}
-
-      {grouped.size === 0 ? (
+      {header}
+      {creating && createForm}
+      {pillars.length === 0 ? (
         <div className={styles.empty}>
           <Flag size={22} strokeWidth={1.6} />
           <p>{emptyMessage}</p>
         </div>
       ) : (
-        Array.from(grouped.entries()).map(([pillarId, pillarGroup]) => {
-          const hex = resolveColorHex(pillarGroup.pillarColor as ColorKey | null);
-          return (
-            <div key={pillarId} className={styles.pillarGroup}>
-              <div className={styles.pillarHead} style={hex ? { color: hex } : undefined}>
-                {pillarGroup.pillarName}
-              </div>
-              {Array.from(pillarGroup.byArea.entries()).map(([areaKey, areaGroup]) => (
-                <div key={areaKey} className={styles.areaGroup}>
-                  <div className={styles.areaHead}>{areaGroup.areaName}</div>
-                  <ul className={styles.list}>
-                    {areaGroup.goals.map((goal) => (
-                      <li key={goal.id} className={`${styles.row} ${goal.status !== "ACTIVE" ? styles.inactive : ""}`}>
-                        <Link href={`/goals/${goal.id}`} className={styles.name}>
-                          {goal.name}
-                        </Link>
-                        <div className={styles.statusGroup} role="group" aria-label="Status">
-                          {STATUS_ORDER.map((s) => (
-                            <button
-                              key={s}
-                              type="button"
-                              className={`${styles.statusBtn} ${goal.status === s ? styles.statusBtnActive : ""}`}
-                              onClick={() => handleStatus(goal, s)}
-                            >
-                              {STATUS_LABEL[s]}
-                            </button>
-                          ))}
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
-            </div>
-          );
-        })
+        <div className={styles.tileList}>
+          {pillars.map((pillar) => {
+            const hex = resolveColorHex(pillar.color as ColorKey | null);
+            const count = countForPillar(pillar.id);
+            return (
+              <button
+                key={pillar.id}
+                type="button"
+                className={styles.tile}
+                style={hex ? { borderLeftColor: `${hex}55` } : undefined}
+                onClick={() => navigate(pillar.id, "")}
+              >
+                <span className={styles.tileName} style={hex ? { color: hex } : undefined}>
+                  {pillar.name}
+                </span>
+                <span className={styles.tileMeta}>
+                  {count} goal{count === 1 ? "" : "s"}
+                  <ChevronRight size={14} strokeWidth={2} />
+                </span>
+              </button>
+            );
+          })}
+        </div>
       )}
     </div>
   );

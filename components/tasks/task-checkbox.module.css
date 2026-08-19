@@ -15,13 +15,13 @@
 }
 
 .checkbox:hover:not(:disabled) {
-  border-color: var(--health);
+  border-color: var(--task-accent, var(--health));
   transform: scale(1.08);
 }
 
 .checked {
-  background: var(--health);
-  border-color: var(--health);
+  background: var(--task-accent, var(--health));
+  border-color: var(--task-accent, var(--health));
 }
 
 .checkbox:disabled {

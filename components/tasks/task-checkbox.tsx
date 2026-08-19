@@ -6,11 +6,16 @@ export function TaskCheckbox({
   onToggle,
   disabled,
   label,
+  accentColor,
 }: {
   checked: boolean;
   onToggle: () => void;
   disabled?: boolean;
   label: string;
+  /** The task's Pillar color (resolved hex), when set — the checked/hover
+   * state uses it instead of the default green, one of the "subtle...
+   * checkbox/accent state" propagation points from the color system spec. */
+  accentColor?: string | null;
 }) {
   return (
     <button
@@ -21,6 +26,7 @@ export function TaskCheckbox({
       role="checkbox"
       aria-checked={checked}
       aria-label={label}
+      style={accentColor ? ({ "--task-accent": accentColor } as React.CSSProperties) : undefined}
     >
       {checked && <Check size={13} strokeWidth={3} />}
     </button>
