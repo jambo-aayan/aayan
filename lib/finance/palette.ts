@@ -4,10 +4,12 @@
  * --slate/--health tokens defined in app/globals.css.
  */
 export const CHART_COLORS = {
-  coral: "#D9714B",
-  amber: "#C79A3D",
-  slate: "#6C7A8C",
-  health: "#6E8B74",
+  coral: "#C97B5F",
+  amber: "#B08A3E",
+  slate: "#6C7C88",
+  health: "#6F8F6A",
+  lavender: "#8E85B0",
+  plum: "#96667A",
 } as const;
 
 export const BREAKDOWN_SEGMENT_COLORS = [
@@ -15,6 +17,6 @@ export const BREAKDOWN_SEGMENT_COLORS = [
   CHART_COLORS.amber,
   CHART_COLORS.slate,
   CHART_COLORS.health,
-  "#8A6FB8",
-  "#4A90A4",
+  CHART_COLORS.lavender,
+  CHART_COLORS.plum,
 ];

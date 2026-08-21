@@ -1,6 +1,7 @@
 import { Landmark } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import pageStyles from "@/components/page-header.module.css";
+import { PageTitle } from "@/components/page-title";
 import { Card } from "@/components/card";
 import { DashboardCard } from "@/components/dashboard-card";
 import { BaselineForm } from "@/components/baseline-form";
@@ -49,8 +50,9 @@ export default async function FinancesPage() {
 
   return (
     <>
-      <PageHeader title="Finances" />
+      <PageHeader />
       <div className={pageStyles.content}>
+        <PageTitle eyebrow="Pillar" title="Finances" />
         <StatRow accessible={accessible} total={total} surplus={monthlySurplus} northStarPercent={northStarPercent} />
 
         <div className={dashboardStyles.dashGrid}>

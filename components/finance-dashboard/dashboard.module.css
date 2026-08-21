@@ -1,12 +1,12 @@
 .statRow {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: 12px;
   margin-bottom: 12px;
 }
 
 .statCard {
-  background: var(--card);
+  background: var(--surface);
   border: 1px solid var(--border-soft);
   border-radius: var(--radius-lg);
   padding: 16px 18px;
@@ -29,18 +29,19 @@
 
 .statLabel {
   font-size: 12.5px;
-  color: var(--muted);
+  color: var(--muted-2);
   font-weight: 500;
 }
 
 .statNum {
-  font-size: 22px;
-  font-weight: 700;
+  font-family: var(--font-serif), Georgia, serif;
+  font-size: 23px;
+  letter-spacing: -0.015em;
 }
 
 .statSub {
   font-size: 11.5px;
-  color: var(--muted);
+  color: var(--muted-2);
   margin-top: 4px;
 }
 
@@ -52,7 +53,7 @@
 }
 
 .bentoCard {
-  background: var(--card);
+  background: var(--surface);
   border: 1px solid var(--border-soft);
   border-radius: var(--radius-lg);
   padding: 18px;
@@ -66,14 +67,16 @@
 }
 
 .cardHead {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--muted);
+  font-family: var(--font-serif), Georgia, serif;
+  font-size: var(--text-card-title);
+  font-weight: 400;
+  letter-spacing: -0.015em;
+  color: var(--ink);
   margin-bottom: 14px;
 }
 
 .dark .cardHead {
-  color: rgba(244, 239, 231, 0.6);
+  color: var(--bg);
 }
 
 .ringWrap {
@@ -88,19 +91,15 @@
 .divider {
   margin: 28px 0 16px;
   padding-top: 16px;
-  border-top: 1px solid var(--border);
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--muted);
+  border-top: 1px solid var(--section-divider);
+  font-size: var(--text-eyebrow);
+  font-weight: 500;
+  color: var(--muted-2);
   text-transform: uppercase;
-  letter-spacing: 0.07em;
+  letter-spacing: 0.1em;
 }
 
-@media (min-width: 860px) {
-  .statRow {
-    grid-template-columns: repeat(4, 1fr);
-  }
-
+@media (min-width: 900px) {
   .dashGrid {
     grid-template-columns: repeat(6, 1fr);
     grid-auto-rows: minmax(70px, auto);

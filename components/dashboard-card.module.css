@@ -2,8 +2,8 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  background: var(--card);
-  border: 1px solid var(--border-soft);
+  background: linear-gradient(180deg, var(--panel-gold-bg) 0%, var(--surface) 100%);
+  border: 1px solid var(--panel-gold-border);
   border-radius: var(--radius-lg);
   padding: 14px 16px;
   box-shadow: var(--shadow-sm);
