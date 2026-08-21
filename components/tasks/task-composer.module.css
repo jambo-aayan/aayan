@@ -16,7 +16,7 @@
   display: flex;
   flex-direction: column;
   z-index: 61;
-  animation: ay-sheet 0.24s var(--ease) both;
+  animation: ay-sheet var(--duration-base) var(--ease) both;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -171,7 +171,7 @@
 }
 
 .dueChipActive {
-  background: rgba(201, 123, 95, 0.12);
+  background: var(--coral-soft);
   border-color: var(--coral);
   color: var(--coral);
 }
@@ -202,7 +202,7 @@
     max-height: 86vh;
     border-radius: 22px;
     box-shadow: var(--shadow-md);
-    animation: ay-in 0.22s var(--ease) both;
+    animation: ay-in var(--duration-base) var(--ease) both;
   }
 
   @media (prefers-reduced-motion: reduce) {

@@ -2,7 +2,7 @@
   width: 19px;
   height: 19px;
   border-radius: 6px;
-  border: 1.5px solid rgba(34, 30, 26, 0.26);
+  border: 1.5px solid var(--border-strong);
   background: var(--surface);
   flex-shrink: 0;
   cursor: pointer;

@@ -5,6 +5,7 @@ import { Plus, X, GripVertical } from "lucide-react";
 import { createTaskStep, toggleTaskStep, deleteTaskStep, reorderTaskSteps } from "@/lib/tasks/actions";
 import { useDragReorder } from "@/components/use-drag-reorder";
 import { withRetry } from "@/lib/with-retry";
+import { TaskCheckbox } from "./task-checkbox";
 import type { TaskStep } from "@/lib/tasks/types";
 import styles from "./task-steps.module.css";
 
@@ -90,10 +91,19 @@ export function TaskSteps({ taskId, initialSteps }: { taskId: string; initialSte
                 <GripVertical size={13} strokeWidth={2} />
               </button>
             )}
-            <label className={styles.check}>
-              <input type="checkbox" checked={step.completed} onChange={() => handleToggle(step)} />
-              <span className={step.completed ? styles.titleDone : styles.title}>{step.title}</span>
-            </label>
+            <span className={styles.check}>
+              <TaskCheckbox
+                checked={step.completed}
+                onToggle={() => handleToggle(step)}
+                label={step.completed ? `Mark "${step.title}" not done` : `Mark "${step.title}" done`}
+              />
+              <span
+                className={step.completed ? styles.titleDone : styles.title}
+                onClick={() => handleToggle(step)}
+              >
+                {step.title}
+              </span>
+            </span>
             <button type="button" className={styles.remove} onClick={() => handleDelete(step)} aria-label={`Remove step "${step.title}"`}>
               <X size={13} strokeWidth={2} />
             </button>

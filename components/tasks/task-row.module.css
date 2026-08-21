@@ -76,7 +76,7 @@
   font-size: var(--text-task-title);
   font-weight: 500;
   line-height: 1.35;
-  color: #a79e93;
+  color: var(--muted-2);
   text-decoration: line-through;
   transition: color 0.2s var(--ease);
 }
@@ -116,7 +116,7 @@
 .tag {
   font-size: var(--text-pill);
   color: var(--ink-2);
-  background: rgba(34, 30, 26, 0.05);
+  background: var(--surface-hover);
   padding: 1px 6px;
   border-radius: 5px;
 }
@@ -161,7 +161,7 @@
   width: 28px;
   height: 28px;
   border-radius: var(--radius-sm);
-  color: rgba(34, 30, 26, 0.2);
+  color: var(--faintest);
   flex-shrink: 0;
   transition: color var(--duration-fast) var(--ease), background var(--duration-fast) var(--ease);
 }

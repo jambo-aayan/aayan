@@ -51,35 +51,19 @@
   gap: 9px;
   flex: 1;
   min-width: 0;
-  cursor: pointer;
-}
-
-.check input[type="checkbox"] {
-  appearance: none;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  border: 1.5px solid rgba(34, 30, 26, 0.26);
-  background: var(--surface);
-  flex-shrink: 0;
-  cursor: pointer;
-  transition: background 0.18s var(--ease), border-color 0.18s var(--ease);
-}
-
-.check input[type="checkbox"]:checked {
-  background: var(--green);
-  border-color: var(--green);
 }
 
 .title {
   font-size: 13.5px;
   color: var(--ink-2);
+  cursor: pointer;
 }
 
 .titleDone {
   font-size: 13.5px;
   color: var(--muted-2);
   text-decoration: line-through;
+  cursor: pointer;
 }
 
 .remove {
@@ -108,7 +92,7 @@
   min-width: 0;
   padding: 8px 10px;
   border-radius: var(--radius-sm);
-  border: 1px dashed rgba(34, 30, 26, 0.2);
+  border: 1px dashed var(--faintest);
   font-size: 13px;
   background: var(--surface-sunken);
   color: var(--ink);
