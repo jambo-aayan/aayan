@@ -27,34 +27,6 @@
   margin-top: 2px;
 }
 
-.dot {
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  border: none;
-  flex-shrink: 0;
-  cursor: pointer;
-  padding: 0;
-  transition: transform var(--duration-fast) var(--ease);
-}
-
-.dot:hover:not(:disabled) {
-  transform: scale(1.1);
-}
-
-.dot.none {
-  background: var(--bg2);
-}
-
-.dot.full {
-  background: var(--health);
-}
-
-.dot.minimum {
-  background: var(--coral);
-  opacity: 0.55;
-}
-
 .error {
   color: var(--danger);
   font-size: 12px;

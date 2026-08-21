@@ -1,4 +1,3 @@
-import { resolveColorHex, type ColorKey } from "@/lib/colors";
 import styles from "./habit-dot.module.css";
 
 /**
@@ -12,18 +11,30 @@ export function HabitDot({
   level,
   accentColor,
   size,
+  onToggle,
+  label,
 }: {
   level: "FULL" | "MINIMUM" | null;
-  /** The habit's Pillar color key — falls back to green when unset. */
+  /** The habit's Pillar color, already resolved to hex — falls back to
+   * green when unset. Callers resolve from the stored color key
+   * themselves (see lib/colors.ts's resolveColorHex), matching
+   * TaskCheckbox's accentColor convention. */
   accentColor?: string | null;
   size: number;
+  /** Cycles none -> full -> partial -> none, per the handoff's tri-state
+   * dot spec. Omit for a display-only dot (e.g. a read-only summary). */
+  onToggle?: () => void;
+  label?: string;
 }) {
-  const accent = resolveColorHex(accentColor as ColorKey | null) ?? "var(--green)";
+  const accent = accentColor ?? "var(--green)";
+  const className = `${styles.dot} ${level === "FULL" ? styles.full : ""} ${level === "MINIMUM" ? styles.partial : ""}`;
+  const style = { "--habit-accent": accent, width: size, height: size } as React.CSSProperties;
+
+  if (!onToggle) {
+    return <span className={className} style={style} aria-hidden />;
+  }
+
   return (
-    <span
-      className={`${styles.dot} ${level === "FULL" ? styles.full : ""} ${level === "MINIMUM" ? styles.partial : ""}`}
-      style={{ "--habit-accent": accent, width: size, height: size } as React.CSSProperties}
-      aria-hidden
-    />
+    <button type="button" className={className} style={style} onClick={onToggle} aria-label={label ?? "Cycle check-in"} />
   );
 }

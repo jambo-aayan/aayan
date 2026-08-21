@@ -6,13 +6,14 @@ import { usePathname } from "next/navigation";
 import { X } from "lucide-react";
 import { NAV_ITEMS } from "./nav-config";
 import { HabitDot } from "./habit-dot";
+import { useDailyFocusHabits } from "./use-daily-focus-habits";
 import type { DailyFocusHabit } from "./daily-focus-types";
 import styles from "./mobile-nav-drawer.module.css";
 
 export function MobileNavDrawer({
   open,
   onClose,
-  dailyFocusHabits,
+  dailyFocusHabits: initialDailyFocusHabits,
   nudgesUnreadCount,
 }: {
   open: boolean;
@@ -21,6 +22,7 @@ export function MobileNavDrawer({
   nudgesUnreadCount: number;
 }) {
   const pathname = usePathname();
+  const { habits: dailyFocusHabits, toggle } = useDailyFocusHabits(initialDailyFocusHabits);
 
   useEffect(() => {
     if (!open) return;
@@ -71,7 +73,13 @@ export function MobileNavDrawer({
             <div className={styles.focusRows}>
               {dailyFocusHabits.slice(0, 3).map((habit) => (
                 <div key={habit.id} className={styles.focusRow}>
-                  <HabitDot level={habit.todayLevel} accentColor={habit.pillarColor} size={13} />
+                  <HabitDot
+                    level={habit.todayLevel}
+                    accentColor={habit.pillarColor}
+                    size={13}
+                    onToggle={() => toggle(habit)}
+                    label={`Check in "${habit.name}": currently ${habit.todayLevel ?? "not checked in"}`}
+                  />
                   <span className={habit.todayLevel === "FULL" ? styles.focusRowNameDone : styles.focusRowName}>
                     {habit.name}
                   </span>

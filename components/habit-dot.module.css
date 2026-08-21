@@ -4,6 +4,11 @@
   border-radius: 50%;
   border: 1.5px solid rgba(34, 30, 26, 0.24);
   background: transparent;
+  padding: 0;
+}
+
+button.dot {
+  cursor: pointer;
 }
 
 .full {

@@ -6,7 +6,7 @@ import styles from "./task-menu.module.css";
 
 export type TaskMenuItem = { label: string; onSelect: () => void; danger?: boolean };
 
-export function TaskMenu({ items }: { items: TaskMenuItem[] }) {
+export function TaskMenu({ items, label = "Task options" }: { items: TaskMenuItem[]; label?: string }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -32,7 +32,7 @@ export function TaskMenu({ items }: { items: TaskMenuItem[] }) {
         type="button"
         className={styles.trigger}
         onClick={() => setOpen((v) => !v)}
-        aria-label="Task options"
+        aria-label={label}
         aria-haspopup="menu"
         aria-expanded={open}
       >

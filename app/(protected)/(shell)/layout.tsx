@@ -1,6 +1,7 @@
 import { AppShell } from "@/components/app-shell";
 import { ToastProvider } from "@/components/toast/toast-provider";
 import { getHabitOccurrencesForDate } from "@/lib/habits/data";
+import { resolveColorHex, type ColorKey } from "@/lib/colors";
 
 export default async function ShellLayout({ children }: { children: React.ReactNode }) {
   const habits = await getHabitOccurrencesForDate(new Date());
@@ -8,7 +9,7 @@ export default async function ShellLayout({ children }: { children: React.ReactN
     id: h.id,
     name: h.name,
     todayLevel: h.todayLevel,
-    pillarColor: h.pillarColor,
+    pillarColor: resolveColorHex(h.pillarColor as ColorKey | null),
   }));
 
   return (

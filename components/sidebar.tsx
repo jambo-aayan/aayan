@@ -5,17 +5,19 @@ import { usePathname } from "next/navigation";
 import { Search } from "lucide-react";
 import { NAV_ITEMS } from "./nav-config";
 import { HabitDot } from "./habit-dot";
+import { useDailyFocusHabits } from "./use-daily-focus-habits";
 import type { DailyFocusHabit } from "./daily-focus-types";
 import styles from "./sidebar.module.css";
 
 export function Sidebar({
-  dailyFocusHabits,
+  dailyFocusHabits: initialDailyFocusHabits,
   nudgesUnreadCount,
 }: {
   dailyFocusHabits: DailyFocusHabit[];
   nudgesUnreadCount: number;
 }) {
   const pathname = usePathname();
+  const { habits: dailyFocusHabits, toggle } = useDailyFocusHabits(initialDailyFocusHabits);
   const doneCount = dailyFocusHabits.filter((h) => h.todayLevel !== null).length;
 
   return (
@@ -66,7 +68,13 @@ export function Sidebar({
           <div className={styles.focusRows}>
             {dailyFocusHabits.slice(0, 3).map((habit) => (
               <div key={habit.id} className={styles.focusRow}>
-                <HabitDot level={habit.todayLevel} accentColor={habit.pillarColor} size={13} />
+                <HabitDot
+                  level={habit.todayLevel}
+                  accentColor={habit.pillarColor}
+                  size={13}
+                  onToggle={() => toggle(habit)}
+                  label={`Check in "${habit.name}": currently ${habit.todayLevel ?? "not checked in"}`}
+                />
                 <span className={habit.todayLevel === "FULL" ? styles.focusRowNameDone : styles.focusRowName}>
                   {habit.name}
                 </span>

@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { dailyStreak, weeklyStreak, isEstablished } from "@/lib/habits/streak";
 import { formatScheduleLabel, type HabitScheduleType } from "@/lib/habits/schedule";
+import { nextCheckInLevel, type CheckInLevel } from "@/lib/habits/check-in";
 import {
   createHabit,
   updateHabit,
@@ -17,11 +18,11 @@ import { utcMidnight } from "@/lib/habits/date-utils";
 import { withRetry } from "@/lib/with-retry";
 import { useToast } from "@/components/toast/toast-provider";
 import { ThoughtPrompt } from "@/components/thoughts/thought-prompt";
+import { HabitDot } from "@/components/habit-dot";
 import styles from "./habits-list.module.css";
 
 const UNDO_WINDOW_MS = 5000;
 
-type CheckInLevel = "FULL" | "MINIMUM" | null;
 type HabitStatus = "ACTIVE" | "PAUSED" | "ARCHIVED";
 
 const QUICK_SCHEDULES: HabitScheduleType[] = ["DAILY", "WEEKDAYS", "WEEKLY", "MONTHLY"];
@@ -41,12 +42,6 @@ export type AreaHabit = {
 
 function streakFor(habit: AreaHabit): number {
   return habit.scheduleType === "WEEKLY" ? weeklyStreak(habit.checkInDates) : dailyStreak(habit.checkInDates);
-}
-
-function nextLevel(level: CheckInLevel): CheckInLevel {
-  if (level === null) return "FULL";
-  if (level === "FULL") return "MINIMUM";
-  return null;
 }
 
 const EMPTY_FORM = { name: "", scheduleType: "DAILY" as HabitScheduleType };
@@ -130,7 +125,7 @@ export function HabitsList({
   }
 
   async function handleToggleCheckIn(habit: AreaHabit) {
-    const newLevel = nextLevel(habit.todayLevel);
+    const newLevel = nextCheckInLevel(habit.todayLevel);
     const todayDate = utcMidnight(new Date());
 
     setHabits((prev) =>
@@ -240,12 +235,14 @@ export function HabitsList({
               </div>
               <div className={styles.rowActions}>
                 {habit.status === "ACTIVE" && (
-                  <button
-                    type="button"
-                    className={`${styles.dot} ${styles[habit.todayLevel?.toLowerCase() ?? "none"]}`}
-                    aria-label={`Check in: currently ${habit.todayLevel ?? "not checked in"}`}
-                    disabled={pendingIds.has(habit.id)}
-                    onClick={withPending(habit.id, () => handleToggleCheckIn(habit))}
+                  <HabitDot
+                    level={habit.todayLevel}
+                    accentColor={pillarColor}
+                    size={20}
+                    label={`Check in "${habit.name}": currently ${habit.todayLevel ?? "not checked in"}`}
+                    onToggle={
+                      pendingIds.has(habit.id) ? undefined : withPending(habit.id, () => handleToggleCheckIn(habit))
+                    }
                   />
                 )}
                 <button

@@ -4,5 +4,7 @@ export type DailyFocusHabit = {
   id: string;
   name: string;
   todayLevel: "FULL" | "MINIMUM" | null;
+  /** Already resolved to hex (see lib/colors.ts's resolveColorHex) — not a
+   * stored color key. */
   pillarColor: string | null;
 };

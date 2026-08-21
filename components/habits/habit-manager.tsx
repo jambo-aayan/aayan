@@ -6,10 +6,21 @@ import { PrimaryButton } from "@/components/primary-button";
 import { HabitComposer, type HabitFormInput } from "./habit-composer";
 import { useToast } from "@/components/toast/toast-provider";
 import { withRetry } from "@/lib/with-retry";
-import { createHabit, updateHabit, deleteHabit, restoreHabit, setHabitStatus, type DeletedHabit } from "@/lib/habits/actions";
+import {
+  createHabit,
+  updateHabit,
+  deleteHabit,
+  restoreHabit,
+  setHabitStatus,
+  cycleTodayCheckIn,
+  type DeletedHabit,
+} from "@/lib/habits/actions";
 import { formatScheduleLabel } from "@/lib/habits/schedule";
 import { dailyStreak, weeklyStreak } from "@/lib/habits/streak";
+import { nextCheckInLevel } from "@/lib/habits/check-in";
 import { resolveColorHex, type ColorKey } from "@/lib/colors";
+import { HabitDot } from "@/components/habit-dot";
+import { TaskMenu } from "@/components/tasks/task-menu";
 import type { HabitWithRelations } from "@/lib/habits/data";
 import styles from "./habit-manager.module.css";
 
@@ -35,7 +46,26 @@ export function HabitManager({
 }) {
   const [habits, setHabits] = useState(initialHabits);
   const [composer, setComposer] = useState<{ mode: "create" | "edit"; habit?: HabitWithRelations } | null>(null);
+  const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
   const { notifyError, notifyUndo } = useToast();
+
+  async function handleToggleCheckIn(habit: HabitWithRelations) {
+    if (pendingIds.has(habit.id)) return;
+    setPendingIds((prev) => new Set(prev).add(habit.id));
+    const newLevel = nextCheckInLevel(habit.todayLevel);
+    setHabits((prev) => prev.map((h) => (h.id === habit.id ? { ...h, todayLevel: newLevel } : h)));
+
+    const result = await withRetry(() => cycleTodayCheckIn(habit.id));
+    setPendingIds((prev) => {
+      const next = new Set(prev);
+      next.delete(habit.id);
+      return next;
+    });
+    if (!result.ok) {
+      setHabits((prev) => prev.map((h) => (h.id === habit.id ? habit : h)));
+      notifyError(result.error, { onRetry: () => handleToggleCheckIn(habit) });
+    }
+  }
 
   async function handleStatus(habit: HabitWithRelations, status: "ACTIVE" | "PAUSED" | "ARCHIVED") {
     if (habit.status === status) return;
@@ -205,28 +235,35 @@ export function HabitManager({
           {habits.map((habit) => {
             const hex = resolveColorHex(habit.pillarColor as ColorKey | null);
             return (
-              <li
-                key={habit.id}
-                className={`${styles.row} ${habit.status !== "ACTIVE" ? styles.inactive : ""}`}
-                style={hex ? { borderLeft: `3px solid ${hex}55` } : undefined}
-              >
-                <button type="button" className={styles.main} onClick={() => setComposer({ mode: "edit", habit })}>
-                  <div className={styles.name}>{habit.name}</div>
-                  <div className={styles.meta}>
-                    <span className={styles.pill} style={{ background: hex ? `${hex}22` : "var(--bg2)", color: hex ?? "var(--muted)" }}>
-                      {habit.pillarName}
-                    </span>
-                    {habit.areaName && <span className={styles.pillMuted}>{habit.areaName}</span>}
-                    <span className={styles.pillMuted}>{formatScheduleLabel(habit)}</span>
-                    {habit.status === "ACTIVE" && <span className={styles.pillMuted}>{streakFor(habit)} day streak</span>}
-                    {habit.goals.map((g) => (
-                      <span key={g.id} className={styles.goalPill}>
-                        {g.isPrimary ? "★ " : ""}
-                        {g.name}
+              <li key={habit.id} className={`${styles.row} ${habit.status === "ARCHIVED" ? styles.archived : ""}`}>
+                <div className={styles.top}>
+                  {habit.status === "ACTIVE" && (
+                    <HabitDot
+                      level={habit.todayLevel}
+                      accentColor={hex}
+                      size={20}
+                      label={`Check in "${habit.name}": currently ${habit.todayLevel ?? "not checked in"}`}
+                      onToggle={() => handleToggleCheckIn(habit)}
+                    />
+                  )}
+                  <button type="button" className={styles.main} onClick={() => setComposer({ mode: "edit", habit })}>
+                    <div className={styles.name}>{habit.name}</div>
+                    <div className={styles.meta}>
+                      <span className={styles.pill} style={{ background: hex ? `${hex}22` : "var(--bg2)", color: hex ?? "var(--muted)" }}>
+                        {habit.pillarName}
                       </span>
-                    ))}
-                  </div>
-                </button>
+                      {habit.areaName && <span className={styles.pillMuted}>{habit.areaName}</span>}
+                      <span className={styles.scheduleChip}>{formatScheduleLabel(habit)}</span>
+                      {habit.status === "ACTIVE" && <span className={styles.pillMuted}>{streakFor(habit)} day streak</span>}
+                      {habit.goals.map((g) => (
+                        <span key={g.id} className={styles.goalPill}>
+                          {g.isPrimary ? "★ " : ""}
+                          {g.name}
+                        </span>
+                      ))}
+                    </div>
+                  </button>
+                </div>
                 <div className={styles.actions}>
                   <div className={styles.statusGroup} role="group" aria-label="Status">
                     {(["ACTIVE", "PAUSED", "ARCHIVED"] as const).map((s) => (
@@ -240,9 +277,10 @@ export function HabitManager({
                       </button>
                     ))}
                   </div>
-                  <button type="button" className={styles.deleteBtn} onClick={() => handleDelete(habit)}>
-                    Delete
-                  </button>
+                  <TaskMenu
+                    items={[{ label: "Delete", onSelect: () => handleDelete(habit), danger: true }]}
+                    label="Habit options"
+                  />
                 </div>
               </li>
             );

@@ -3,13 +3,13 @@
 import { useState } from "react";
 import { CheckCircle2 } from "lucide-react";
 import { cycleTodayCheckIn } from "@/lib/habits/actions";
+import { nextCheckInLevel, type CheckInLevel } from "@/lib/habits/check-in";
 import { withRetry } from "@/lib/with-retry";
 import { useToast } from "@/components/toast/toast-provider";
 import { ThoughtPrompt } from "@/components/thoughts/thought-prompt";
 import { EmptyState } from "@/components/empty-state";
+import { HabitDot } from "@/components/habit-dot";
 import styles from "./my-day-habits.module.css";
-
-type CheckInLevel = "FULL" | "MINIMUM" | null;
 
 export type MyDayHabit = {
   id: string;
@@ -17,13 +17,9 @@ export type MyDayHabit = {
   name: string;
   areaName: string | null;
   todayLevel: CheckInLevel;
+  /** Already resolved to hex — see lib/colors.ts's resolveColorHex. */
+  pillarColor: string | null;
 };
-
-function nextLevel(level: CheckInLevel): CheckInLevel {
-  if (level === null) return "FULL";
-  if (level === "FULL") return "MINIMUM";
-  return null;
-}
 
 export function MyDayHabits({ initialHabits }: { initialHabits: MyDayHabit[] }) {
   const [habits, setHabits] = useState(initialHabits);
@@ -37,7 +33,7 @@ export function MyDayHabits({ initialHabits }: { initialHabits: MyDayHabit[] }) 
   async function handleToggle(habit: MyDayHabit) {
     if (pendingIds.has(habit.id)) return;
     setPendingIds((prev) => new Set(prev).add(habit.id));
-    const newLevel = nextLevel(habit.todayLevel);
+    const newLevel = nextCheckInLevel(habit.todayLevel);
     setHabits((prev) => prev.map((h) => (h.id === habit.id ? { ...h, todayLevel: newLevel } : h)));
     const result = await withRetry(() => cycleTodayCheckIn(habit.id));
     if (!result.ok) {
@@ -70,12 +66,12 @@ export function MyDayHabits({ initialHabits }: { initialHabits: MyDayHabit[] }) 
                 <ThoughtPrompt areaId={habit.areaId} onDone={() => setPromptHabitId(null)} />
               )}
             </div>
-            <button
-              type="button"
-              className={`${styles.dot} ${styles[habit.todayLevel?.toLowerCase() ?? "none"]}`}
-              aria-label={`Check in: currently ${habit.todayLevel ?? "not checked in"}`}
-              disabled={pendingIds.has(habit.id)}
-              onClick={() => handleToggle(habit)}
+            <HabitDot
+              level={habit.todayLevel}
+              accentColor={habit.pillarColor}
+              size={30}
+              label={`Check in "${habit.name}": currently ${habit.todayLevel ?? "not checked in"}`}
+              onToggle={pendingIds.has(habit.id) ? undefined : () => handleToggle(habit)}
             />
           </li>
         ))}
