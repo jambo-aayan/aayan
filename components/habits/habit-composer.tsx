@@ -137,53 +137,54 @@ export function HabitComposer({
             aria-label="Habit name"
           />
 
-          <div className={styles.grid}>
-            <label className={styles.field}>
-              <span className={styles.label}>Pillar</span>
-              <select
-                className={styles.select}
-                value={pillarId}
-                onChange={(e) => {
-                  setPillarId(e.target.value);
-                  if (areaId && areas.find((a) => a.id === areaId)?.pillarId !== e.target.value) setAreaId("");
-                  setGoalIds([]);
-                  setPrimaryGoalId(null);
-                }}
-              >
-                {pillars.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className={styles.field}>
-              <span className={styles.label}>Area (optional)</span>
-              <select className={styles.select} value={areaId} onChange={(e) => setAreaId(e.target.value)}>
-                <option value="">No area</option>
-                {areas.filter((a) => a.pillarId === pillarId).map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.name}
-                  </option>
-                ))}
-              </select>
-            </label>
+          <div className={styles.field}>
+            <span className={styles.label}>Pillar</span>
+            <div className={styles.chips}>
+              {pillars.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  className={`${styles.chip} ${pillarId === p.id ? styles.chipActive : ""}`}
+                  onClick={() => {
+                    setPillarId(p.id);
+                    if (areaId && areas.find((a) => a.id === areaId)?.pillarId !== p.id) setAreaId("");
+                    setGoalIds([]);
+                    setPrimaryGoalId(null);
+                  }}
+                >
+                  {p.name}
+                </button>
+              ))}
+            </div>
           </div>
 
           <label className={styles.field}>
-            <span className={styles.label}>Schedule</span>
-            <select
-              className={styles.select}
-              value={scheduleType}
-              onChange={(e) => setScheduleType(e.target.value as HabitScheduleType)}
-            >
-              {SCHEDULE_TYPES.map((s) => (
-                <option key={s.value} value={s.value}>
-                  {s.label}
+            <span className={styles.label}>Area (optional)</span>
+            <select className={styles.select} value={areaId} onChange={(e) => setAreaId(e.target.value)}>
+              <option value="">No area</option>
+              {areas.filter((a) => a.pillarId === pillarId).map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name}
                 </option>
               ))}
             </select>
           </label>
+
+          <div className={styles.field}>
+            <span className={styles.label}>Schedule</span>
+            <div className={styles.chips}>
+              {SCHEDULE_TYPES.map((s) => (
+                <button
+                  key={s.value}
+                  type="button"
+                  className={`${styles.chip} ${scheduleType === s.value ? styles.chipActive : ""}`}
+                  onClick={() => setScheduleType(s.value)}
+                >
+                  {s.label}
+                </button>
+              ))}
+            </div>
+          </div>
 
           {scheduleType === "SELECTED_WEEKDAYS" && (
             <div className={styles.weekdays}>
@@ -191,7 +192,7 @@ export function HabitComposer({
                 <button
                   key={day}
                   type="button"
-                  className={`${styles.weekdayChip} ${scheduleWeekdays.includes(day) ? styles.weekdayChipActive : ""}`}
+                  className={`${styles.weekdaySquare} ${scheduleWeekdays.includes(day) ? styles.weekdaySquareActive : ""}`}
                   onClick={() => toggleWeekday(day)}
                 >
                   {label}
@@ -233,7 +234,7 @@ export function HabitComposer({
                       className={`${styles.primaryToggle} ${primaryGoalId === g.id ? styles.primaryToggleActive : ""}`}
                       onClick={() => setPrimaryGoalId(g.id)}
                     >
-                      {primaryGoalId === g.id ? "Primary" : "Make primary"}
+                      ★ {primaryGoalId === g.id ? "Primary" : "Make primary"}
                     </button>
                   )}
                 </div>
@@ -245,8 +246,11 @@ export function HabitComposer({
         </div>
 
         <div className={styles.footer}>
+          <button type="button" className={styles.cancelBtn} onClick={onClose} disabled={saving}>
+            Cancel
+          </button>
           <PrimaryButton onClick={handleSubmit} disabled={saving}>
-            {saving ? "Saving…" : mode === "create" ? "Add habit" : "Save changes"}
+            {saving ? "Saving…" : mode === "create" ? "Create habit" : "Save changes"}
           </PrimaryButton>
         </div>
       </div>

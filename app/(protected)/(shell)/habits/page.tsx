@@ -1,12 +1,15 @@
 import { Suspense } from "react";
 import { PageHeader } from "@/components/page-header";
 import pageStyles from "@/components/page-header.module.css";
+import { PageTitle } from "@/components/page-title";
 import { Card } from "@/components/card";
 import { HabitsFilters } from "@/components/habits/habits-filters";
 import { HabitManager } from "@/components/habits/habit-manager";
+import { TodaySectionPills } from "@/components/nav-pills";
 import { getAllHabits } from "@/lib/habits/data";
 import { getPillarOptions, getAreaOptions } from "@/lib/tasks/data";
 import { getGoalOptions } from "@/lib/goals/data";
+import styles from "./habits.module.css";
 
 export default async function HabitsPage({
   searchParams,
@@ -36,8 +39,12 @@ export default async function HabitsPage({
 
   return (
     <>
-      <PageHeader title="Habits" backHref="/today" />
+      <PageHeader backHref="/today" />
       <div className={pageStyles.content}>
+        <PageTitle eyebrow="Management" title="Habits" />
+        <div className={styles.pillsWrap}>
+          <TodaySectionPills />
+        </div>
         <Suspense fallback={null}>
           <HabitsFilters pillars={pillars} areas={areas} goals={goals} />
         </Suspense>
