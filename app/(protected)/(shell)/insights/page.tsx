@@ -11,6 +11,7 @@ import { AttentionBalance } from "@/components/insights/attention-balance";
 import { TaskFlowCard } from "@/components/insights/task-flow-card";
 import { CorrelationsSection } from "@/components/insights/correlations-section";
 import { TrajectoryCard } from "@/components/insights/trajectory-card";
+import { WeeklyDigestCard } from "@/components/insights/weekly-digest-card";
 import {
   getMomentumSummary,
   getKpiSummary,
@@ -20,6 +21,7 @@ import {
   getTaskFlowSummary,
   getCorrelations,
   getTrajectory,
+  getWeeklyDigest,
 } from "@/lib/insights/data";
 import { parseInsightsRange } from "@/lib/insights/range";
 import styles from "./insights.module.css";
@@ -30,12 +32,13 @@ export default async function InsightsPage({
   searchParams: Promise<{ range?: string | string[] }>;
 }) {
   const range = parseInsightsRange((await searchParams).range);
-  // Momentum, the Neglect radar, Task flow, and Trajectory all ignore
-  // `range` by design — Momentum is a fixed rolling 28 days, "days since
-  // activity" is inherently as-of-now, and Task flow/Trajectory are both
-  // spec'd as fixed-window charts. Every KPI, the Consistency grid,
-  // Attention balance, and Correlations do respond to it.
-  const [momentum, kpis, consistencyGrid, neglectRows, attentionRows, taskFlow, correlations, trajectory] = await Promise.all([
+  // Momentum, the Neglect radar, Task flow, Trajectory, and the Weekly
+  // digest all ignore `range` by design — Momentum is a fixed rolling 28
+  // days, "days since activity" is inherently as-of-now, Task flow/
+  // Trajectory are fixed-window charts, and the digest is always "this
+  // week." Every KPI, the Consistency grid, Attention balance, and
+  // Correlations do respond to it.
+  const [momentum, kpis, consistencyGrid, neglectRows, attentionRows, taskFlow, correlations, trajectory, weeklyDigest] = await Promise.all([
     getMomentumSummary(),
     getKpiSummary(range),
     getConsistencyGridSummary(range),
@@ -44,6 +47,7 @@ export default async function InsightsPage({
     getTaskFlowSummary(),
     getCorrelations(range),
     getTrajectory(),
+    getWeeklyDigest(),
   ]);
 
   return (
@@ -95,6 +99,10 @@ export default async function InsightsPage({
 
         <div className={styles.section}>
           <TrajectoryCard trajectory={trajectory} />
+        </div>
+
+        <div className={styles.section}>
+          <WeeklyDigestCard digest={weeklyDigest} />
         </div>
       </div>
     </>

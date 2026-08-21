@@ -32,6 +32,8 @@ import { computeCorrelations, type CorrelationPair } from "./correlations";
 import { computeTrajectory, type TrajectoryPoint } from "./trajectory";
 import { netWorth } from "@/lib/finance/net-worth";
 import { FINANCE_NORTH_STAR_ID } from "@/lib/finance/north-star-id";
+import { computeWeeklyDigest, type DeltaFixture, type CorrelationFixture, type HabitAdherenceFixture } from "./weekly-digest";
+import { adherenceForHabit } from "./momentum";
 import { resolveColorHex, type ColorKey } from "@/lib/colors";
 
 // Momentum's history strip needs 12 rolling 28-day windows, and its delta
@@ -516,4 +518,57 @@ export async function getTrajectory(asOf: Date = new Date()) {
 
   const trajectory = computeTrajectory(actuals, northStar.target.toNumber(), northStar.deadline, asOf);
   return { ...trajectory, actuals, target: northStar.target.toNumber(), deadline: northStar.deadline?.toISOString().slice(0, 10) ?? null };
+}
+
+/** The prior this app holds about each correlation pair's expected
+ * direction — see computeSurprising's doc comment in weekly-digest.ts.
+ * Kept alongside the pair ids getCorrelations() already uses. */
+const CORRELATION_EXPECTED_SIGN: Record<string, 1 | -1 | 0> = {
+  "adherence-followthrough": 1,
+  "adherence-pain": -1,
+  "adherence-surplus": 1,
+};
+
+/** Assembles the Weekly digest from data this module already knows how
+ * to compute: the four KPIs' week-over-week deltas (reusing getKpiSummary
+ * over a 7d range so "this week" matches what the KPI cards themselves
+ * would show at that range), the same Correlations pairs with each one's
+ * expected-sign prior attached, and per-habit adherence over the current
+ * Mon-Sun week for the "anchor worst to best" recommendation. */
+export async function getWeeklyDigest(asOf: Date = new Date()) {
+  const weekStart = mondayOf(asOf);
+
+  const [kpis, correlations, habits, checkIns] = await Promise.all([
+    getKpiSummary("7d", asOf),
+    getCorrelations("90d", asOf),
+    prisma.habit.findMany({
+      where: { status: "ACTIVE" },
+      select: { id: true, name: true, scheduleType: true, scheduleWeekdays: true, scheduleIntervalN: true, scheduleAnchorDate: true },
+    }),
+    prisma.checkIn.findMany({ where: { date: { gte: weekStart, lte: asOf } }, select: { habitId: true, date: true, level: true } }),
+  ]);
+
+  const deltas: DeltaFixture[] = [
+    { label: "Habit adherence", delta: kpis.adherence.delta },
+    { label: "Task follow-through", delta: kpis.followThrough.delta },
+    { label: "Goal velocity", delta: kpis.goalVelocity.delta },
+    { label: "Surplus rate", delta: kpis.surplusRate.delta },
+  ];
+
+  const correlationFixtures: CorrelationFixture[] = correlations.map((c) => ({
+    labelA: c.labelA,
+    labelB: c.labelB,
+    r: c.r,
+    expectedSign: CORRELATION_EXPECTED_SIGN[c.id] ?? 0,
+  }));
+
+  const habitAdherence: HabitAdherenceFixture[] = habits
+    .map((h) => {
+      const schedule = { scheduleType: h.scheduleType, scheduleWeekdays: h.scheduleWeekdays, scheduleIntervalN: h.scheduleIntervalN, scheduleAnchorDate: h.scheduleAnchorDate };
+      const { scheduled, logged } = adherenceForHabit({ id: h.id, schedule }, checkIns, weekStart, asOf);
+      return scheduled === 0 ? null : { name: h.name, pct: Math.round((logged / scheduled) * 100) };
+    })
+    .filter((h): h is HabitAdherenceFixture => h !== null);
+
+  return computeWeeklyDigest(deltas, correlationFixtures, habitAdherence);
 }
