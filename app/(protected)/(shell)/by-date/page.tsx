@@ -1,57 +1,40 @@
 import { PageHeader } from "@/components/page-header";
 import pageStyles from "@/components/page-header.module.css";
+import { PageTitle } from "@/components/page-title";
+import { TodaySectionPills } from "@/components/nav-pills";
 import { Card } from "@/components/card";
-import { getActiveTasksForByDate } from "@/lib/tasks/data";
-import { groupTasksByDate } from "@/lib/tasks/date-groups";
-import { formatDueBadge } from "@/lib/tasks/format";
+import { ByDateTasks } from "@/components/tasks/by-date-tasks";
+import { getActiveTasksForByDate, getTaskLists, getPillarOptions, getAreaOptions, getTaskTags } from "@/lib/tasks/data";
+import { getGoalOptions } from "@/lib/goals/data";
 import styles from "./by-date.module.css";
 
-const TASK_GROUP_LABEL = {
-  overdue: "Overdue",
-  today: "Today",
-  tomorrow: "Tomorrow",
-  thisWeek: "This week",
-  later: "Later",
-  noDueDate: "No due date",
-} as const;
-
 export default async function ByDatePage() {
-  const now = new Date();
-  const tasks = await getActiveTasksForByDate();
-  const taskGroups = groupTasksByDate(tasks, now);
+  const [tasks, lists, pillars, areas, goals, tags] = await Promise.all([
+    getActiveTasksForByDate(),
+    getTaskLists(),
+    getPillarOptions(),
+    getAreaOptions(),
+    getGoalOptions(),
+    getTaskTags(),
+  ]);
 
   return (
     <>
-      <PageHeader title="By Date" backHref="/today" />
+      <PageHeader backHref="/today" />
       <div className={pageStyles.content}>
+        <PageTitle eyebrow="All tasks" title="By date" />
+        <div className={styles.pillsWrap}>
+          <TodaySectionPills />
+        </div>
         <Card>
-          {tasks.length === 0 ? (
-            <p className={styles.empty}>No tasks yet.</p>
-          ) : (
-            (Object.keys(TASK_GROUP_LABEL) as (keyof typeof TASK_GROUP_LABEL)[]).map((key) => {
-              const group = taskGroups[key];
-              if (group.length === 0) return null;
-              return (
-                <div key={key} className={styles.group}>
-                  <div className={styles.date}>{TASK_GROUP_LABEL[key]}</div>
-                  <ul className={styles.list}>
-                    {group.map((task) => {
-                      const due = formatDueBadge(task.dueDate, task.dueTime, now);
-                      return (
-                        <li key={task.id} className={styles.row}>
-                          <span className={styles.name}>{task.title}</span>
-                          <span className={styles.meta}>
-                            {[task.listName, task.areaName ?? task.pillarName].filter(Boolean).join(" · ")}
-                            {due && key !== "today" && key !== "tomorrow" ? ` · ${due.label}` : ""}
-                          </span>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </div>
-              );
-            })
-          )}
+          <ByDateTasks
+            initialTasks={tasks}
+            lists={lists}
+            pillars={pillars}
+            areas={areas}
+            goals={goals}
+            tagSuggestions={tags.map((t) => t.name)}
+          />
         </Card>
       </div>
     </>
