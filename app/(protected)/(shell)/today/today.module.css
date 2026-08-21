@@ -1,16 +1,10 @@
 .summaryRow {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: 12px;
   margin-bottom: 20px;
 }
 
 .pillsWrap {
   margin-bottom: 20px;
-}
-
-@media (min-width: 560px) {
-  .summaryRow {
-    flex-direction: row;
-  }
 }

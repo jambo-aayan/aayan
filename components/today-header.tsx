@@ -12,13 +12,10 @@ export function TodayHeader({ name, now }: { name: string; now: Date }) {
 
   return (
     <div className={styles.header}>
-      <div>
-        <h1 className={styles.greeting}>
-          {greeting(now.getHours())}, {name}
-        </h1>
-        <p className={styles.sub}>Focus on what matters today.</p>
-      </div>
-      <div className={styles.date}>{dateLabel}</div>
+      <div className={styles.eyebrow}>{dateLabel}</div>
+      <h1 className={styles.greeting}>
+        {greeting(now.getHours())}, {name}.
+      </h1>
     </div>
   );
 }

@@ -75,18 +75,21 @@ export function TaskQuickAdd({ onAdd }: { onAdd: (submission: QuickAddSubmission
       }}
     >
       <div className={styles.inputRow}>
+        <span className={styles.dashedBox} aria-hidden>
+          <Plus size={11} strokeWidth={2} />
+        </span>
         <input
           type="text"
           className={styles.input}
-          placeholder="Add a task..."
+          placeholder="Call mum tomorrow 9am"
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={handleKeyDown}
           aria-label="Add a task"
         />
         {preview && <span className={styles.preview}>{preview.label}</span>}
-        <button type="button" className={styles.add} onClick={submit} disabled={!text.trim()} aria-label="Add task">
-          <Plus size={16} strokeWidth={2.5} />
+        <button type="button" className={styles.add} onClick={submit} disabled={!text.trim()}>
+          Add
         </button>
       </div>
       {focused && (

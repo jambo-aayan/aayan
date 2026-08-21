@@ -2,7 +2,7 @@ import { CheckCircle2, Flag } from "lucide-react";
 import pageStyles from "@/components/page-header.module.css";
 import { TodayHeader } from "@/components/today-header";
 import { SectionHeader } from "@/components/section-header";
-import { DashboardCard } from "@/components/dashboard-card";
+import { StatCard } from "@/components/stat-card";
 import { TodaySectionPills } from "@/components/nav-pills";
 import { Card } from "@/components/card";
 import { ThoughtQuickAdd } from "@/components/thoughts/thought-quick-add";
@@ -11,6 +11,7 @@ import { getHabitOccurrencesForDate } from "@/lib/habits/data";
 import { getAllGoals } from "@/lib/goals/data";
 import { getTagOptions } from "@/lib/thoughts/data";
 import { habitsNotCheckedIn } from "@/lib/home/today";
+import { resolveColorHex, type ColorKey } from "@/lib/colors";
 import {
   getMyDayTasks,
   getTodayCompletedTasks,
@@ -22,15 +23,14 @@ import {
 } from "@/lib/tasks/data";
 import styles from "./today.module.css";
 
-function habitsStatus(occurringCount: number, dueCount: number): string {
+function habitsClause(occurringCount: number, dueCount: number): string {
   if (occurringCount === 0) return "Nothing scheduled today.";
   if (dueCount === 0) return "All checked in for today.";
-  return `${dueCount} left to check in today`;
+  return "left to check in today";
 }
 
-function goalsStatus(activeCount: number): string {
-  if (activeCount === 0) return "No active goals yet.";
-  return `${activeCount} active`;
+function goalsClause(activeCount: number): string {
+  return activeCount === 0 ? "No active goals yet." : "active";
 }
 
 export default async function TodayPage() {
@@ -60,6 +60,12 @@ export default async function TodayPage() {
   ]);
 
   const dueHabits = habitsNotCheckedIn(todaysHabits);
+  const myDayHabits = todaysHabits.map((h) => ({
+    id: h.id,
+    name: h.name,
+    todayLevel: h.todayLevel,
+    pillarColor: resolveColorHex(h.pillarColor as ColorKey | null),
+  }));
 
   return (
     <>
@@ -67,19 +73,21 @@ export default async function TodayPage() {
       <div className={pageStyles.content}>
         <SectionHeader>Your day</SectionHeader>
         <div className={styles.summaryRow}>
-          <DashboardCard
+          <StatCard
             href="/habits"
             icon={CheckCircle2}
             accent="health"
-            title="Habits"
-            status={habitsStatus(todaysHabits.length, dueHabits.length)}
+            label="Habits"
+            value={dueHabits.length}
+            clause={habitsClause(todaysHabits.length, dueHabits.length)}
           />
-          <DashboardCard
+          <StatCard
             href="/goals"
             icon={Flag}
             accent="finance"
-            title="Goals"
-            status={goalsStatus(activeGoals.length)}
+            label="Goals"
+            value={activeGoals.length}
+            clause={goalsClause(activeGoals.length)}
           />
         </div>
 
@@ -92,6 +100,7 @@ export default async function TodayPage() {
             initialTasks={myDayTasks}
             initialCompletedTasks={completedTasks}
             initialYesterdayUnfinished={yesterdayUnfinished}
+            initialHabits={myDayHabits}
             lists={taskLists}
             pillars={pillarOptions}
             areas={areaOptions}

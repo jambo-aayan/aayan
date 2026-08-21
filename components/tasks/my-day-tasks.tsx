@@ -9,6 +9,10 @@ import { TaskComposer, type TaskFormInput } from "./task-composer";
 import { useToast } from "@/components/toast/toast-provider";
 import { useDragReorder } from "@/components/use-drag-reorder";
 import { withRetry } from "@/lib/with-retry";
+import { HabitDot } from "@/components/habit-dot";
+import { cycleTodayCheckIn } from "@/lib/habits/actions";
+import { nextCheckInLevel } from "@/lib/habits/check-in";
+import type { DailyFocusHabit } from "@/components/daily-focus-types";
 import {
   createTask,
   updateTask,
@@ -30,6 +34,7 @@ export function MyDayTasks({
   initialTasks,
   initialCompletedTasks,
   initialYesterdayUnfinished,
+  initialHabits,
   lists,
   pillars,
   areas,
@@ -39,6 +44,9 @@ export function MyDayTasks({
   initialTasks: Task[];
   initialCompletedTasks: Task[];
   initialYesterdayUnfinished: Task[];
+  /** Today's habit occurrences — the My Day card's spec includes a
+   * "TODAY'S HABITS" sub-section below the task rows, not just tasks. */
+  initialHabits: DailyFocusHabit[];
   lists: TaskListSummary[];
   pillars: { id: string; name: string; color?: string | null }[];
   areas: { id: string; name: string; pillarId: string }[];
@@ -48,11 +56,31 @@ export function MyDayTasks({
   const [tasks, setTasks] = useState(initialTasks);
   const [completedTasks, setCompletedTasks] = useState(initialCompletedTasks);
   const [yesterdayUnfinished, setYesterdayUnfinished] = useState(initialYesterdayUnfinished);
+  const [habits, setHabits] = useState(initialHabits);
+  const [habitPendingIds, setHabitPendingIds] = useState<Set<string>>(new Set());
   const [showCompleted, setShowCompleted] = useState(false);
   const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
   const [composer, setComposer] = useState<{ mode: "create" | "edit"; task?: Task } | null>(null);
   const { notifyError, notifyUndo } = useToast();
   const today = new Date();
+
+  async function handleToggleHabit(habit: DailyFocusHabit) {
+    if (habitPendingIds.has(habit.id)) return;
+    setHabitPendingIds((prev) => new Set(prev).add(habit.id));
+    const newLevel = nextCheckInLevel(habit.todayLevel);
+    setHabits((prev) => prev.map((h) => (h.id === habit.id ? { ...h, todayLevel: newLevel } : h)));
+
+    const result = await withRetry(() => cycleTodayCheckIn(habit.id));
+    setHabitPendingIds((prev) => {
+      const next = new Set(prev);
+      next.delete(habit.id);
+      return next;
+    });
+    if (!result.ok) {
+      setHabits((prev) => prev.map((h) => (h.id === habit.id ? habit : h)));
+      notifyError(result.error, { onRetry: () => handleToggleHabit(habit) });
+    }
+  }
 
   function setPending(id: string, pending: boolean) {
     setPendingIds((prev) => {
@@ -333,7 +361,8 @@ export function MyDayTasks({
 
       {yesterdayUnfinished.length > 0 && (
         <div className={styles.banner}>
-          <span>
+          <span className={styles.bannerDot} aria-hidden />
+          <span className={styles.bannerText}>
             {yesterdayUnfinished.length} unfinished task{yesterdayUnfinished.length === 1 ? "" : "s"} from yesterday
           </span>
           <button type="button" className={styles.bannerAction} onClick={handleAddYesterday}>
@@ -374,6 +403,28 @@ export function MyDayTasks({
               emptyMessage="No completed tasks yet."
             />
           )}
+        </div>
+      )}
+
+      {habits.length > 0 && (
+        <div className={styles.habitsSection}>
+          <div className={styles.habitsHeading}>Today&rsquo;s habits</div>
+          <ul className={styles.habitsList}>
+            {habits.map((habit) => (
+              <li key={habit.id} className={styles.habitRow}>
+                <HabitDot
+                  level={habit.todayLevel}
+                  accentColor={habit.pillarColor}
+                  size={20}
+                  label={`Check in "${habit.name}": currently ${habit.todayLevel ?? "not checked in"}`}
+                  onToggle={habitPendingIds.has(habit.id) ? undefined : () => handleToggleHabit(habit)}
+                />
+                <span className={habit.todayLevel === "FULL" ? styles.habitNameDone : styles.habitName}>
+                  {habit.name}
+                </span>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
 
