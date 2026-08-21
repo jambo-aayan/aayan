@@ -6,9 +6,11 @@ import styles from "./mobile-header.module.css";
 
 export function MobileHeader({
   onMenuClick,
+  onSearchClick,
   nudgesUnreadCount,
 }: {
   onMenuClick: () => void;
+  onSearchClick: () => void;
   nudgesUnreadCount: number;
 }) {
   return (
@@ -19,7 +21,7 @@ export function MobileHeader({
       </button>
       <span className={styles.brand}>aayan</span>
       <div className={styles.actions}>
-        <button type="button" className={styles.iconButton} aria-label="Search">
+        <button type="button" className={styles.iconButton} onClick={onSearchClick} aria-label="Search">
           <Search size={17} strokeWidth={2} />
         </button>
         <Link href="/nudges" className={styles.iconButton} aria-label="Nudges">

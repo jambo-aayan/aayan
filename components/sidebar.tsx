@@ -12,9 +12,11 @@ import styles from "./sidebar.module.css";
 export function Sidebar({
   dailyFocusHabits: initialDailyFocusHabits,
   nudgesUnreadCount,
+  onSearchClick,
 }: {
   dailyFocusHabits: DailyFocusHabit[];
   nudgesUnreadCount: number;
+  onSearchClick: () => void;
 }) {
   const pathname = usePathname();
   const { habits: dailyFocusHabits, toggle } = useDailyFocusHabits(initialDailyFocusHabits);
@@ -27,7 +29,7 @@ export function Sidebar({
         aayan
       </div>
 
-      <button type="button" className={styles.search}>
+      <button type="button" className={styles.search} onClick={onSearchClick}>
         <Search size={15} strokeWidth={2} />
         <span className={styles.searchPlaceholder}>Search or jump…</span>
         <span className={styles.keycap}>⌘K</span>
