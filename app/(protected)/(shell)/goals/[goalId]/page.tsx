@@ -2,7 +2,9 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
 import pageStyles from "@/components/page-header.module.css";
+import { BackLink } from "@/components/back-link";
 import { Card } from "@/components/card";
+import { HabitDot } from "@/components/habit-dot";
 import { GoalStatusControl } from "@/components/goals/goal-status-control";
 import { getGoalDetail } from "@/lib/goals/data";
 import { resolveColorHex, type ColorKey } from "@/lib/colors";
@@ -22,8 +24,9 @@ export default async function GoalDetailPage({ params }: { params: Promise<{ goa
 
   return (
     <>
-      <PageHeader title={goal.name} backHref="/goals" />
+      <PageHeader backHref="/goals" />
       <div className={pageStyles.content}>
+        <BackLink href="/goals" label="Goals" />
         <Card>
           <div className={styles.headRow}>
             <span className={styles.pillarPill} style={{ background: hex ? `${hex}22` : "var(--bg2)", color: hex ?? "var(--muted)" }}>
@@ -31,43 +34,75 @@ export default async function GoalDetailPage({ params }: { params: Promise<{ goa
             </span>
             {goal.areaName && <span className={styles.areaPill}>{goal.areaName}</span>}
           </div>
+          <h1 className={styles.goalName}>{goal.name}</h1>
           <GoalStatusControl goalId={goal.id} initialStatus={goal.status} />
         </Card>
 
-        <Card title={`Habits (${activeHabits.length} active, ${pausedHabits.length} paused)`}>
+        <Card title="Habits">
           {habits.length === 0 ? (
             <p className={styles.empty}>No habits linked to this goal yet.</p>
           ) : (
-            <ul className={styles.list}>
-              {habits.map((h) => (
-                <li key={h.id} className={styles.row}>
-                  <Link href="/habits" className={styles.rowName}>
-                    {h.isPrimary && "★ "}
-                    {h.name}
-                  </Link>
-                  <span className={styles.rowMeta}>{h.status === "ACTIVE" ? "Active" : h.status === "PAUSED" ? "Paused" : "Archived"}</span>
-                </li>
-              ))}
-            </ul>
+            <>
+              {activeHabits.length > 0 && (
+                <ul className={styles.habitList}>
+                  {activeHabits.map((h) => (
+                    <li key={h.id} className={styles.habitRow}>
+                      <HabitDot level={h.todayLevel} accentColor={hex} size={20} />
+                      <Link href="/habits" className={styles.rowName}>
+                        {h.isPrimary && "★ "}
+                        {h.name}
+                      </Link>
+                      <span className={styles.rowMeta}>{h.streak} day streak</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {pausedHabits.length > 0 && (
+                <>
+                  <div className={styles.subHeading}>Paused</div>
+                  <ul className={styles.habitList}>
+                    {pausedHabits.map((h) => (
+                      <li key={h.id} className={`${styles.habitRow} ${styles.inactive}`}>
+                        <Link href="/habits" className={styles.rowName}>
+                          {h.isPrimary && "★ "}
+                          {h.name}
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+            </>
           )}
         </Card>
 
-        <Card title={`Tasks (${openTasks.length} open, ${completedTasks.length} completed)`}>
-          {tasks.length === 0 ? (
-            <p className={styles.empty}>No tasks linked to this goal yet.</p>
-          ) : (
+        <Card title="Tasks">
+          <div className={styles.taskCounts}>
+            <div>
+              <div className={styles.taskCountNum}>{openTasks.length}</div>
+              <div className={styles.taskCountLabel}>Open</div>
+            </div>
+            <div>
+              <div className={styles.taskCountNum}>{completedTasks.length}</div>
+              <div className={styles.taskCountLabel}>Completed</div>
+            </div>
+          </div>
+          {tasks.length > 0 && (
             <ul className={styles.list}>
               {tasks.map((t) => (
                 <li key={t.id} className={styles.row}>
-                  <Link href={`/tasks?goalId=${goal.id}`} className={`${styles.rowName} ${t.status === "COMPLETED" ? styles.done : ""}`}>
+                  <span className={`${styles.rowName} ${t.status === "COMPLETED" ? styles.done : ""}`}>
                     {t.important && "★ "}
                     {t.title}
-                  </Link>
+                  </span>
                   <span className={styles.rowMeta}>{t.listName ?? "Inbox"}</span>
                 </li>
               ))}
             </ul>
           )}
+          <Link href={`/tasks?goalId=${goal.id}`} className={styles.openInTasks}>
+            Open in Tasks, filtered to this goal →
+          </Link>
         </Card>
       </div>
     </>

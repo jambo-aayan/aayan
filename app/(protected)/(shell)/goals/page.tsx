@@ -40,7 +40,7 @@ export default async function GoalsPage({
 
   return (
     <>
-      <PageHeader title="Goals" backHref="/today" />
+      <PageHeader backHref="/today" />
       <div className={pageStyles.content}>
         <Suspense fallback={null}>
           <GoalsFilters pillars={pillars} areas={areas} />

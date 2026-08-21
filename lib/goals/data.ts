@@ -1,11 +1,14 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
+import { dailyStreak, weeklyStreak } from "@/lib/habits/streak";
+import { isSameUtcDay } from "@/lib/habits/date-utils";
 
 export type LifeGoalStatus = "ACTIVE" | "PAUSED" | "COMPLETED" | "ARCHIVED";
 
 const GOAL_INCLUDE = {
   pillar: { select: { id: true, name: true, color: true } },
   area: { select: { id: true, name: true } },
+  _count: { select: { habits: true, tasks: { where: { status: "ACTIVE" } } } },
 } as const;
 
 function mapGoal(row: {
@@ -18,9 +21,17 @@ function mapGoal(row: {
   area: { id: string; name: string } | null;
   createdAt: Date;
   updatedAt: Date;
+  _count: { habits: number; tasks: number };
 }) {
-  const { pillar, area, ...goal } = row;
-  return { ...goal, pillarName: pillar.name, pillarColor: pillar.color, areaName: area?.name ?? null };
+  const { pillar, area, _count, ...goal } = row;
+  return {
+    ...goal,
+    pillarName: pillar.name,
+    pillarColor: pillar.color,
+    areaName: area?.name ?? null,
+    habitCount: _count.habits,
+    openTaskCount: _count.tasks,
+  };
 }
 
 export type LifeGoalWithRelations = ReturnType<typeof mapGoal>;
@@ -77,7 +88,18 @@ export async function getGoalDetail(id: string) {
     }),
     prisma.habitGoal.findMany({
       where: { goalId: id },
-      include: { habit: { select: { id: true, name: true, status: true, areaId: true } } },
+      include: {
+        habit: {
+          select: {
+            id: true,
+            name: true,
+            status: true,
+            areaId: true,
+            scheduleType: true,
+            checkIns: { select: { date: true, level: true } },
+          },
+        },
+      },
     }),
   ]);
 
@@ -92,6 +114,11 @@ export async function getGoalDetail(id: string) {
       listName: t.list?.name ?? null,
       tags: t.tags.map((tt) => tt.tag.name),
     })),
-    habits: habitLinks.map((h) => ({ id: h.habit.id, name: h.habit.name, status: h.habit.status, isPrimary: h.isPrimary })),
+    habits: habitLinks.map((h) => {
+      const checkInDates = h.habit.checkIns.map((c) => c.date);
+      const streak = h.habit.scheduleType === "WEEKLY" ? weeklyStreak(checkInDates) : dailyStreak(checkInDates);
+      const todayLevel = h.habit.checkIns.find((c) => isSameUtcDay(c.date, new Date()))?.level ?? null;
+      return { id: h.habit.id, name: h.habit.name, status: h.habit.status, isPrimary: h.isPrimary, streak, todayLevel };
+    }),
   };
 }

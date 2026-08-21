@@ -11,6 +11,7 @@ import { createGoal, setGoalStatus } from "@/lib/goals/actions";
 import { resolveColorHex, type ColorKey } from "@/lib/colors";
 import type { LifeGoalWithRelations, LifeGoalStatus } from "@/lib/goals/data";
 import styles from "./goal-manager.module.css";
+import titleStyles from "@/components/page-title.module.css";
 
 const STATUS_LABEL: Record<LifeGoalStatus, string> = { ACTIVE: "Active", PAUSED: "Paused", COMPLETED: "Completed", ARCHIVED: "Archived" };
 const STATUS_ORDER: LifeGoalStatus[] = ["ACTIVE", "PAUSED", "COMPLETED", "ARCHIVED"];
@@ -88,6 +89,8 @@ export function GoalManager({
         pillarColor: pillars.find((p) => p.id === formPillarId)?.color ?? null,
         areaId: formAreaId || null,
         areaName: areas.find((a) => a.id === formAreaId)?.name ?? null,
+        habitCount: 0,
+        openTaskCount: 0,
         createdAt: new Date(),
         updatedAt: new Date(),
       },
@@ -151,6 +154,17 @@ export function GoalManager({
     </div>
   );
 
+  const crumbPillar = pillarId ? pillars.find((p) => p.id === pillarId)?.name : undefined;
+  const crumbArea = areaId ? (areaId === NO_AREA_KEY ? "No area" : areas.find((a) => a.id === areaId)?.name) : undefined;
+  const breadcrumb = ["Goals", crumbPillar, crumbArea].filter(Boolean).join(" · ");
+
+  const title = (
+    <div className={titleStyles.wrap}>
+      <div className={titleStyles.eyebrow}>{breadcrumb}</div>
+      <h1 className={titleStyles.title}>{areaId ? crumbArea : pillarId ? crumbPillar : "Goals"}</h1>
+    </div>
+  );
+
   const header = (
     <div className={styles.header}>
       <PrimaryButton onClick={() => setCreating((v) => !v)}>
@@ -163,17 +177,14 @@ export function GoalManager({
   if (pillarId && areaId) {
     const pillar = pillars.find((p) => p.id === pillarId);
     const hex = resolveColorHex(pillar?.color as ColorKey | null);
-    const areaName = areaId === NO_AREA_KEY ? "No area" : areas.find((a) => a.id === areaId)?.name ?? "Area";
     return (
       <div className={styles.wrap}>
+        {title}
         {header}
         {creating && createForm}
         <button type="button" className={styles.back} onClick={() => navigate(pillarId, "")}>
           <ChevronLeft size={14} strokeWidth={2.5} /> {pillar?.name ?? "Pillar"}
         </button>
-        <div className={styles.pillarHead} style={hex ? { color: hex } : undefined}>
-          {areaName}
-        </div>
         {goals.length === 0 ? (
           <div className={styles.empty}>
             <Flag size={22} strokeWidth={1.6} />
@@ -187,8 +198,12 @@ export function GoalManager({
                 className={`${styles.row} ${goal.status !== "ACTIVE" ? styles.inactive : ""}`}
                 style={hex ? { borderLeft: `3px solid ${hex}55` } : undefined}
               >
-                <Link href={`/goals/${goal.id}`} className={styles.name}>
-                  {goal.name}
+                <Link href={`/goals/${goal.id}`} className={styles.rowMain}>
+                  <span className={styles.name}>{goal.name}</span>
+                  <span className={styles.rowMeta}>
+                    {goal.habitCount} habit{goal.habitCount === 1 ? "" : "s"} · {goal.openTaskCount} open task
+                    {goal.openTaskCount === 1 ? "" : "s"}
+                  </span>
                 </Link>
                 <div className={styles.statusGroup} role="group" aria-label="Status">
                   {STATUS_ORDER.map((s) => (
@@ -220,14 +235,12 @@ export function GoalManager({
 
     return (
       <div className={styles.wrap}>
+        {title}
         {header}
         {creating && createForm}
         <button type="button" className={styles.back} onClick={() => navigate("", "")}>
           <ChevronLeft size={14} strokeWidth={2.5} /> All pillars
         </button>
-        <div className={styles.pillarHead} style={hex ? { color: hex } : undefined}>
-          {pillar?.name ?? "Pillar"}
-        </div>
         <div className={styles.tileList}>
           {pillarAreas.map((area) => (
             <button
@@ -275,6 +288,7 @@ export function GoalManager({
 
   return (
     <div className={styles.wrap}>
+      {title}
       {header}
       {creating && createForm}
       {pillars.length === 0 ? (
