@@ -4,6 +4,7 @@ import { dailyStreak, mondayOf } from "@/lib/habits/streak";
 import { habitOccursOn } from "@/lib/habits/schedule";
 import { BASELINE_ID } from "@/lib/finance/baseline-id";
 import { APP_SETTINGS_ID } from "@/lib/settings/constants";
+import { resolveColorHex, type ColorKey } from "@/lib/colors";
 import {
   evaluateEligibility,
   reEvaluateSnoozed,
@@ -21,16 +22,14 @@ function utcMidnight(date: Date): Date {
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
 }
 
-// The delivery-rule toggles live on AppSettings today only as reduceMotion/
-// emptyAppMode/weeklyReviewPrompt (see lib/settings) — morning brief,
-// evening check-in and streak warnings don't have a settings UI yet
-// (that's #79's "delivery-rule toggles" scope), so they default on here.
+// The Nudges page's Delivery rules card (#79) reads/writes these same
+// AppSettings fields — see lib/settings/actions.ts's updateAppSettings.
 async function getDeliveryRules(): Promise<DeliveryRules> {
   const settings = await prisma.appSettings.findUnique({ where: { id: APP_SETTINGS_ID } });
   return {
-    morningBrief: true,
-    eveningCheckIn: true,
-    streakWarnings: true,
+    morningBrief: settings?.morningBrief ?? true,
+    eveningCheckIn: settings?.eveningCheckIn ?? true,
+    streakWarnings: settings?.streakWarnings ?? true,
     weeklyReviewPrompt: settings?.weeklyReviewPrompt ?? true,
   };
 }
@@ -211,6 +210,16 @@ export async function runNudgeEvaluation(runKind: NudgeRunKind, now: Date = new 
 
 export type NudgeFilter = "unread" | "all" | "snoozed";
 
+/** Habit due/Streak-at-risk render in their target habit's own Pillar
+ * accent (per the design_handoff_aayan README's Notification-type table)
+ * rather than a fixed color — every other type has one fixed semantic
+ * accent. Resolves in one batched query rather than N+1 per row. */
+async function resolveHabitAccents(habitIds: string[]): Promise<Map<string, string | null>> {
+  if (habitIds.length === 0) return new Map();
+  const habits = await prisma.habit.findMany({ where: { id: { in: habitIds } }, select: { id: true, pillar: { select: { color: true } } } });
+  return new Map(habits.map((h) => [h.id, resolveColorHex(h.pillar?.color as ColorKey | null)]));
+}
+
 export async function getNudges(filter: NudgeFilter) {
   const now = new Date();
   const where =
@@ -221,7 +230,13 @@ export async function getNudges(filter: NudgeFilter) {
         : {};
 
   const rows = await prisma.nudge.findMany({ where, orderBy: { createdAt: "desc" }, take: 100 });
-  return rows;
+  const habitIds = [...new Set(rows.filter((r) => r.targetType === "HABIT" && r.targetId).map((r) => r.targetId!))];
+  const habitAccents = await resolveHabitAccents(habitIds);
+
+  return rows.map((row) => ({
+    ...row,
+    pillarAccentHex: row.targetType === "HABIT" && row.targetId ? (habitAccents.get(row.targetId) ?? null) : null,
+  }));
 }
 
 /** Badge count: all unread, undifferentiated (ADR-0002) — but excluding

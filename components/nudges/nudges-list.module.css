@@ -1,6 +1,3 @@
-/* Deliberately basic — full restyle to match the design_handoff_aayan
- * README's notification-card spec is #79's job, not this ticket's. */
-
 .wrap {
   display: flex;
   flex-direction: column;
@@ -56,19 +53,71 @@
 .row {
   display: flex;
   gap: 10px;
-  padding: 14px;
+  padding: 14px 16px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius-md);
+  border-radius: 18px;
+}
+
+/* Semantic-accent border at .28 opacity, per the design_handoff_aayan
+ * README's notification-card spec — one class per fixed type accent,
+ * plus .accentCustom for Habit due's per-habit Pillar accent (set via
+ * the --nudge-accent custom property, see nudges-list.tsx's rowAccent). */
+.accentDanger {
+  border-color: color-mix(in srgb, var(--danger) 28%, var(--border));
+}
+
+.accentCoral {
+  border-color: color-mix(in srgb, var(--coral) 28%, var(--border));
+}
+
+.accentLavender {
+  border-color: color-mix(in srgb, var(--lavender) 28%, var(--border));
+}
+
+.accentGold {
+  border-color: color-mix(in srgb, var(--warning) 28%, var(--border));
+}
+
+.accentInk {
+  border-color: color-mix(in srgb, var(--ink) 28%, var(--border));
+}
+
+.accentCustom {
+  border-color: color-mix(in srgb, var(--nudge-accent) 28%, var(--border));
 }
 
 .dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--coral);
+  background: var(--danger);
   margin-top: 5px;
   flex-shrink: 0;
+}
+
+.accentDanger .dot {
+  background: var(--danger);
+}
+
+.accentCoral .dot {
+  background: var(--coral);
+}
+
+.accentLavender .dot {
+  background: var(--lavender);
+}
+
+.accentGold .dot {
+  background: var(--warning);
+}
+
+.accentInk .dot {
+  background: var(--ink);
+}
+
+.accentCustom .dot {
+  background: var(--nudge-accent);
 }
 
 .body {
@@ -91,7 +140,7 @@
 
 .time {
   font-size: 11.5px;
-  color: var(--muted-2);
+  color: var(--faint);
   white-space: nowrap;
 }
 
@@ -109,7 +158,7 @@
 }
 
 .primaryAction {
-  padding: 6px 12px;
+  padding: 7px 14px;
   border-radius: var(--radius-pill);
   background: var(--ink);
   color: #fffdf9;
@@ -118,7 +167,7 @@
 }
 
 .snoozeAction {
-  padding: 6px 12px;
+  padding: 7px 14px;
   border-radius: var(--radius-pill);
   border: 1px solid var(--border);
   font-size: 12px;

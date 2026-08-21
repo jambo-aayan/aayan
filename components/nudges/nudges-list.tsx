@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { markAllNudgesRead, markNudgeRead, snoozeNudge } from "@/lib/nudges/actions";
-import { NUDGE_PRIMARY_ACTION_LABEL, type NudgeType } from "@/lib/nudges/types";
+import { NUDGE_PRIMARY_ACTION_LABEL, NUDGE_ACCENT, type NudgeType } from "@/lib/nudges/types";
 import { useToast } from "@/components/toast/toast-provider";
 import { withRetry } from "@/lib/with-retry";
 import styles from "./nudges-list.module.css";
@@ -17,7 +17,31 @@ export type NudgeRow = {
   createdAt: string;
   readAt: string | null;
   snoozedUntil: string | null;
+  /** Habit due/Streak at risk render in their target habit's own Pillar
+   * accent, resolved server-side — see lib/nudges/data.ts. Null for every
+   * other type, which uses NUDGE_ACCENT's fixed semantic color instead. */
+  pillarAccentHex: string | null;
 };
+
+const ACCENT_CLASS: Record<"danger" | "coral" | "lavender" | "gold" | "ink", string> = {
+  danger: styles.accentDanger,
+  coral: styles.accentCoral,
+  lavender: styles.accentLavender,
+  gold: styles.accentGold,
+  ink: styles.accentInk,
+};
+
+/** Habit due uses its target habit's own Pillar accent (resolved
+ * server-side as `pillarAccentHex`), applied via the --nudge-accent
+ * custom property and the .accentCustom class — every other type uses
+ * NUDGE_ACCENT's fixed semantic color and a plain CSS class. */
+function rowAccent(row: NudgeRow): { className: string; style?: React.CSSProperties } {
+  if (row.type === "HABIT_DUE" && row.pillarAccentHex) {
+    return { className: styles.accentCustom, style: { "--nudge-accent": row.pillarAccentHex } as React.CSSProperties };
+  }
+  const kind = row.type === "HABIT_DUE" ? "ink" : NUDGE_ACCENT[row.type];
+  return { className: ACCENT_CLASS[kind] };
+}
 
 const FILTERS = [
   { value: "unread", label: "Unread" },
@@ -104,8 +128,9 @@ export function NudgesList({ filter, nudges }: { filter: "unread" | "all" | "sno
       <ul className={styles.list}>
         {nudges.map((n) => {
           const pending = pendingIds.has(n.id);
+          const accent = rowAccent(n);
           return (
-            <li key={n.id} className={styles.row}>
+            <li key={n.id} className={`${styles.row} ${accent.className}`} style={accent.style}>
               <span className={styles.dot} aria-hidden />
               <div className={styles.body}>
                 <div className={styles.rowHead}>

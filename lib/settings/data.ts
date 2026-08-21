@@ -6,6 +6,9 @@ export type AppSettings = {
   reduceMotion: boolean;
   emptyAppMode: boolean;
   weeklyReviewPrompt: boolean;
+  morningBrief: boolean;
+  eveningCheckIn: boolean;
+  streakWarnings: boolean;
 };
 
 /** The singleton row is seeded directly by its migration (see
@@ -14,5 +17,12 @@ export type AppSettings = {
  * prerendering) would otherwise race to insert it themselves. */
 export async function getAppSettings(): Promise<AppSettings> {
   const row = await prisma.appSettings.findUniqueOrThrow({ where: { id: APP_SETTINGS_ID } });
-  return { reduceMotion: row.reduceMotion, emptyAppMode: row.emptyAppMode, weeklyReviewPrompt: row.weeklyReviewPrompt };
+  return {
+    reduceMotion: row.reduceMotion,
+    emptyAppMode: row.emptyAppMode,
+    weeklyReviewPrompt: row.weeklyReviewPrompt,
+    morningBrief: row.morningBrief,
+    eveningCheckIn: row.eveningCheckIn,
+    streakWarnings: row.streakWarnings,
+  };
 }

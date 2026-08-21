@@ -33,6 +33,13 @@ model AppSettings {
   reduceMotion       Boolean  @default(false)
   emptyAppMode       Boolean  @default(false)
   weeklyReviewPrompt Boolean  @default(true)
+  /// The Nudges page's Delivery rules card (#79) — read by
+  /// lib/nudges/data.ts's getDeliveryRules(). Defaulting true matches
+  /// the behavior these three had before this card existed (#69 hardcoded
+  /// them on).
+  morningBrief       Boolean  @default(true)
+  eveningCheckIn     Boolean  @default(true)
+  streakWarnings     Boolean  @default(true)
   updatedAt          DateTime @updatedAt
 }
 
