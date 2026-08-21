@@ -13,7 +13,7 @@ export function TaskFlowCard({ flow }: { flow: TaskFlowSummary }) {
     <div className={styles.card}>
       <div className={styles.eyebrow}>Task flow</div>
 
-      <div className={styles.chart}>
+      <div className={styles.chart} aria-hidden>
         {flow.weeks.map((week) => (
           <div key={week.weekStart} className={styles.weekGroup}>
             <div className={styles.bars}>

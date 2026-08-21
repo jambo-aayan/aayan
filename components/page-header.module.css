@@ -23,8 +23,17 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  position: relative;
   flex-shrink: 0;
   transition: background var(--duration-fast) var(--ease);
+}
+
+/* Expand the tappable area to 44px via an invisible overflowing
+ * pseudo-element rather than growing the visible button. */
+.back::before {
+  content: "";
+  position: absolute;
+  inset: -5px;
 }
 
 .back:hover {

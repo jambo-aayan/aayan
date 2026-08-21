@@ -11,7 +11,16 @@
   border-radius: var(--radius-sm);
   color: var(--muted);
   flex-shrink: 0;
+  position: relative;
   transition: background var(--duration-fast) var(--ease), color var(--duration-fast) var(--ease);
+}
+
+/* Expand the tappable area to 44px via an invisible overflowing
+ * pseudo-element rather than growing the visible button. */
+.trigger::before {
+  content: "";
+  position: absolute;
+  inset: -7px;
 }
 
 .trigger:hover {
@@ -41,7 +50,7 @@
   border-radius: var(--radius-sm);
   font-size: 13px;
   color: var(--ink);
-  min-height: 36px;
+  min-height: 44px;
   display: flex;
   align-items: center;
 }

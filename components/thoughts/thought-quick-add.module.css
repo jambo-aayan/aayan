@@ -61,9 +61,6 @@
   font-family: var(--font-serif), Georgia, serif;
 }
 
-.input:focus-visible {
-  outline: none;
-}
 
 .row {
   display: flex;

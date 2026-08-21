@@ -1,11 +1,15 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { X } from "lucide-react";
 import type { DrillDownData } from "@/lib/insights/kpis";
+import { useDialogFocusTrap } from "@/components/use-dialog-focus-trap";
 import styles from "./drill-down-sheet.module.css";
 
 export function DrillDownSheet({ data, onClose }: { data: DrillDownData; onClose: () => void }) {
+  const sheetRef = useRef<HTMLDivElement>(null);
+  useDialogFocusTrap(sheetRef);
+
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
       if (e.key === "Escape") onClose();
@@ -19,7 +23,7 @@ export function DrillDownSheet({ data, onClose }: { data: DrillDownData; onClose
   return (
     <>
       <div className={styles.overlay} onClick={onClose} aria-hidden />
-      <div className={styles.sheet} role="dialog" aria-modal="true" aria-label={data.title}>
+      <div ref={sheetRef} className={styles.sheet} role="dialog" aria-modal="true" aria-label={data.title} tabIndex={-1}>
         <div className={styles.header}>
           <div>
             <div className={styles.eyebrow}>{data.kindEyebrow}</div>

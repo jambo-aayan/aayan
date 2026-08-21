@@ -41,9 +41,6 @@
   padding: 9px 0;
 }
 
-.input:focus {
-  outline: none;
-}
 
 .preview {
   flex-shrink: 0;
@@ -61,6 +58,7 @@
   align-items: center;
   justify-content: center;
   padding: 9px 16px;
+  min-height: 44px;
   border-radius: var(--radius-pill);
   background: var(--ink);
   color: var(--bg);

@@ -94,9 +94,6 @@
   color: var(--ink);
 }
 
-.input:focus-visible {
-  outline: none;
-}
 
 .button {
   width: 100%;

@@ -7,16 +7,32 @@
   padding: 0;
 }
 
+/* The visual dot can be as small as 13px (sidebar widget), well under the
+ * 44px minimum hit target. Expand the tappable area via an invisible
+ * overflowing pseudo-element rather than growing the dot itself — the
+ * inset comfortably clears 44px for every documented size (13/20/30px). */
 button.dot {
   cursor: pointer;
+  position: relative;
+}
+
+button.dot::before {
+  content: "";
+  position: absolute;
+  inset: -16px;
 }
 
 .full {
   background: var(--habit-accent);
   border-color: var(--habit-accent);
+  border-style: solid;
 }
 
+/* Partial must read without relying on the half-fill's color alone — the
+ * dashed ring is a shape difference that survives grayscale/color-blind
+ * viewing, on top of the half-fill. */
 .partial {
   background: linear-gradient(90deg, var(--habit-accent) 50%, transparent 50%);
   border-color: var(--habit-accent);
+  border-style: dashed;
 }

@@ -23,7 +23,7 @@ export function ConsistencyGrid({ grid }: { grid: ConsistencyGridSummary }) {
                 <span className={styles.habitName} title={row.habitName}>
                   {row.habitName}
                 </span>
-                <div className={styles.cells}>
+                <div className={styles.cells} aria-hidden>
                   {row.cells.map((cell, i) => (
                     <span
                       key={grid.days[i]}

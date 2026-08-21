@@ -50,7 +50,6 @@
   flex: 1;
   min-width: 0;
   border: none;
-  outline: none;
   background: transparent;
   font-family: var(--font-sans), sans-serif;
   font-size: 15px;
@@ -139,8 +138,13 @@
   text-align: left;
 }
 
-.row:hover {
+.row:hover,
+.row.rowActive {
   background: var(--surface-hover);
+}
+
+.captureRow.rowActive {
+  background: color-mix(in srgb, var(--coral) 20%, var(--coral-soft));
 }
 
 .dotSquare {

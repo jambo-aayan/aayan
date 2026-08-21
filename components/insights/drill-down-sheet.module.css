@@ -80,6 +80,15 @@
   border-radius: var(--radius-sm);
   color: var(--muted);
   flex-shrink: 0;
+  position: relative;
+}
+
+/* Expand the tappable area to 44px via an invisible overflowing
+ * pseudo-element rather than growing the visible button. */
+.close::before {
+  content: "";
+  position: absolute;
+  inset: -6px;
 }
 
 .close:hover {

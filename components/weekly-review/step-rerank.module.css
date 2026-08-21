@@ -84,6 +84,19 @@
   width: 22px;
   height: 15px;
   color: var(--muted);
+  position: relative;
+}
+
+/* Expand the tappable area via an invisible overflowing pseudo-element
+ * rather than growing the visible arrow button. Vertical growth is kept
+ * small since the up/down buttons stack with only 1px between them —
+ * expanding to a full 44px here would make adjacent taps ambiguous
+ * between "move up" and "move down". Width has no such neighbor, so it
+ * grows to the full 44px. */
+.arrowButton::before {
+  content: "";
+  position: absolute;
+  inset: -3px -11px;
 }
 
 .arrowButton:disabled {

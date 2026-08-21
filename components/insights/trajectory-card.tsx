@@ -57,7 +57,13 @@ export function TrajectoryCard({ trajectory }: { trajectory: TrajectorySummary |
     <div className={styles.card}>
       <div className={styles.eyebrow}>Trajectory</div>
 
-      <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className={styles.svg} role="img" aria-label="Net worth trajectory toward North Star target">
+      <svg
+        viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
+        className={styles.svg}
+        role="img"
+        aria-label="Net worth trajectory toward North Star target"
+        aria-describedby="trajectory-written-read"
+      >
         <line x1={PAD} y1={HEIGHT / 2} x2={WIDTH - PAD} y2={HEIGHT / 2} className={styles.gridline} />
         <line x1={PAD} y1={targetY} x2={WIDTH - PAD} y2={targetY} className={styles.targetLine} />
         <path d={buildPath(trajectory.actuals, minY, maxY, minX, maxX)} className={styles.actualsLine} />
@@ -85,7 +91,9 @@ export function TrajectoryCard({ trajectory }: { trajectory: TrajectorySummary |
         </div>
       </div>
 
-      <p className={styles.read}>{trajectory.writtenRead}</p>
+      <p id="trajectory-written-read" className={styles.read}>
+        {trajectory.writtenRead}
+      </p>
     </div>
   );
 }

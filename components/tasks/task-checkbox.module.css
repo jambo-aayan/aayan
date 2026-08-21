@@ -11,6 +11,15 @@
   justify-content: center;
   color: var(--surface);
   transition: background 0.18s var(--ease), border-color 0.18s var(--ease);
+  position: relative;
+}
+
+/* Expand the tappable area to 44px via an invisible overflowing
+ * pseudo-element rather than growing the visible checkbox itself. */
+.checkbox::before {
+  content: "";
+  position: absolute;
+  inset: -13px;
 }
 
 .checkbox:hover:not(:disabled) {

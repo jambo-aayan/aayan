@@ -37,6 +37,16 @@
   color: var(--faintest);
   touch-action: none;
   cursor: grab;
+  position: relative;
+}
+
+/* Expand the tappable area via an invisible overflowing pseudo-element
+ * rather than growing the visible handle — kept modest vertically since
+ * rows stack with little space between them. */
+.grip::before {
+  content: "";
+  position: absolute;
+  inset: -4px -14px;
 }
 
 .grip:hover {
@@ -163,7 +173,16 @@
   border-radius: var(--radius-sm);
   color: var(--star-off);
   flex-shrink: 0;
+  position: relative;
   transition: color var(--duration-fast) var(--ease), background var(--duration-fast) var(--ease);
+}
+
+/* Expand the tappable area to 44px via an invisible overflowing
+ * pseudo-element rather than growing the visible button. */
+.star::before {
+  content: "";
+  position: absolute;
+  inset: -8px;
 }
 
 .star:hover {

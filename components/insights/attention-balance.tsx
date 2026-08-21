@@ -14,7 +14,7 @@ export function AttentionBalance({ rows }: { rows: AttentionBalanceRow[] }) {
               <span className={styles.label}>{row.label}</span>
               <span className={styles.pct}>{row.actualSharePct}%</span>
             </div>
-            <div className={styles.track}>
+            <div className={styles.track} aria-hidden>
               <div className={styles.fill} style={{ width: `${Math.min(100, row.actualSharePct)}%` }} />
               {row.intendedSharePct !== null && (
                 <div className={styles.marker} style={{ left: `${Math.min(100, row.intendedSharePct)}%` }} aria-hidden />

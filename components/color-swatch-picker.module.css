@@ -10,6 +10,15 @@
   border-radius: 50%;
   border: none;
   --swatch-ring-color: var(--faintest);
+  position: relative;
+}
+
+/* Expand the tappable area to 44px via an invisible overflowing
+ * pseudo-element rather than growing the visible swatch. */
+.swatch::before {
+  content: "";
+  position: absolute;
+  inset: -15px;
 }
 
 .swatchNone {

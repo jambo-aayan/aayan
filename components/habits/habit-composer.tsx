@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 import { PrimaryButton } from "@/components/primary-button";
+import { useDialogFocusTrap } from "@/components/use-dialog-focus-trap";
 import type { HabitScheduleType } from "@/lib/habits/schedule";
 import type { HabitWithRelations } from "@/lib/habits/data";
 import styles from "./habit-composer.module.css";
@@ -58,6 +59,9 @@ export function HabitComposer({
   const [primaryGoalId, setPrimaryGoalId] = useState<string | null>(habit?.primaryGoal?.id ?? null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const sheetRef = useRef<HTMLDivElement>(null);
+  useDialogFocusTrap(sheetRef);
 
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
@@ -118,7 +122,14 @@ export function HabitComposer({
   return (
     <>
       <div className={styles.overlay} onClick={onClose} aria-hidden />
-      <div className={styles.sheet} role="dialog" aria-modal="true" aria-label={mode === "create" ? "New habit" : "Edit habit"}>
+      <div
+        ref={sheetRef}
+        className={styles.sheet}
+        role="dialog"
+        aria-modal="true"
+        aria-label={mode === "create" ? "New habit" : "Edit habit"}
+        tabIndex={-1}
+      >
         <div className={styles.header}>
           <h2 className={styles.heading}>{mode === "create" ? "New habit" : "Edit habit"}</h2>
           <button type="button" className={styles.close} onClick={onClose} aria-label="Close">

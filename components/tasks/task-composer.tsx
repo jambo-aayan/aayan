@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 import { PrimaryButton } from "@/components/primary-button";
+import { useDialogFocusTrap } from "@/components/use-dialog-focus-trap";
 import { REMINDER_LABEL, REPEAT_LABEL, type TaskReminderOffset, type TaskRepeatRule } from "@/lib/tasks/types";
 import type { Task } from "@/lib/tasks/types";
 import type { TaskListSummary } from "@/lib/tasks/data";
@@ -115,6 +116,9 @@ export function TaskComposer({
 
   const pillarHex = resolveColorHex((pillars.find((p) => p.id === pillarId)?.color ?? null) as ColorKey | null);
 
+  const sheetRef = useRef<HTMLDivElement>(null);
+  useDialogFocusTrap(sheetRef);
+
   function toggleRepeatWeekday(day: number) {
     setRepeatWeekdays((prev) => (prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]));
   }
@@ -187,7 +191,14 @@ export function TaskComposer({
   return (
     <>
       <div className={styles.overlay} onClick={onClose} aria-hidden />
-      <div className={styles.sheet} role="dialog" aria-modal="true" aria-label={mode === "create" ? "New task" : "Edit task"}>
+      <div
+        ref={sheetRef}
+        className={styles.sheet}
+        role="dialog"
+        aria-modal="true"
+        aria-label={mode === "create" ? "New task" : "Edit task"}
+        tabIndex={-1}
+      >
         <div className={styles.header}>
           <TaskCheckbox
             checked={done}

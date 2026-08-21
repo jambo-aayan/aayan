@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { X } from "lucide-react";
 import { NAV_ITEMS } from "./nav-config";
 import { HabitDot } from "./habit-dot";
 import { useDailyFocusHabits } from "./use-daily-focus-habits";
+import { useDialogFocusTrap } from "./use-dialog-focus-trap";
 import type { DailyFocusHabit } from "./daily-focus-types";
 import styles from "./mobile-nav-drawer.module.css";
 
@@ -23,6 +24,8 @@ export function MobileNavDrawer({
 }) {
   const pathname = usePathname();
   const { habits: dailyFocusHabits, toggle } = useDailyFocusHabits(initialDailyFocusHabits);
+  const drawerRef = useRef<HTMLDivElement>(null);
+  useDialogFocusTrap(drawerRef, open);
 
   useEffect(() => {
     if (!open) return;
@@ -45,7 +48,14 @@ export function MobileNavDrawer({
         onClick={onClose}
         aria-hidden={!open}
       />
-      <div className={`${styles.drawer} ${open ? styles.drawerOpen : ""}`} role="dialog" aria-modal="true" aria-label="Navigation">
+      <div
+        ref={drawerRef}
+        className={`${styles.drawer} ${open ? styles.drawerOpen : ""}`}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Navigation"
+        tabIndex={-1}
+      >
         <div className={styles.head}>
           <span className={styles.brand}>aayan</span>
           <button type="button" className={styles.close} onClick={onClose} aria-label="Close menu">

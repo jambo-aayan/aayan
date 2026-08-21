@@ -192,11 +192,8 @@ h3 {
   letter-spacing: -0.015em;
 }
 
-/* Coral focus ring is the accessibility pass's job (issue #81), alongside
- * a full audit of every interactive element — left as --ink here so this
- * ticket stays scoped to token values, not new visual behavior. */
 :focus-visible {
-  outline: 2px solid var(--ink);
+  outline: 2px solid var(--coral);
   outline-offset: 2px;
   border-radius: 4px;
 }

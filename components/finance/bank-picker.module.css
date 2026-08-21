@@ -26,7 +26,6 @@
 }
 
 .search:focus-visible {
-  outline: none;
   border-color: var(--ink);
 }
 
