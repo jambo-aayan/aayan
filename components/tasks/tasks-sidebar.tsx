@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
-import { Plus, Calendar, ListChecks, Star, CheckCircle2 } from "lucide-react";
+import { Plus, ListChecks, Star, CheckCircle2 } from "lucide-react";
 import Link from "next/link";
 import { TaskMenu } from "./task-menu";
 import { ColorSwatchPicker } from "@/components/color-swatch-picker";
@@ -109,7 +109,7 @@ export function TasksSidebar({ lists: initialLists }: { lists: TaskListSummary[]
   return (
     <div className={styles.wrap}>
       <Link href="/today" className={styles.myDayLink}>
-        <Calendar size={15} strokeWidth={2} />
+        <span className={styles.myDayDot} aria-hidden />
         My Day
       </Link>
 

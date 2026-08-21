@@ -6,14 +6,14 @@
 }
 
 .select {
-  padding: 8px 10px;
-  border-radius: var(--radius-sm);
+  padding: 7px 12px;
+  border-radius: var(--radius-pill);
   border: 1px solid var(--border);
   font-size: 12.5px;
   font-weight: 500;
-  background: var(--card);
-  color: var(--ink);
-  min-height: 36px;
+  background: var(--surface);
+  color: var(--ink-2);
+  min-height: 34px;
 }
 
 .select:focus-visible {

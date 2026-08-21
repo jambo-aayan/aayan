@@ -1,10 +1,12 @@
 import { Suspense } from "react";
 import { PageHeader } from "@/components/page-header";
 import pageStyles from "@/components/page-header.module.css";
+import { PageTitle } from "@/components/page-title";
 import { Card } from "@/components/card";
 import { TaskFilters } from "@/components/tasks/task-filters";
 import { AllTasksView } from "@/components/tasks/all-tasks-view";
 import { TasksSidebar } from "@/components/tasks/tasks-sidebar";
+import { TodaySectionPills } from "@/components/nav-pills";
 import { getAllTasks, getTaskLists, getPillarOptions, getAreaOptions, getTaskTags, type TaskView } from "@/lib/tasks/data";
 import { getGoalOptions } from "@/lib/goals/data";
 import layoutStyles from "./tasks.module.css";
@@ -54,8 +56,12 @@ export default async function TasksPage({
 
   return (
     <>
-      <PageHeader title="Tasks" backHref="/today" />
+      <PageHeader backHref="/today" />
       <div className={pageStyles.content}>
+        <PageTitle eyebrow="Lists" title="Tasks" />
+        <div className={layoutStyles.pillsWrap}>
+          <TodaySectionPills />
+        </div>
         <div className={layoutStyles.layout}>
           <div className={layoutStyles.sidebarCol}>
             <TasksSidebar lists={lists} />
