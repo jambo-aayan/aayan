@@ -6,6 +6,8 @@ import {
   momentumWindows,
   momentumWrittenRead,
   MOMENTUM_WEIGHTS,
+  computeAdherence,
+  computeFollowThrough,
   type MomentumInputs,
 } from "./momentum";
 import {
@@ -26,6 +28,7 @@ import { computeNeglectRadar, type NeglectFixture } from "./neglect";
 import { computeAttentionBalance, type ActivityFixture, type PillarFixture } from "./attention-balance";
 import { computeTaskFlow, TASK_FLOW_WEEKS } from "./task-flow";
 import { mondayOf } from "@/lib/habits/streak";
+import { computeCorrelations, type CorrelationPair } from "./correlations";
 import { resolveColorHex, type ColorKey } from "@/lib/colors";
 
 // Momentum's history strip needs 12 rolling 28-day windows, and its delta
@@ -371,4 +374,92 @@ export async function getTaskFlowSummary(asOf: Date = new Date()) {
   ]);
 
   return computeTaskFlow(windowTasks, openTasks, weekStarts, asOf);
+}
+
+const DAY_MS_CORR = 24 * 60 * 60 * 1000;
+
+function dateKeyCorr(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
+function eachDayCorr(start: Date, end: Date): Date[] {
+  const days: Date[] = [];
+  for (let t = start.getTime(); t <= end.getTime(); t += DAY_MS_CORR) days.push(new Date(t));
+  return days;
+}
+
+/** Correlations between paired daily series — responds to the range
+ * control (a longer range gives Pearson's r more points to work with,
+ * which is exactly what the n < 14 suppression is calibrated for). Pairs
+ * only include days where *both* series have a real observation — a
+ * missing pain log or a day with no transactions is excluded from both
+ * sides, not defaulted to 0, since that would fabricate a data point that
+ * was never actually logged. */
+export async function getCorrelations(range: InsightsRange, asOf: Date = new Date()) {
+  const { current } = insightsWindows(range, asOf);
+  const [start, end] = current;
+  const days = eachDayCorr(start, end);
+
+  const [habits, checkIns, tasks, painLogs, transactions] = await Promise.all([
+    prisma.habit.findMany({
+      where: { status: "ACTIVE" },
+      select: { id: true, scheduleType: true, scheduleWeekdays: true, scheduleIntervalN: true, scheduleAnchorDate: true },
+    }),
+    prisma.checkIn.findMany({ where: { date: { gte: start, lte: end } }, select: { habitId: true, date: true, level: true } }),
+    prisma.task.findMany({ where: { dueDate: { gte: start, lte: end }, deletedAt: null }, select: { dueDate: true, completedAt: true } }),
+    prisma.painMobilityLog.findMany({ where: { date: { gte: start, lte: end } }, select: { date: true, pain: true } }),
+    prisma.transaction.findMany({ where: { date: { gte: start, lte: end } }, select: { date: true, amount: true, direction: true } }),
+  ]);
+
+  const habitFixtures = habits.map((h) => ({
+    id: h.id,
+    schedule: { scheduleType: h.scheduleType, scheduleWeekdays: h.scheduleWeekdays, scheduleIntervalN: h.scheduleIntervalN, scheduleAnchorDate: h.scheduleAnchorDate },
+  }));
+  const taskFixtures = tasks
+    .filter((t): t is { dueDate: Date; completedAt: Date | null } => t.dueDate !== null)
+    .map((t) => ({ dueDate: t.dueDate, completedAt: t.completedAt }));
+
+  const adherenceByDay = new Map(days.map((d) => [dateKeyCorr(d), computeAdherence(habitFixtures, checkIns, d, d)]));
+  const followThroughByDay = new Map(days.map((d) => [dateKeyCorr(d), computeFollowThrough(taskFixtures, d, d)]));
+
+  const painByDay = new Map<string, number[]>();
+  for (const log of painLogs) {
+    const key = dateKeyCorr(log.date);
+    painByDay.set(key, [...(painByDay.get(key) ?? []), log.pain]);
+  }
+  const avgPainByDay = new Map([...painByDay.entries()].map(([k, vs]) => [k, vs.reduce((s, v) => s + v, 0) / vs.length]));
+
+  const surplusByDay = new Map<string, number>();
+  const hasTxByDay = new Set<string>();
+  for (const tx of transactions) {
+    const key = dateKeyCorr(tx.date);
+    hasTxByDay.add(key);
+    const signed = tx.direction === "IN" ? tx.amount.toNumber() : -tx.amount.toNumber();
+    surplusByDay.set(key, (surplusByDay.get(key) ?? 0) + signed);
+  }
+
+  function pairedSeries(a: Map<string, number>, bDays: Set<string>, b: Map<string, number>): { seriesA: number[]; seriesB: number[]; dates: string[] } {
+    const seriesA: number[] = [];
+    const seriesB: number[] = [];
+    const dates: string[] = [];
+    for (const key of a.keys()) {
+      if (!bDays.has(key)) continue;
+      seriesA.push(a.get(key)!);
+      seriesB.push(b.get(key)!);
+      dates.push(key);
+    }
+    return { seriesA, seriesB, dates };
+  }
+
+  const adherenceVsFollowThrough = pairedSeries(adherenceByDay, new Set(followThroughByDay.keys()), followThroughByDay);
+  const adherenceVsPain = pairedSeries(adherenceByDay, new Set(avgPainByDay.keys()), avgPainByDay);
+  const adherenceVsSurplus = pairedSeries(adherenceByDay, hasTxByDay, surplusByDay);
+
+  const pairs: CorrelationPair[] = [
+    { id: "adherence-followthrough", labelA: "Habit adherence", labelB: "Task follow-through", ...adherenceVsFollowThrough },
+    { id: "adherence-pain", labelA: "Habit adherence", labelB: "Pain level", ...adherenceVsPain },
+    { id: "adherence-surplus", labelA: "Habit adherence", labelB: "Daily surplus", ...adherenceVsSurplus },
+  ];
+
+  return computeCorrelations(pairs);
 }

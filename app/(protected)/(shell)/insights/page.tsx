@@ -9,6 +9,7 @@ import { ConsistencyGrid } from "@/components/insights/consistency-grid";
 import { NeglectRadar } from "@/components/insights/neglect-radar";
 import { AttentionBalance } from "@/components/insights/attention-balance";
 import { TaskFlowCard } from "@/components/insights/task-flow-card";
+import { CorrelationsSection } from "@/components/insights/correlations-section";
 import {
   getMomentumSummary,
   getKpiSummary,
@@ -16,6 +17,7 @@ import {
   getNeglectRadar,
   getAttentionBalance,
   getTaskFlowSummary,
+  getCorrelations,
 } from "@/lib/insights/data";
 import { parseInsightsRange } from "@/lib/insights/range";
 import styles from "./insights.module.css";
@@ -29,15 +31,16 @@ export default async function InsightsPage({
   // Momentum, the Neglect radar, and Task flow all ignore `range` by
   // design — Momentum is a fixed rolling 28 days, "days since activity"
   // is inherently as-of-now, and Task flow is spec'd as a fixed 8-week
-  // chart. Every KPI, the Consistency grid, and Attention balance do
-  // respond to it.
-  const [momentum, kpis, consistencyGrid, neglectRows, attentionRows, taskFlow] = await Promise.all([
+  // chart. Every KPI, the Consistency grid, Attention balance, and
+  // Correlations do respond to it.
+  const [momentum, kpis, consistencyGrid, neglectRows, attentionRows, taskFlow, correlations] = await Promise.all([
     getMomentumSummary(),
     getKpiSummary(range),
     getConsistencyGridSummary(range),
     getNeglectRadar(),
     getAttentionBalance(range),
     getTaskFlowSummary(),
+    getCorrelations(range),
   ]);
 
   return (
@@ -81,6 +84,10 @@ export default async function InsightsPage({
 
         <div className={styles.section}>
           <TaskFlowCard flow={taskFlow} />
+        </div>
+
+        <div className={styles.section}>
+          <CorrelationsSection results={correlations} />
         </div>
       </div>
     </>
