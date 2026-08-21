@@ -1,12 +1,15 @@
-# Build a real recurrence engine for Task.repeatRule in v1
+# Extend Task.repeatRule to match Habit's schedule richness, not build a new engine
 
-`Task.repeatRule` has existed since the original Tasks build but never did anything — the field
-is stored and displayed, with no code that acts on it. The Claude Design handoff surfaces this
-as a known stub rather than asking to fix it.
+Corrects an earlier version of this ADR written from the Claude Design handoff's claim that
+"repeat rules... have no recurrence engine behind them." That's not accurate — a real engine
+already exists (`nextOccurrenceDate`, wired into `completeTask`: completing a repeating Task
+creates its next occurrence with a recalculated due date, same List/Pillar/Area/Goal/Tags).
 
-Decided to build a real engine rather than carry the stub forward into the redesign: on
-completing a Task with a non-null `repeatRule`, create the next occurrence (same List, Pillar,
-Area, Goal, Tags; a recalculated due date) rather than leaving the field cosmetic. A repeat rule
-that visibly implies recurrence but silently does nothing is worse than not showing the control
-at all — the redesign is the point at which this either gets built or the control should be
-removed, and removing a feature the user has been shown isn't the better option.
+The actual gap is narrower: `TaskRepeatRule` only covers `Daily/Weekdays/Weekly/Monthly/Custom`,
+while the handoff's Task detail sheet implies the same rule richness as Habit's schedule
+(`Daily/Weekdays/Selected weekdays/Weekly/Every N days/Monthly/Custom`). Decided to extend
+`TaskRepeatRule` to match rather than leave the two schedule pickers inconsistent — a user who
+learns "every 3 days" on a Habit shouldn't hit a narrower set of options on a Task's repeat rule.
+`Selected weekdays` and `Every N days` need the same extra fields Habit already carries
+(`scheduleWeekdays`/`scheduleIntervalN`-equivalent), computed into `nextOccurrenceDate` the same
+way `lib/habits/schedule.ts`'s `habitOccursOn` already handles them for Habit.
