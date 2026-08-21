@@ -1,20 +1,29 @@
-export type ColorKey = "coral" | "amber" | "health" | "slate" | "lavender" | "rose" | "teal" | "ochre";
+export type ColorKey = "green" | "coral" | "lavender" | "gold" | "slate" | "plum";
 
-/** A tasteful, fixed palette for user-chosen Pillar/List colors — not a
- * free color picker, per the design brief. Each hex is picked to sit
- * comfortably in Aayan's warm neutral palette at low opacity (rows use it
- * as a soft tint + small accent, never a strong fill — see components that
- * consume this). */
+/** The six Pillar/List accent colors from the Claude Design v2 handoff —
+ * shown in every color-swatch picker going forward. Not a free color
+ * picker, per the design brief. */
 export const COLOR_PALETTE: { key: ColorKey; label: string; hex: string }[] = [
-  { key: "coral", label: "Coral", hex: "#D9714B" },
-  { key: "amber", label: "Amber", hex: "#C79A3D" },
-  { key: "health", label: "Green", hex: "#6E8B74" },
-  { key: "slate", label: "Slate", hex: "#6C7A8C" },
-  { key: "lavender", label: "Lavender", hex: "#8A7FB0" },
-  { key: "rose", label: "Rose", hex: "#B8637A" },
-  { key: "teal", label: "Teal", hex: "#4F8F86" },
-  { key: "ochre", label: "Ochre", hex: "#A6752E" },
+  { key: "green", label: "Green", hex: "#6F8F6A" },
+  { key: "coral", label: "Coral", hex: "#C97B5F" },
+  { key: "lavender", label: "Lavender", hex: "#8E85B0" },
+  { key: "gold", label: "Gold", hex: "#B08A3E" },
+  { key: "slate", label: "Slate", hex: "#6C7C88" },
+  { key: "plum", label: "Plum", hex: "#96667A" },
 ];
+
+/** Pre-redesign color keys that may already be stored on real Pillar/List
+ * rows (the color picker shipped before this palette was reduced to the
+ * handoff's six). Resolved to their original hex so anything already
+ * chosen keeps rendering exactly as before — never remapped out from under
+ * the user — but no longer offered in the picker UI going forward. */
+const LEGACY_KEY_HEX: Record<string, string> = {
+  amber: "#C79A3D",
+  health: "#6E8B74",
+  rose: "#B8637A",
+  teal: "#4F8F86",
+  ochre: "#A6752E",
+};
 
 const PALETTE_MAP = new Map(COLOR_PALETTE.map((c) => [c.key, c.hex]));
 
@@ -23,5 +32,5 @@ const PALETTE_MAP = new Map(COLOR_PALETTE.map((c) => [c.key, c.hex]));
  * missing-color error. */
 export function resolveColorHex(key: string | null | undefined): string | null {
   if (!key) return null;
-  return PALETTE_MAP.get(key as ColorKey) ?? null;
+  return PALETTE_MAP.get(key as ColorKey) ?? LEGACY_KEY_HEX[key] ?? null;
 }

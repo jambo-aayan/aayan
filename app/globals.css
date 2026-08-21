@@ -1,48 +1,146 @@
 :root {
-  /* Surfaces */
-  --bg: #f7f2e9;
-  --bg-sidebar: #f2ebdd;
-  --bg2: #eae2d3;
-  --card: #fffefb;
-  --surface-hover: rgba(33, 29, 25, 0.035);
-  --surface-active: rgba(33, 29, 25, 0.055);
+  /* Surfaces & ink — warm-editorial: ivory ground, near-black ink, no pure
+   * white/black anywhere. Values match the Claude Design v2 handoff's
+   * Design Tokens section exactly (see GitHub issue #49/#50) — not tuned
+   * by eye. */
+  --bg: #f7f4ee;
+  --surface: #fffdf9;
+  --surface-sunken: #fdfbf6;
+  --surface-nav: #fbf8f2;
+  --ink: #221e1a;
+  --ink-2: #3a342d;
+  --ink-3: #6c6357;
+  --muted: #7a7268;
+  --muted-2: #9a9188;
+  --faint: #b6ada2;
+  --faintest: #c0b7ac;
+  --avatar-bg: #e8dfd1;
 
-  /* Text */
-  --ink: #211d19;
-  --muted: #8c8375;
+  /* Back-compat aliases for the pre-redesign token names still referenced
+   * across older CSS modules — point them at the new surfaces so nothing
+   * silently reverts to the old palette while pages are reskinned one at a
+   * time (see the reskin tickets under #49). Remove once every page has
+   * migrated to the tokens above directly. */
+  --bg-sidebar: var(--surface-nav);
+  --bg2: var(--surface-sunken);
+  --card: var(--surface);
+  --surface-hover: rgba(34, 30, 26, 0.05);
+  --surface-active: rgba(34, 30, 26, 0.06);
+  --border: rgba(34, 30, 26, 0.12);
+  --border-soft: rgba(34, 30, 26, 0.1);
 
-  /* Borders */
-  --border: rgba(33, 29, 25, 0.08);
-  --border-soft: rgba(33, 29, 25, 0.05);
+  /* Pillar accents — six only, user-recolorable per Pillar from the Pillars
+   * screen. lib/colors.ts's palette keys map onto these. */
+  --green: #6f8f6a;
+  --coral: #c97b5f;
+  --lavender: #8e85b0;
+  --gold: #b08a3e;
+  --slate: #6c7c88;
+  --plum: #96667a;
 
-  /* Category accents */
-  --coral: #d9714b;
-  --coral-soft: #f6e1d5;
-  --health: #6e8b74;
-  --health-soft: #e7eee6;
-  --thoughts: #8a7fb0;
-  --thoughts-soft: #e9e5f3;
-  --amber: #c79a3d;
-  --amber-soft: #f3e9d2;
-  --slate: #6c7a8c;
-  --slate-soft: #e3e7ec;
-  --danger: #b3261e;
-  --danger-soft: #f6e1de;
+  /* Legacy accent aliases — old call sites used --health/--thoughts/--amber
+   * as fixed per-feature colors rather than user-choosable Pillar accents.
+   * Same removal note as the surface aliases above. */
+  --health: var(--green);
+  --health-soft: rgba(111, 143, 106, 0.14);
+  --thoughts: var(--lavender);
+  --thoughts-soft: rgba(142, 133, 176, 0.14);
+  --amber: var(--gold);
+  --amber-soft: rgba(176, 138, 62, 0.14);
+  --coral-soft: rgba(201, 123, 95, 0.14);
+  --slate-soft: rgba(108, 124, 136, 0.14);
+
+  /* Semantic */
+  --danger: #b4503c;
+  --positive: #5f7f5a;
+  --warning: #b08a3e;
+  --danger-soft: rgba(180, 80, 60, 0.14);
+
+  /* Tinted panels — Thoughts composer, Weekly digest */
+  --panel-lavender-bg: #f4eff6;
+  --panel-lavender-border: rgba(142, 133, 176, 0.26);
+  --panel-lavender-eyebrow: #6e6680;
+  --panel-gold-bg: #f1eadc;
+  --panel-gold-border: rgba(176, 138, 62, 0.29);
 
   /* Radii */
-  --radius-lg: 18px;
+  --radius-hero: 21px;
+  --radius-lg: 17px;
   --radius-md: 12px;
   --radius-sm: 10px;
   --radius-pill: 999px;
 
-  /* Shadows — extremely subtle, two-layer */
-  --shadow-sm: 0 1px 2px rgba(33, 29, 25, 0.04), 0 6px 16px rgba(33, 29, 25, 0.04);
-  --shadow-md: 0 2px 4px rgba(33, 29, 25, 0.05), 0 12px 28px rgba(33, 29, 25, 0.06);
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(34, 30, 26, 0.04);
+  --shadow-md: 0 24px 60px rgba(34, 30, 26, 0.24);
+  --shadow-sheet: 0 -14px 40px rgba(34, 30, 26, 0.2);
+  --shadow-palette: 0 28px 70px rgba(34, 30, 26, 0.3);
+  --shadow-toast: 0 10px 30px rgba(34, 30, 26, 0.28);
+  --shadow-drawer: 8px 0 30px rgba(34, 30, 26, 0.14);
+  --scrim: rgba(34, 30, 26, 0.32);
+  --scrim-drawer: rgba(34, 30, 26, 0.34);
 
   /* Motion */
   --ease: cubic-bezier(0.4, 0, 0.2, 1);
   --duration-fast: 150ms;
   --duration-base: 200ms;
+
+  /* Spacing — 4px base, but the real scale in use is exactly these values
+   * (not every multiple of 4). Page gap / card / row padding are named
+   * separately since they're reused constantly and read better as intent
+   * than as a bare --space-N reference. */
+  --space-2: 2px;
+  --space-3: 3px;
+  --space-5: 5px;
+  --space-6: 6px;
+  --space-7: 7px;
+  --space-9: 9px;
+  --space-11: 11px;
+  --space-13: 13px;
+  --space-14: 14px;
+  --space-16: 16px;
+  --space-18: 18px;
+  --space-20: 20px;
+  --space-26: 26px;
+  --space-34: 34px;
+  --page-gap: 16px;
+  --card-padding: 17px;
+  --row-padding-y: 12px;
+  --row-padding-x: 16px;
+
+  /* Typography scale. Fraunces for headings/card titles/big numbers,
+   * Instrument Sans for everything else — see the h1/h2/h3 rule below and
+   * each component's own styling for which family applies. Ranges in the
+   * handoff (e.g. "17-18px") collapse to one value here; components can
+   * still override locally where the range matters (clamp()-based sizes
+   * are kept as ranges since they're responsive, not a single value). */
+  --text-h1: clamp(26px, 4vw, 38px);
+  --text-h1-login: 34px;
+  --text-review-title: clamp(24px, 3.6vw, 33px);
+  --text-greeting: clamp(28px, 4.4vw, 42px);
+  --text-h2: 19px;
+  --text-card-title: 17px;
+  --text-metric: 28px;
+  --text-momentum: 52px;
+  --text-thought: 16.5px;
+  --text-body: 14px;
+  --text-task-title: 14.5px;
+  --text-meta: 11.5px;
+  --text-eyebrow: 11px;
+  --text-pill: 10.5px;
+}
+
+@media (min-width: 860px) {
+  :root {
+    --page-gap: 20px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-fast: 0ms;
+    --duration-base: 0ms;
+  }
 }
 
 html {
@@ -59,7 +157,7 @@ body {
   min-height: 100%;
   color: var(--ink);
   background: var(--bg);
-  font-family: var(--font-geist-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-family: var(--font-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -75,17 +173,67 @@ a {
   text-decoration: none;
 }
 
+/* Fraunces is weight 400 only, everywhere — never bold — with a slightly
+ * tightened tracking at display sizes. See handoff Typography rules. */
 h1,
 h2,
 h3 {
   font-family: var(--font-serif), Georgia, serif;
-  font-weight: 600;
+  font-weight: 400;
+  letter-spacing: -0.015em;
 }
 
+/* Coral focus ring is the accessibility pass's job (issue #81), alongside
+ * a full audit of every interactive element — left as --ink here so this
+ * ticket stays scoped to token values, not new visual behavior. */
 :focus-visible {
   outline: 2px solid var(--ink);
   outline-offset: 2px;
   border-radius: 4px;
+}
+
+@keyframes ay-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes ay-sheet {
+  from {
+    opacity: 0.4;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes ay-toast {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 button {

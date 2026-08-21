@@ -1,11 +1,12 @@
 import type { Metadata, Viewport } from "next";
-import { Fraunces, Geist, Geist_Mono } from "next/font/google";
+import { Fraunces, Instrument_Sans, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { RegisterServiceWorker } from "./register-service-worker";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const sans = Instrument_Sans({
+  variable: "--font-sans",
   subsets: ["latin"],
+  weight: ["400", "500"],
 });
 
 const geistMono = Geist_Mono({
@@ -13,10 +14,14 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+// Fraunces is weight 400 only throughout this app — never bold — but its
+// optical-size axis still needs to be requested so headings render crisp at
+// display sizes rather than the body-text-tuned default.
 const serif = Fraunces({
   variable: "--font-serif",
   subsets: ["latin"],
-  weight: ["500", "600"],
+  weight: "variable",
+  axes: ["opsz"],
 });
 
 export const metadata: Metadata = {
@@ -40,7 +45,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} ${serif.variable}`}>
+    <html lang="en" className={`${sans.variable} ${geistMono.variable} ${serif.variable}`}>
       <body>
         <RegisterServiceWorker />
         {children}
