@@ -29,6 +29,9 @@ import { computeAttentionBalance, type ActivityFixture, type PillarFixture } fro
 import { computeTaskFlow, TASK_FLOW_WEEKS } from "./task-flow";
 import { mondayOf } from "@/lib/habits/streak";
 import { computeCorrelations, type CorrelationPair } from "./correlations";
+import { computeTrajectory, type TrajectoryPoint } from "./trajectory";
+import { netWorth } from "@/lib/finance/net-worth";
+import { FINANCE_NORTH_STAR_ID } from "@/lib/finance/north-star-id";
 import { resolveColorHex, type ColorKey } from "@/lib/colors";
 
 // Momentum's history strip needs 12 rolling 28-day windows, and its delta
@@ -462,4 +465,55 @@ export async function getCorrelations(range: InsightsRange, asOf: Date = new Dat
   ];
 
   return computeCorrelations(pairs);
+}
+
+const TRAJECTORY_LOOKBACK_DAYS = 60;
+const DAY_MS_TRAJECTORY = 24 * 60 * 60 * 1000;
+
+/** Finance is the only Pillar with an actual numeric target/deadline
+ * today (Pillar.northStar elsewhere is free text, not a structured
+ * target — see #58's schema comment) — this covers what the handoff's
+ * "per Pillar with a North Star target/deadline" actually has data for,
+ * rather than inventing target/deadline fields other Pillars don't have.
+ * There's also no logged net-worth history to read directly, so the
+ * actuals series is *approximated* backward from today's real net worth
+ * by undoing each day's net transactions — an honest reconstruction
+ * given the data that exists, not a literal historical log. Fixed at a
+ * 60-day lookback regardless of the range control, same reasoning as
+ * Momentum/Task flow's fixed windows. */
+export async function getTrajectory(asOf: Date = new Date()) {
+  const [items, northStar, transactions] = await Promise.all([
+    prisma.item.findMany({ select: { value: true, type: true, excluded: true } }),
+    prisma.financeNorthStar.findUnique({ where: { id: FINANCE_NORTH_STAR_ID }, select: { target: true, deadline: true } }),
+    prisma.transaction.findMany({
+      where: { date: { gte: new Date(asOf.getTime() - TRAJECTORY_LOOKBACK_DAYS * DAY_MS_TRAJECTORY), lte: asOf } },
+      select: { date: true, amount: true, direction: true },
+    }),
+  ]);
+
+  if (!northStar || northStar.target === null) return null;
+
+  const { accessible: currentValue } = netWorth(items.map((i) => ({ value: i.value.toNumber(), type: i.type, excluded: i.excluded })));
+
+  const dailyNet = new Map<string, number>();
+  for (const tx of transactions) {
+    const key = tx.date.toISOString().slice(0, 10);
+    const signed = tx.direction === "IN" ? tx.amount.toNumber() : -tx.amount.toNumber();
+    dailyNet.set(key, (dailyNet.get(key) ?? 0) + signed);
+  }
+
+  const days = Array.from({ length: TRAJECTORY_LOOKBACK_DAYS + 1 }, (_, i) => {
+    const t = asOf.getTime() - (TRAJECTORY_LOOKBACK_DAYS - i) * DAY_MS_TRAJECTORY;
+    return new Date(t).toISOString().slice(0, 10);
+  });
+  const totalNetInWindow = days.reduce((sum, key) => sum + (dailyNet.get(key) ?? 0), 0);
+
+  let running = currentValue - totalNetInWindow;
+  const actuals: TrajectoryPoint[] = days.map((date) => {
+    running += dailyNet.get(date) ?? 0;
+    return { date, value: running };
+  });
+
+  const trajectory = computeTrajectory(actuals, northStar.target.toNumber(), northStar.deadline, asOf);
+  return { ...trajectory, actuals, target: northStar.target.toNumber(), deadline: northStar.deadline?.toISOString().slice(0, 10) ?? null };
 }
