@@ -23,6 +23,7 @@ import {
 import { insightsWindows, RANGE_DAYS, type InsightsRange } from "./range";
 import { computeConsistencyGrid, CONSISTENCY_GRID_MAX_DAYS } from "./consistency";
 import { computeNeglectRadar, type NeglectFixture } from "./neglect";
+import { computeAttentionBalance, type ActivityFixture, type PillarFixture } from "./attention-balance";
 import { resolveColorHex, type ColorKey } from "@/lib/colors";
 
 // Momentum's history strip needs 12 rolling 28-day windows, and its delta
@@ -301,4 +302,36 @@ export async function getNeglectRadar(asOf: Date = new Date()) {
   ];
 
   return computeNeglectRadar(fixtures, asOf);
+}
+
+/** Actual share of activity per Pillar over the selected range, weighed
+ * against each Pillar's stated intended share (#58's Pillar.intendedTimeShare).
+ * Responds to the range control — "actual share of activity" is inherently
+ * a windowed measure, unlike Momentum/Neglect radar's fixed/as-of-now
+ * shapes. */
+export async function getAttentionBalance(range: InsightsRange, asOf: Date = new Date()) {
+  const { current } = insightsWindows(range, asOf);
+  const [start, end] = current;
+
+  const [pillars, completedTasks, checkIns, thoughts] = await Promise.all([
+    prisma.pillar.findMany({ select: { id: true, name: true, intendedTimeShare: true } }),
+    prisma.task.findMany({
+      where: { completedAt: { gte: start, lte: end } },
+      select: { pillarId: true },
+    }),
+    prisma.checkIn.findMany({
+      where: { date: { gte: start, lte: end } },
+      select: { habit: { select: { pillarId: true } } },
+    }),
+    prisma.thought.findMany({ where: { createdAt: { gte: start, lte: end } }, select: { id: true } }),
+  ]);
+
+  const pillarFixtures: PillarFixture[] = pillars.map((p) => ({ id: p.id, name: p.name, intendedSharePct: p.intendedTimeShare }));
+  const activities: ActivityFixture[] = [
+    ...completedTasks.map((t): ActivityFixture => ({ pillarId: t.pillarId, isThought: false })),
+    ...checkIns.map((c): ActivityFixture => ({ pillarId: c.habit.pillarId, isThought: false })),
+    ...thoughts.map((): ActivityFixture => ({ pillarId: null, isThought: true })),
+  ];
+
+  return computeAttentionBalance(pillarFixtures, activities);
 }

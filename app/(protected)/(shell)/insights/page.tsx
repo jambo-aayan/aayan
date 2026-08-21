@@ -7,7 +7,8 @@ import { MomentumCard } from "@/components/insights/momentum-card";
 import { KpiCard } from "@/components/insights/kpi-card";
 import { ConsistencyGrid } from "@/components/insights/consistency-grid";
 import { NeglectRadar } from "@/components/insights/neglect-radar";
-import { getMomentumSummary, getKpiSummary, getConsistencyGridSummary, getNeglectRadar } from "@/lib/insights/data";
+import { AttentionBalance } from "@/components/insights/attention-balance";
+import { getMomentumSummary, getKpiSummary, getConsistencyGridSummary, getNeglectRadar, getAttentionBalance } from "@/lib/insights/data";
 import { parseInsightsRange } from "@/lib/insights/range";
 import styles from "./insights.module.css";
 
@@ -19,13 +20,14 @@ export default async function InsightsPage({
   const range = parseInsightsRange((await searchParams).range);
   // Momentum and the Neglect radar both ignore `range` by design — Momentum
   // is a fixed rolling 28 days, and "days since activity" is inherently
-  // as-of-now, not something a lookback window redefines. Every KPI and
-  // the Consistency grid do respond to it.
-  const [momentum, kpis, consistencyGrid, neglectRows] = await Promise.all([
+  // as-of-now, not something a lookback window redefines. Every KPI, the
+  // Consistency grid, and Attention balance do respond to it.
+  const [momentum, kpis, consistencyGrid, neglectRows, attentionRows] = await Promise.all([
     getMomentumSummary(),
     getKpiSummary(range),
     getConsistencyGridSummary(range),
     getNeglectRadar(),
+    getAttentionBalance(range),
   ]);
 
   return (
@@ -61,6 +63,10 @@ export default async function InsightsPage({
 
         <div className={styles.section}>
           <NeglectRadar rows={neglectRows} />
+        </div>
+
+        <div className={styles.section}>
+          <AttentionBalance rows={attentionRows} />
         </div>
       </div>
     </>
