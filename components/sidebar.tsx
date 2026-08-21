@@ -2,58 +2,82 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Settings } from "lucide-react";
+import { Search } from "lucide-react";
 import { NAV_ITEMS } from "./nav-config";
+import { HabitDot } from "./habit-dot";
+import type { DailyFocusHabit } from "./daily-focus-types";
 import styles from "./sidebar.module.css";
 
-export function Sidebar({ dailyFocusPercent }: { dailyFocusPercent: number | null }) {
+export function Sidebar({
+  dailyFocusHabits,
+  nudgesUnreadCount,
+}: {
+  dailyFocusHabits: DailyFocusHabit[];
+  nudgesUnreadCount: number;
+}) {
   const pathname = usePathname();
+  const doneCount = dailyFocusHabits.filter((h) => h.todayLevel !== null).length;
 
   return (
     <nav className={styles.sidebar} aria-label="Main">
-      <div className={styles.brand}>aayan</div>
+      <div className={styles.wordmark}>
+        <span className={styles.wordmarkBadge}>a</span>
+        aayan
+      </div>
+
+      <button type="button" className={styles.search}>
+        <Search size={15} strokeWidth={2} />
+        <span className={styles.searchPlaceholder}>Search or jump…</span>
+        <span className={styles.keycap}>⌘K</span>
+      </button>
 
       <div className={styles.nav}>
         {NAV_ITEMS.map((item) => {
           const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
           const Icon = item.icon;
           return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`${styles.item} ${active ? styles.active : ""}`}
-              style={item.accent ? ({ "--nav-accent": item.accent } as React.CSSProperties) : undefined}
-            >
+            <Link key={item.href} href={item.href} className={`${styles.item} ${active ? styles.active : ""}`}>
               <Icon size={17} strokeWidth={2} className={styles.icon} />
               {item.label}
+              {item.href === "/nudges" && nudgesUnreadCount > 0 && (
+                <span className={styles.badge}>{nudgesUnreadCount}</span>
+              )}
             </Link>
           );
         })}
       </div>
 
-      <div className={styles.footer}>
-        {dailyFocusPercent !== null && (
-          <div className={styles.focus}>
-            <div className={styles.focusHead}>
-              <span>Daily focus</span>
-              <span className={styles.focusPercent}>{dailyFocusPercent}%</span>
-            </div>
-            <div className={styles.focusTrack}>
-              <div className={styles.focusFill} style={{ width: `${dailyFocusPercent}%` }} />
-            </div>
-            <div className={styles.focusHint}>
-              {dailyFocusPercent >= 100 ? "All habits checked in" : "Keep going, every day counts."}
-            </div>
+      <Link href="/weekly-review" className={styles.reviewCta}>
+        <span className={styles.reviewEyebrow}>Sunday ritual</span>
+        <span className={styles.reviewTitle}>Weekly review</span>
+        <span className={styles.reviewMeta}>5 steps · about 6 minutes</span>
+      </Link>
+
+      <div className={styles.spacer} />
+
+      {dailyFocusHabits.length > 0 && (
+        <div className={styles.focus}>
+          <div className={styles.focusHead}>
+            <span className={styles.focusEyebrow}>Daily focus</span>
+            <span className={styles.focusCount}>
+              {doneCount}/{dailyFocusHabits.length}
+            </span>
           </div>
-        )}
-        <Link
-          href="/settings"
-          className={`${styles.item} ${pathname === "/settings" ? styles.active : ""}`}
-        >
-          <Settings size={17} strokeWidth={2} className={styles.icon} />
-          Settings
-        </Link>
-      </div>
+          <div className={styles.focusRows}>
+            {dailyFocusHabits.slice(0, 3).map((habit) => (
+              <div key={habit.id} className={styles.focusRow}>
+                <HabitDot level={habit.todayLevel} accentColor={habit.pillarColor} size={13} />
+                <span className={habit.todayLevel === "FULL" ? styles.focusRowNameDone : styles.focusRowName}>
+                  {habit.name}
+                </span>
+              </div>
+            ))}
+          </div>
+          <Link href="/habits" className={styles.focusLink}>
+            All habits →
+          </Link>
+        </div>
+      )}
     </nav>
   );
 }

@@ -36,7 +36,7 @@
   max-width: 1080px;
 }
 
-@media (min-width: 860px) {
+@media (min-width: 900px) {
   .topbar {
     padding-left: 28px;
     padding-right: 28px;

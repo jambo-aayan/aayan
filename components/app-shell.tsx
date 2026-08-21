@@ -4,23 +4,31 @@ import { useState } from "react";
 import { Sidebar } from "./sidebar";
 import { MobileHeader } from "./mobile-header";
 import { MobileNavDrawer } from "./mobile-nav-drawer";
+import type { DailyFocusHabit } from "./daily-focus-types";
 import styles from "./app-shell.module.css";
 
 export function AppShell({
-  dailyFocusPercent,
+  dailyFocusHabits,
+  nudgesUnreadCount,
   children,
 }: {
-  dailyFocusPercent: number | null;
+  dailyFocusHabits: DailyFocusHabit[];
+  nudgesUnreadCount: number;
   children: React.ReactNode;
 }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   return (
     <div className={styles.shell}>
-      <Sidebar dailyFocusPercent={dailyFocusPercent} />
-      <MobileNavDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} dailyFocusPercent={dailyFocusPercent} />
+      <Sidebar dailyFocusHabits={dailyFocusHabits} nudgesUnreadCount={nudgesUnreadCount} />
+      <MobileNavDrawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        dailyFocusHabits={dailyFocusHabits}
+        nudgesUnreadCount={nudgesUnreadCount}
+      />
       <div className={styles.main}>
-        <MobileHeader onMenuClick={() => setDrawerOpen(true)} />
+        <MobileHeader onMenuClick={() => setDrawerOpen(true)} nudgesUnreadCount={nudgesUnreadCount} />
         <main className={styles.content}>{children}</main>
       </div>
     </div>

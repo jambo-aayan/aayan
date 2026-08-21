@@ -3,7 +3,7 @@ import { ArrowLeft } from "lucide-react";
 import styles from "./page-header.module.css";
 
 /**
- * backHref only renders on mobile (hidden ≥860px) — the sidebar already
+ * backHref only renders on mobile (hidden ≥900px) — the sidebar already
  * covers navigation at that width, and without it mobile has no way back
  * off a pillar dashboard.
  */

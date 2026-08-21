@@ -2,8 +2,11 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 14px 20px;
-  background: var(--bg);
+  height: 56px;
+  padding: 0 16px;
+  background: rgba(251, 248, 242, 0.92);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--border-soft);
   position: sticky;
   top: 0;
@@ -11,13 +14,16 @@
 }
 
 .iconButton {
+  position: relative;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
-  margin-left: -8px;
-  border-radius: var(--radius-md);
+  gap: 4px;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
   color: var(--ink);
   flex-shrink: 0;
   transition: background var(--duration-fast) var(--ease);
@@ -27,29 +33,39 @@
   background: var(--surface-hover);
 }
 
-.brand {
-  font-family: var(--font-serif), Georgia, serif;
-  font-size: 21px;
-  font-weight: 600;
-  color: var(--ink);
-  flex: 1;
+.hamburgerBar {
+  width: 15px;
+  height: 1.5px;
+  background: var(--ink);
 }
 
-.avatar {
+.brand {
+  font-family: var(--font-serif), Georgia, serif;
+  font-size: 18px;
+  color: var(--ink);
+  flex: 1;
+  text-align: center;
+}
+
+.actions {
   display: flex;
   align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background: var(--ink);
-  color: var(--bg);
-  font-size: 13px;
-  font-weight: 600;
+  gap: 8px;
   flex-shrink: 0;
 }
 
-@media (min-width: 860px) {
+.unreadDot {
+  position: absolute;
+  top: -1px;
+  right: -1px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--coral);
+  border: 1.5px solid var(--surface);
+}
+
+@media (min-width: 900px) {
   .header {
     display: none;
   }

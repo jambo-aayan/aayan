@@ -3,18 +3,22 @@
 import { useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Settings, X } from "lucide-react";
+import { X } from "lucide-react";
 import { NAV_ITEMS } from "./nav-config";
+import { HabitDot } from "./habit-dot";
+import type { DailyFocusHabit } from "./daily-focus-types";
 import styles from "./mobile-nav-drawer.module.css";
 
 export function MobileNavDrawer({
   open,
   onClose,
-  dailyFocusPercent,
+  dailyFocusHabits,
+  nudgesUnreadCount,
 }: {
   open: boolean;
   onClose: () => void;
-  dailyFocusPercent: number | null;
+  dailyFocusHabits: DailyFocusHabit[];
+  nudgesUnreadCount: number;
 }) {
   const pathname = usePathname();
 
@@ -51,35 +55,31 @@ export function MobileNavDrawer({
             const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
             const Icon = item.icon;
             return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`${styles.item} ${active ? styles.active : ""}`}
-                style={item.accent ? ({ "--nav-accent": item.accent } as React.CSSProperties) : undefined}
-              >
+              <Link key={item.href} href={item.href} className={`${styles.item} ${active ? styles.active : ""}`}>
                 <Icon size={18} strokeWidth={2} className={styles.icon} />
                 {item.label}
+                {item.href === "/nudges" && nudgesUnreadCount > 0 && (
+                  <span className={styles.badge}>{nudgesUnreadCount}</span>
+                )}
               </Link>
             );
           })}
         </div>
-        <div className={styles.footer}>
-          {dailyFocusPercent !== null && (
-            <div className={styles.focus}>
-              <div className={styles.focusHead}>
-                <span>Daily focus</span>
-                <span className={styles.focusPercent}>{dailyFocusPercent}%</span>
-              </div>
-              <div className={styles.focusTrack}>
-                <div className={styles.focusFill} style={{ width: `${dailyFocusPercent}%` }} />
-              </div>
+        {dailyFocusHabits.length > 0 && (
+          <>
+            <div className={styles.divider} />
+            <div className={styles.focusRows}>
+              {dailyFocusHabits.slice(0, 3).map((habit) => (
+                <div key={habit.id} className={styles.focusRow}>
+                  <HabitDot level={habit.todayLevel} accentColor={habit.pillarColor} size={13} />
+                  <span className={habit.todayLevel === "FULL" ? styles.focusRowNameDone : styles.focusRowName}>
+                    {habit.name}
+                  </span>
+                </div>
+              ))}
             </div>
-          )}
-          <Link href="/settings" className={`${styles.item} ${pathname === "/settings" ? styles.active : ""}`}>
-            <Settings size={18} strokeWidth={2} className={styles.icon} />
-            Settings
-          </Link>
-        </div>
+          </>
+        )}
       </div>
     </>
   );

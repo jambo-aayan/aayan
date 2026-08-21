@@ -1,7 +1,7 @@
 .overlay {
   position: fixed;
   inset: 0;
-  background: rgba(33, 29, 25, 0.32);
+  background: rgba(34, 30, 26, 0.34);
   opacity: 0;
   pointer-events: none;
   transition: opacity var(--duration-base) var(--ease);
@@ -18,19 +18,25 @@
   top: 0;
   bottom: 0;
   left: 0;
-  width: min(280px, 82vw);
-  background: var(--bg-sidebar);
-  border-right: 1px solid var(--border-soft);
+  width: min(280px, 80%);
+  background: var(--surface-nav);
+  box-shadow: 8px 0 30px rgba(34, 30, 26, 0.14);
   display: flex;
   flex-direction: column;
   padding: 18px 16px 20px;
   transform: translateX(-100%);
-  transition: transform var(--duration-base) var(--ease);
   z-index: 31;
 }
 
 .drawerOpen {
   transform: translateX(0);
+  animation: ay-in 0.22s var(--ease) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .drawerOpen {
+    animation: none;
+  }
 }
 
 .head {
@@ -42,8 +48,8 @@
 
 .brand {
   font-family: var(--font-serif), Georgia, serif;
-  font-size: 21px;
-  font-weight: 600;
+  font-size: 19px;
+  color: var(--ink);
 }
 
 .close {
@@ -70,12 +76,11 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px;
+  height: 46px;
+  padding: 0 12px;
   border-radius: var(--radius-md);
-  color: var(--muted);
-  font-size: 14.5px;
-  font-weight: 500;
-  min-height: 44px;
+  color: var(--ink-3);
+  font-size: 15px;
 }
 
 .item:hover {
@@ -84,65 +89,65 @@
 
 .icon {
   flex-shrink: 0;
-  color: var(--nav-accent, currentColor);
-  opacity: 0.85;
+  color: var(--muted-2);
 }
 
 .active {
   background: var(--surface-active);
   color: var(--ink);
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .active .icon {
-  opacity: 1;
+  color: var(--coral);
 }
 
-.footer {
-  margin-top: auto;
+.badge {
+  margin-left: auto;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 5px;
+  border-radius: var(--radius-pill);
+  background: var(--coral);
+  color: var(--surface);
+  font-size: 10.5px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.divider {
+  height: 1px;
+  background: var(--section-divider);
+  margin: 16px 4px;
+}
+
+.focusRows {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding-top: 16px;
+  padding: 0 12px;
 }
 
-.focus {
-  background: var(--card);
-  border: 1px solid var(--border-soft);
-  border-radius: var(--radius-md);
-  padding: 12px 14px;
-}
-
-.focusHead {
+.focusRow {
   display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--muted);
-  margin-bottom: 8px;
+  align-items: center;
+  gap: 9px;
 }
 
-.focusPercent {
-  color: var(--ink);
+.focusRowName {
   font-size: 13px;
+  color: var(--ink-2);
 }
 
-.focusTrack {
-  height: 5px;
-  border-radius: var(--radius-pill);
-  background: var(--bg2);
-  overflow: hidden;
+.focusRowNameDone {
+  font-size: 13px;
+  color: var(--muted-2);
+  text-decoration: line-through;
 }
 
-.focusFill {
-  height: 100%;
-  background: var(--health);
-  border-radius: var(--radius-pill);
-  transition: width var(--duration-base) var(--ease);
-}
-
-@media (min-width: 860px) {
+@media (min-width: 900px) {
   .overlay,
   .drawer {
     display: none;

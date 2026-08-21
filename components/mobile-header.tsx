@@ -1,19 +1,32 @@
 "use client";
 
 import Link from "next/link";
-import { Menu } from "lucide-react";
+import { Search, Bell } from "lucide-react";
 import styles from "./mobile-header.module.css";
 
-export function MobileHeader({ onMenuClick }: { onMenuClick: () => void }) {
+export function MobileHeader({
+  onMenuClick,
+  nudgesUnreadCount,
+}: {
+  onMenuClick: () => void;
+  nudgesUnreadCount: number;
+}) {
   return (
     <header className={styles.header}>
       <button type="button" className={styles.iconButton} onClick={onMenuClick} aria-label="Open menu">
-        <Menu size={20} strokeWidth={2} />
+        <span className={styles.hamburgerBar} />
+        <span className={styles.hamburgerBar} />
       </button>
       <span className={styles.brand}>aayan</span>
-      <Link href="/settings" className={styles.avatar} aria-label="Settings">
-        A
-      </Link>
+      <div className={styles.actions}>
+        <button type="button" className={styles.iconButton} aria-label="Search">
+          <Search size={17} strokeWidth={2} />
+        </button>
+        <Link href="/nudges" className={styles.iconButton} aria-label="Nudges">
+          <Bell size={17} strokeWidth={2} />
+          {nudgesUnreadCount > 0 && <span className={styles.unreadDot} aria-hidden />}
+        </Link>
+      </div>
     </header>
   );
 }
