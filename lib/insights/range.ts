@@ -18,7 +18,7 @@ export function parseInsightsRange(raw: string | string[] | undefined): Insights
   return INSIGHTS_RANGES.some((r) => r.value === value) ? (value as InsightsRange) : DEFAULT_INSIGHTS_RANGE;
 }
 
-const RANGE_DAYS: Record<InsightsRange, number> = { "7d": 7, "30d": 30, "90d": 90, year: 365 };
+export const RANGE_DAYS: Record<InsightsRange, number> = { "7d": 7, "30d": 30, "90d": 90, year: 365 };
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 

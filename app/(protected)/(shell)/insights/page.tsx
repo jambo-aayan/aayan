@@ -5,7 +5,8 @@ import { PageTitle } from "@/components/page-title";
 import { RangeControl } from "@/components/insights/range-control";
 import { MomentumCard } from "@/components/insights/momentum-card";
 import { KpiCard } from "@/components/insights/kpi-card";
-import { getMomentumSummary, getKpiSummary } from "@/lib/insights/data";
+import { ConsistencyGrid } from "@/components/insights/consistency-grid";
+import { getMomentumSummary, getKpiSummary, getConsistencyGridSummary } from "@/lib/insights/data";
 import { parseInsightsRange } from "@/lib/insights/range";
 import styles from "./insights.module.css";
 
@@ -17,7 +18,11 @@ export default async function InsightsPage({
   const range = parseInsightsRange((await searchParams).range);
   // Momentum ignores `range` by design (fixed rolling 28 days) — every KPI
   // below does respond to it, per the Insights header's own instruction.
-  const [momentum, kpis] = await Promise.all([getMomentumSummary(), getKpiSummary(range)]);
+  const [momentum, kpis, consistencyGrid] = await Promise.all([
+    getMomentumSummary(),
+    getKpiSummary(range),
+    getConsistencyGridSummary(range),
+  ]);
 
   return (
     <>
@@ -44,6 +49,10 @@ export default async function InsightsPage({
           <KpiCard label="Task follow-through" unit="%" kpi={kpis.followThrough} />
           <KpiCard label="Goal velocity" unit="%" kpi={kpis.goalVelocity} />
           <KpiCard label="Surplus rate" unit="%" kpi={kpis.surplusRate} />
+        </div>
+
+        <div className={styles.section}>
+          <ConsistencyGrid grid={consistencyGrid} />
         </div>
       </div>
     </>

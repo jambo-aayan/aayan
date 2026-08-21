@@ -20,7 +20,9 @@ import {
   type KpiResult,
   type DrillDownData,
 } from "./kpis";
-import { insightsWindows, type InsightsRange } from "./range";
+import { insightsWindows, RANGE_DAYS, type InsightsRange } from "./range";
+import { computeConsistencyGrid, CONSISTENCY_GRID_MAX_DAYS } from "./consistency";
+import { resolveColorHex, type ColorKey } from "@/lib/colors";
 
 // Momentum's history strip needs 12 rolling 28-day windows, and its delta
 // needs the 28-day window before that — furthest back is 12 + 28 + 28 days
@@ -189,3 +191,46 @@ export async function getKpiSummary(range: InsightsRange, asOf: Date = new Date(
     },
   };
 }
+
+/** The grid is 28 columns wide per the design_handoff_aayan README's
+ * Consistency grid spec — but for a range shorter than 28 days (7d), it
+ * genuinely responds to the range control by showing fewer columns rather
+ * than 28 days' worth of data under a 7-day selection; for 30d/90d/Year
+ * it caps at 28, since more than that stops being a grid anyone reads at
+ * a glance. */
+export async function getConsistencyGridSummary(range: InsightsRange, asOf: Date = new Date()) {
+  const gridDays = Math.min(CONSISTENCY_GRID_MAX_DAYS, RANGE_DAYS[range]);
+  const end = new Date(Date.UTC(asOf.getUTCFullYear(), asOf.getUTCMonth(), asOf.getUTCDate()));
+  const start = new Date(end.getTime() - (gridDays - 1) * DAY_MS);
+  // A week or so of slack before `start` so a WEEKLY/EVERY_N_WEEKS habit's
+  // "already done this week" check (see habitOccursOn) is correct for the
+  // first few grid days even when their week began before the window.
+  const checkInFetchStart = new Date(start.getTime() - 7 * DAY_MS);
+
+  const habits = await prisma.habit.findMany({
+    where: { status: "ACTIVE" },
+    select: {
+      id: true,
+      name: true,
+      scheduleType: true,
+      scheduleWeekdays: true,
+      scheduleIntervalN: true,
+      scheduleAnchorDate: true,
+      pillar: { select: { color: true } },
+      checkIns: { where: { date: { gte: checkInFetchStart, lte: end } }, select: { date: true, level: true } },
+    },
+  });
+
+  const habitFixtures = habits.map((h) => ({
+    id: h.id,
+    name: h.name,
+    schedule: { scheduleType: h.scheduleType, scheduleWeekdays: h.scheduleWeekdays, scheduleIntervalN: h.scheduleIntervalN, scheduleAnchorDate: h.scheduleAnchorDate },
+    checkIns: h.checkIns,
+  }));
+
+  const colorByHabitId = new Map(habits.map((h) => [h.id, resolveColorHex(h.pillar?.color as ColorKey | null)]));
+  const grid = computeConsistencyGrid(habitFixtures, start, end);
+  return { ...grid, rows: grid.rows.map((r) => ({ ...r, color: colorByHabitId.get(r.habitId) ?? null })) };
+}
+
+export type ConsistencyGridSummary = Awaited<ReturnType<typeof getConsistencyGridSummary>>;
