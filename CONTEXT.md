@@ -20,9 +20,25 @@ _Avoid_: Sub-bucket, Topic.
 A process within a single Pillar that can target one Area or several Areas in that same Pillar at once — e.g. a stretch routine that improves both the Ankylosing Spondylitis and Body Composition Areas within Health. Systems don't cross Pillars. Concept kept for later — build a real System only once a concrete one earns a dedicated screen (e.g. "Payday routine"); for MVP a System can just be an informal label rather than a managed object.
 _Avoid_: The original prototype's "layer above buckets" framing — that's now inverted; Systems live inside a Pillar, not above all of them.
 
-**Action**:
-A Habit or Goal — the day-to-day or one-off unit of work. Attaches either directly to an Area, or to a System (as one of the steps that make the System work). Never required to have both — a simple habit with no System is fine.
-_Avoid_: Task (reserved for wayfinder's own ticket type — don't reuse it for in-app items).
+**Task**:
+A one-off unit of work — title, optional notes, an optional List/Pillar/Area/Goal/Tags, due date+time, reminder, repeat rule, and lightweight Steps (sub-items with their own completion state that never auto-complete the parent). Lives in exactly one List (defaulting to the always-present "Inbox" list if none is chosen), independent of My Day.
+_Avoid_: Action (retired — see below), Goal (a Task is one-off and lower-ceremony than a Goal; don't conflate the two just because both can be one-off-feeling).
+
+**Habit**:
+A recurring unit of work — required Pillar, optional Area, a schedule (daily / selected weekdays / weekly / every N days / every N weeks / monthly / custom), a status (Active/Paused/Archived), and optional links to one or more Goals (one marked primary). See "Habits" below for check-in/streak mechanics.
+
+**List**:
+A practical grouping for Tasks (e.g. "Groceries," "Work") — distinct from a Pillar (a life domain) and a Tag (flexible metadata). Every Task belongs to exactly one List; the always-present "Inbox" List is where a Task lands if none is chosen, so capturing a Task never forces a categorization decision up front. A List has its own user-configurable accent color, independent of any Pillar's color (no bleed between the two).
+
+**Goal**:
+An outcome, not a unit of work — required Pillar, optional Area, a status (Active/Paused/Completed/Archived). Tasks and Habits can link to a Goal; a Goal itself does no work, it's what the linked Tasks/Habits are in service of.
+_Avoid_: Action (retired — see below).
+
+**Action** _(retired)_:
+Used to mean "a Habit or Goal" in this glossary's earlier draft, written before Task existed as its own entity. Task, Habit, and Goal are now three separate first-class things, connected through Pillar/Area/Goal rather than nested under a shared "Action" umbrella — don't reintroduce the term.
+
+**My Day**:
+A daily working view for Tasks only (not Goals — that flag was retired when Task/Habit/Goal split apart). A Task's My Day membership is a per-date record (so any past day's My Day is reconstructable), independent of that Task's List — reordering within My Day never reorders the List, and vice versa. Active Habits also surface on the Home page for the day, computed from their schedule rather than stored, but that's a separate concept from a Task's My Day membership.
 
 **Cross-Pillar link**:
 When something genuinely spans two Pillars (e.g. "buy a house" touches both Finances and Relationship), it lives in exactly one Pillar as its source of truth, with a visible link from the other — never duplicated as two independent copies. Extends the cross-links the original prototype's mind-map view already drew between buckets.
@@ -68,7 +84,7 @@ Two parts: the user's day job (e.g. sample-apps work) and Jumbo Labs (his startu
   - **New/seeded habits default to inactive.** The user opts in rather than opts out. This is intentional: starting too many habits at once is a known failure pattern for this user, and the seed data intentionally includes more habits than should ever run simultaneously.
 
 ## Goals
-One-off, has `status` (not-started / in-progress / done), optional `dueDate`. Goals added via the "My Day" quick-add get a `myday: true` flag. **Only `myday`-flagged goals (plus habits) surface in the My Day view** — ordinary backlog goals deliberately stay out of the daily view, living in their Area/Pillar and in an "All Actions" cross-cutting list instead. This distinction was added after the user found the daily view cluttered with non-daily backlog items — don't merge them back together.
+Superseded by the Task/Habit/Goal split above — a Goal is now an outcome (`Active`/`Paused`/`Completed`/`Archived`), not a one-off unit of work with a `dueDate` or a `myday` flag. Day-to-day one-off work now lives on Task instead; Task carries `myDay` (see "My Day" above), Goal does not. The old "All Actions" cross-cutting list is superseded by "All Tasks" (which itself is being redesigned into a Lists-first Tasks page per the Claude Design handoff — see `docs/adr/` once that decision lands).
 
 ## Thoughts
 Free-text, dated journal entries. **Cross-cutting, not Pillar-bound** — a quick-add reachable from the homepage (same pattern as the old "My Day" quick-add), for a general daily journal that can be about anything. Tagging a Thought to a specific Pillar or Area is *optional*, not mandatory — use it when a Thought is actually about Health, or Finances specifically; leave it untagged for a general entry. Optionally prompted (dismissible, never forced) after a habit check-in or goal status change. In MVP scope.
