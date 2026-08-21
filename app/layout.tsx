@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Fraunces, Instrument_Sans, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { RegisterServiceWorker } from "./register-service-worker";
+import { getAppSettings } from "@/lib/settings/data";
 
 const sans = Instrument_Sans({
   variable: "--font-sans",
@@ -43,9 +44,15 @@ export const viewport: Viewport = {
   themeColor: "#d9714b",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const { reduceMotion } = await getAppSettings();
+
   return (
-    <html lang="en" className={`${sans.variable} ${geistMono.variable} ${serif.variable}`}>
+    <html
+      lang="en"
+      className={`${sans.variable} ${geistMono.variable} ${serif.variable}`}
+      data-reduce-motion={reduceMotion ? "true" : undefined}
+    >
       <body>
         <RegisterServiceWorker />
         {children}

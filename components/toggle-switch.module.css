@@ -1,0 +1,35 @@
+.track {
+  position: relative;
+  flex-shrink: 0;
+  width: 40px;
+  height: 24px;
+  border-radius: var(--radius-pill);
+  background: var(--bg2);
+  border: none;
+  transition: background var(--duration-fast) var(--ease);
+}
+
+.trackOn {
+  background: var(--ink);
+}
+
+.thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  transition: transform var(--duration-fast) var(--ease);
+}
+
+.trackOn .thumb {
+  transform: translateX(16px);
+}
+
+.track:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

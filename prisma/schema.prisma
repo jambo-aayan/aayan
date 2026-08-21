@@ -24,6 +24,18 @@ model LoginLockout {
   updatedAt   DateTime  @updatedAt
 }
 
+/// Singleton for the three Settings toggles (#66). id is always
+/// APP_SETTINGS_ID. emptyAppMode's actual zero-everywhere behavior lands in
+/// #70; weeklyReviewPrompt's delivery-rule wiring lands with Nudges (#69) —
+/// this ticket only needs the toggle UI + persistence for both.
+model AppSettings {
+  id                 String   @id
+  reduceMotion       Boolean  @default(false)
+  emptyAppMode       Boolean  @default(false)
+  weeklyReviewPrompt Boolean  @default(true)
+  updatedAt          DateTime @updatedAt
+}
+
 /// A top-level life domain (Health, Finances, ...). id is a stable slug,
 /// not a cuid, so seeding can upsert by a human-readable, idempotent key.
 /// color propagates to every Area/Goal/Habit/Task under it (see lib/colors.ts)
