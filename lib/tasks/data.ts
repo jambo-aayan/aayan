@@ -38,6 +38,8 @@ type TaskRow = {
   dueTime: string | null;
   reminderOffset: Task["reminderOffset"];
   repeatRule: Task["repeatRule"];
+  repeatWeekdays: number[];
+  repeatIntervalN: number | null;
   completedAt: Date | null;
   archivedAt: Date | null;
   createdAt: Date;
@@ -68,6 +70,8 @@ function mapTask(row: TaskRow): Task {
     dueTime: row.dueTime,
     reminderOffset: row.reminderOffset,
     repeatRule: row.repeatRule,
+    repeatWeekdays: row.repeatWeekdays,
+    repeatIntervalN: row.repeatIntervalN,
     completedAt: row.completedAt,
     archivedAt: row.archivedAt,
     createdAt: row.createdAt,

@@ -425,7 +425,9 @@ enum TaskReminderOffset {
 enum TaskRepeatRule {
   DAILY
   WEEKDAYS
+  SELECTED_WEEKDAYS
   WEEKLY
+  EVERY_N_DAYS
   MONTHLY
   CUSTOM
 }
@@ -466,8 +468,10 @@ model Task {
   dueDate DateTime? @db.Date
   dueTime String?
 
-  reminderOffset TaskReminderOffset?
-  repeatRule     TaskRepeatRule?
+  reminderOffset  TaskReminderOffset?
+  repeatRule      TaskRepeatRule?
+  repeatWeekdays  Int[]            @default([])
+  repeatIntervalN Int?
 
   completedAt DateTime?
   archivedAt  DateTime?

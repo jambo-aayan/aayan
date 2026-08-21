@@ -56,6 +56,8 @@ export type TaskInput = {
   dueTime: string | null;
   reminderOffset: TaskReminderOffset | null;
   repeatRule: TaskRepeatRule | null;
+  repeatWeekdays: number[];
+  repeatIntervalN: number | null;
   important: boolean;
 };
 
@@ -87,6 +89,8 @@ export async function createTask(input: TaskInput, addToMyDayToday: boolean): Pr
         dueTime: input.dueTime,
         reminderOffset: input.reminderOffset,
         repeatRule: input.repeatRule,
+        repeatWeekdays: input.repeatWeekdays,
+        repeatIntervalN: input.repeatIntervalN,
         important: input.important,
         tags: { create: tagIds.map((tagId) => ({ tagId })) },
         myDayEntries: addToMyDayToday ? { create: { date: dateOnly(new Date()) } } : undefined,
@@ -121,6 +125,8 @@ export async function updateTask(id: string, input: TaskInput): Promise<ActionRe
           dueTime: input.dueTime,
           reminderOffset: input.reminderOffset,
           repeatRule: input.repeatRule,
+          repeatWeekdays: input.repeatWeekdays,
+          repeatIntervalN: input.repeatIntervalN,
           important: input.important,
           tags: { create: tagIds.map((tagId) => ({ tagId })) },
         },
@@ -155,7 +161,10 @@ export async function completeTask(id: string): Promise<ActionResult> {
     });
 
     if (task.repeatRule && task.dueDate) {
-      const next = nextOccurrenceDate(task.repeatRule, task.dueDate);
+      const next = nextOccurrenceDate(task.repeatRule, task.dueDate, {
+        weekdays: task.repeatWeekdays,
+        intervalN: task.repeatIntervalN,
+      });
       if (next) {
         const sortOrder = task.listId ? await nextSortOrderInList(task.listId) : 0;
         await prisma.task.create({
@@ -171,6 +180,8 @@ export async function completeTask(id: string): Promise<ActionResult> {
             dueTime: task.dueTime,
             reminderOffset: task.reminderOffset,
             repeatRule: task.repeatRule,
+            repeatWeekdays: task.repeatWeekdays,
+            repeatIntervalN: task.repeatIntervalN,
             important: task.important,
             tags: { create: task.tags.map((t) => ({ tagId: t.tagId })) },
           },

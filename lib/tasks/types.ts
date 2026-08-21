@@ -2,7 +2,7 @@ export type TaskStatus = "ACTIVE" | "COMPLETED";
 
 export type TaskReminderOffset = "AT_DUE" | "MIN_15_BEFORE" | "HOUR_1_BEFORE" | "DAY_1_BEFORE" | "CUSTOM";
 
-export type TaskRepeatRule = "DAILY" | "WEEKDAYS" | "WEEKLY" | "MONTHLY" | "CUSTOM";
+export type TaskRepeatRule = "DAILY" | "WEEKDAYS" | "SELECTED_WEEKDAYS" | "WEEKLY" | "EVERY_N_DAYS" | "MONTHLY" | "CUSTOM";
 
 export const REMINDER_LABEL: Record<TaskReminderOffset, string> = {
   AT_DUE: "At due time",
@@ -15,10 +15,14 @@ export const REMINDER_LABEL: Record<TaskReminderOffset, string> = {
 export const REPEAT_LABEL: Record<TaskRepeatRule, string> = {
   DAILY: "Daily",
   WEEKDAYS: "Weekdays",
+  SELECTED_WEEKDAYS: "Selected days",
   WEEKLY: "Weekly",
+  EVERY_N_DAYS: "Every N days",
   MONTHLY: "Monthly",
   CUSTOM: "Custom",
 };
+
+export const WEEKDAY_SHORT_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
 
 export type TaskStep = {
   id: string;
@@ -48,6 +52,8 @@ export type Task = {
   dueTime: string | null;
   reminderOffset: TaskReminderOffset | null;
   repeatRule: TaskRepeatRule | null;
+  repeatWeekdays: number[];
+  repeatIntervalN: number | null;
   completedAt: Date | null;
   archivedAt: Date | null;
   createdAt: Date;

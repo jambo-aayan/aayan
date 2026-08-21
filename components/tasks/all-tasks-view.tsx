@@ -191,6 +191,8 @@ export function AllTasksView({
         dueTime: input.dueTime,
         reminderOffset: input.reminderOffset,
         repeatRule: input.repeatRule,
+        repeatWeekdays: input.repeatWeekdays,
+        repeatIntervalN: input.repeatIntervalN,
         completedAt: null,
         archivedAt: null,
         createdAt: today,

@@ -23,8 +23,12 @@ export type TaskFormInput = {
   dueTime: string | null;
   reminderOffset: TaskReminderOffset | null;
   repeatRule: TaskRepeatRule | null;
+  repeatWeekdays: number[];
+  repeatIntervalN: number | null;
   important: boolean;
 };
+
+const WEEKDAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 type DueOption = "none" | "today" | "tomorrow" | "weekend" | "custom";
 
@@ -103,11 +107,17 @@ export function TaskComposer({
   const [dueTime, setDueTime] = useState(task?.dueTime ?? "");
   const [reminderOffset, setReminderOffset] = useState<TaskReminderOffset | "">(task?.reminderOffset ?? "");
   const [repeatRule, setRepeatRule] = useState<TaskRepeatRule | "">(task?.repeatRule ?? "");
+  const [repeatWeekdays, setRepeatWeekdays] = useState<number[]>(task?.repeatWeekdays ?? []);
+  const [repeatIntervalN, setRepeatIntervalN] = useState<string>(task?.repeatIntervalN?.toString() ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(task?.status === "COMPLETED");
 
   const pillarHex = resolveColorHex((pillars.find((p) => p.id === pillarId)?.color ?? null) as ColorKey | null);
+
+  function toggleRepeatWeekday(day: number) {
+    setRepeatWeekdays((prev) => (prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]));
+  }
 
   function handleToggleDone() {
     if (!onToggleComplete) return;
@@ -162,6 +172,8 @@ export function TaskComposer({
       dueTime: dueDate && dueTime ? dueTime : null,
       reminderOffset: reminderOffset || null,
       repeatRule: repeatRule || null,
+      repeatWeekdays: repeatRule === "SELECTED_WEEKDAYS" ? repeatWeekdays : [],
+      repeatIntervalN: repeatRule === "EVERY_N_DAYS" ? parseInt(repeatIntervalN, 10) || 1 : null,
       important: task?.important ?? false,
     });
     setSaving(false);
@@ -358,6 +370,34 @@ export function TaskComposer({
               ))}
             </select>
           </label>
+
+          {repeatRule === "SELECTED_WEEKDAYS" && (
+            <div className={styles.weekdays}>
+              {WEEKDAY_NAMES.map((label, day) => (
+                <button
+                  key={day}
+                  type="button"
+                  className={`${styles.weekdaySquare} ${repeatWeekdays.includes(day) ? styles.weekdaySquareActive : ""}`}
+                  onClick={() => toggleRepeatWeekday(day)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {repeatRule === "EVERY_N_DAYS" && (
+            <label className={styles.field}>
+              <span className={styles.label}>Every N days</span>
+              <input
+                type="number"
+                min={1}
+                className={styles.textInput}
+                value={repeatIntervalN}
+                onChange={(e) => setRepeatIntervalN(e.target.value)}
+              />
+            </label>
+          )}
 
           <label className={styles.field}>
             <span className={styles.label}>Notes</span>
