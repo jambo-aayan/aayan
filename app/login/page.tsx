@@ -37,23 +37,32 @@ export default function LoginPage() {
 
   return (
     <main className={styles.main}>
-      <div className={styles.brand}>aayan</div>
-      <form className={styles.form} onSubmit={handleSubmit}>
-        <h1 className={styles.title}>Enter password</h1>
-        <input
-          type="password"
-          autoFocus
-          value={password}
-          onChange={(event) => setPassword(event.target.value)}
-          className={styles.input}
-          placeholder="Password"
-          aria-label="Password"
-        />
-        {error && <p className={styles.error}>{error}</p>}
-        <button type="submit" className={styles.button} disabled={submitting}>
-          {submitting ? "Checking…" : "Continue"}
-        </button>
-      </form>
+      <div className={styles.column}>
+        <div className={styles.badge}>a</div>
+        <div className={styles.brand}>
+          <div className={styles.wordmark}>aayan</div>
+          <p className={styles.sub}>Health, finances and everything you&rsquo;re building — one quiet place.</p>
+        </div>
+        <form className={styles.form} onSubmit={handleSubmit}>
+          <label className={styles.field}>
+            <span className={styles.statusDot} aria-hidden />
+            <input
+              type="password"
+              autoFocus
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              className={styles.input}
+              placeholder="Password"
+              aria-label="Password"
+            />
+          </label>
+          {error && <p className={styles.error}>{error}</p>}
+          <button type="submit" className={styles.button} disabled={submitting}>
+            {submitting ? "Checking…" : "Continue"}
+          </button>
+        </form>
+        <p className={styles.footer}>Private · single user · locked by default</p>
+      </div>
     </main>
   );
 }
