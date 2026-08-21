@@ -9,7 +9,18 @@ import styles from "./thought-quick-add.module.css";
 
 type TagOption = { id: string; name: string; areas: { id: string; name: string }[] };
 
-export function ThoughtQuickAdd({ tagOptions }: { tagOptions: TagOption[] }) {
+export function ThoughtQuickAdd({
+  tagOptions,
+  multiline,
+  onSaved,
+}: {
+  tagOptions: TagOption[];
+  /** The dedicated Thoughts page gets a 3-row textarea composer; Home's
+   * card gets the single-line quick-capture — same component, per the
+   * handoff's two slightly different Thoughts-composer specs. */
+  multiline?: boolean;
+  onSaved?: () => void;
+}) {
   const [text, setText] = useState("");
   const [pillarId, setPillarId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -42,6 +53,7 @@ export function ThoughtQuickAdd({ tagOptions }: { tagOptions: TagOption[] }) {
     setPillarId(null);
     setSaved(true);
     setTimeout(() => setSaved(false), 2500);
+    onSaved?.();
   }
 
   return (
@@ -54,20 +66,31 @@ export function ThoughtQuickAdd({ tagOptions }: { tagOptions: TagOption[] }) {
       <label className={styles.visuallyHidden} htmlFor="thought-quick-add-text">
         What&rsquo;s on your mind?
       </label>
-      <input
-        id="thought-quick-add-text"
-        type="text"
-        className={styles.input}
-        placeholder="What's on your mind?"
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") {
-            e.preventDefault();
-            handleSave();
-          }
-        }}
-      />
+      {multiline ? (
+        <textarea
+          id="thought-quick-add-text"
+          className={`${styles.input} ${styles.textarea}`}
+          placeholder="What's on your mind?"
+          rows={3}
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+        />
+      ) : (
+        <input
+          id="thought-quick-add-text"
+          type="text"
+          className={styles.input}
+          placeholder="What's on your mind?"
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              handleSave();
+            }
+          }}
+        />
+      )}
       <div className={styles.row}>
         <div className={styles.chips}>
           <button type="button" className={`${styles.chip} ${pillarId === null ? styles.chipActive : ""}`} onClick={() => setPillarId(null)}>

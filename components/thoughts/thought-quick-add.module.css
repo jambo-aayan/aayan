@@ -56,6 +56,11 @@
   color: var(--muted-2);
 }
 
+.textarea {
+  resize: vertical;
+  font-family: var(--font-serif), Georgia, serif;
+}
+
 .input:focus-visible {
   outline: none;
 }

@@ -4,11 +4,20 @@ import { useState } from "react";
 import { deleteThought, restoreThought, type ThoughtInput } from "@/lib/thoughts/actions";
 import { withRetry } from "@/lib/with-retry";
 import { useToast } from "@/components/toast/toast-provider";
+import { resolveColorHex, type ColorKey } from "@/lib/colors";
 import styles from "./thoughts-list.module.css";
 
-export type Thought = ThoughtInput & { id: string; tagName: string | null };
+export type Thought = ThoughtInput & { id: string; tagName: string | null; tagColor: string | null };
 
-function formatDate(date: Date): string {
+/** "Today" / "Yesterday" / "3d ago", falling back to a plain date beyond a
+ * week — per the handoff's "relative timestamp" spec for thought cards.
+ * Thought.date is a date-only value (midnight UTC, see the quick-add's
+ * todayLocalDateString), so this works in day granularity, not hours. */
+function formatRelative(date: Date): string {
+  const days = Math.round((Date.now() - date.getTime()) / 86_400_000);
+  if (days <= 0) return "Today";
+  if (days === 1) return "Yesterday";
+  if (days < 7) return `${days}d ago`;
   return new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric" }).format(date);
 }
 
@@ -42,18 +51,30 @@ export function ThoughtsList({ initialThoughts }: { initialThoughts: Thought[] }
 
   return (
     <ul className={styles.list}>
-      {thoughts.map((thought) => (
-        <li key={thought.id} className={styles.row}>
-          <div className={styles.head}>
-            <span className={styles.date}>{formatDate(thought.date)}</span>
-            {thought.tagName && <span className={styles.tag}>{thought.tagName}</span>}
-            <button type="button" className={styles.delete} onClick={() => handleDelete(thought)}>
-              Delete
-            </button>
-          </div>
-          <p className={styles.text}>{thought.text}</p>
-        </li>
-      ))}
+      {thoughts.map((thought) => {
+        const hex = resolveColorHex(thought.tagColor as ColorKey | null);
+        return (
+          <li key={thought.id} className={styles.card}>
+            <p className={styles.text}>{thought.text}</p>
+            <div className={styles.foot}>
+              <span
+                className={styles.tag}
+                style={
+                  thought.tagName && hex
+                    ? { background: `${hex}22`, color: hex }
+                    : undefined
+                }
+              >
+                {thought.tagName ?? "Untagged"}
+              </span>
+              <span className={styles.date}>{formatRelative(thought.date)}</span>
+              <button type="button" className={styles.delete} onClick={() => handleDelete(thought)}>
+                Delete
+              </button>
+            </div>
+          </li>
+        );
+      })}
     </ul>
   );
 }

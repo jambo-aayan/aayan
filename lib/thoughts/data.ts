@@ -3,12 +3,16 @@ import { prisma } from "@/lib/prisma";
 
 export async function getAllThoughts() {
   const thoughts = await prisma.thought.findMany({
-    include: { pillar: { select: { name: true } }, area: { select: { name: true } } },
+    include: {
+      pillar: { select: { name: true, color: true } },
+      area: { select: { name: true, pillar: { select: { color: true } } } },
+    },
     orderBy: { date: "desc" },
   });
   return thoughts.map(({ pillar, area, ...thought }) => ({
     ...thought,
     tagName: area?.name ?? pillar?.name ?? null,
+    tagColor: area?.pillar.color ?? pillar?.color ?? null,
   }));
 }
 
