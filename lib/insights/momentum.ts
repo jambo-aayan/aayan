@@ -30,41 +30,58 @@ export type MomentumMetrics = {
   surplusRate: number;
 };
 
-function eachDay(start: Date, end: Date): Date[] {
+export function eachDay(start: Date, end: Date): Date[] {
   const days: Date[] = [];
   for (let t = start.getTime(); t <= end.getTime(); t += DAY_MS) days.push(new Date(t));
   return days;
 }
 
-function inRange(date: Date, start: Date, end: Date): boolean {
+export function inRange(date: Date, start: Date, end: Date): boolean {
   return date.getTime() >= start.getTime() && date.getTime() <= end.getTime();
+}
+
+/** logged/scheduled for one habit over [start, end] inclusive — the unit
+ * computeAdherence sums across every habit, and lib/insights/kpis.ts reuses
+ * directly for its per-habit adherence breakdown (naming the weakest
+ * habit in a KPI card's diagnosis line needs the same math per-habit,
+ * not just the aggregate). */
+export function adherenceForHabit(
+  habit: HabitFixture,
+  checkIns: CheckInFixture[],
+  start: Date,
+  end: Date
+): { scheduled: number; logged: number } {
+  const habitCheckIns = checkIns.filter((c) => c.habitId === habit.id);
+  let scheduled = 0;
+  let logged = 0;
+  for (const day of eachDay(start, end)) {
+    const weekStart = mondayOf(day);
+    const doneThisWeek = habitCheckIns.some(
+      (c) => mondayOf(c.date).getTime() === weekStart.getTime() && c.date.getTime() <= day.getTime()
+    );
+    if (!habitOccursOn(habit.schedule, day, doneThisWeek)) continue;
+    scheduled += 1;
+    const checkIn = habitCheckIns.find((c) => c.date.getTime() === day.getTime());
+    if (checkIn) logged += checkIn.level === "FULL" ? 1 : 0.5;
+  }
+  return { scheduled, logged };
 }
 
 /** logged (full = 1, minimum/"partial" = 0.5) ÷ scheduled occurrences,
  * across every habit, over [start, end] inclusive. */
-function computeAdherence(habits: HabitFixture[], checkIns: CheckInFixture[], start: Date, end: Date): number {
+export function computeAdherence(habits: HabitFixture[], checkIns: CheckInFixture[], start: Date, end: Date): number {
   let scheduled = 0;
   let logged = 0;
-
   for (const habit of habits) {
-    const habitCheckIns = checkIns.filter((c) => c.habitId === habit.id);
-    for (const day of eachDay(start, end)) {
-      const weekStart = mondayOf(day);
-      const doneThisWeek = habitCheckIns.some(
-        (c) => mondayOf(c.date).getTime() === weekStart.getTime() && c.date.getTime() <= day.getTime()
-      );
-      if (!habitOccursOn(habit.schedule, day, doneThisWeek)) continue;
-      scheduled += 1;
-      const checkIn = habitCheckIns.find((c) => c.date.getTime() === day.getTime());
-      if (checkIn) logged += checkIn.level === "FULL" ? 1 : 0.5;
-    }
+    const r = adherenceForHabit(habit, checkIns, start, end);
+    scheduled += r.scheduled;
+    logged += r.logged;
   }
-
   return scheduled === 0 ? 0 : (logged / scheduled) * 100;
 }
 
 /** tasks closed ÷ tasks due, over tasks whose dueDate falls in [start, end]. */
-function computeFollowThrough(tasks: TaskFixture[], start: Date, end: Date): number {
+export function computeFollowThrough(tasks: TaskFixture[], start: Date, end: Date): number {
   const due = tasks.filter((t) => inRange(t.dueDate, start, end));
   if (due.length === 0) return 0;
   const closed = due.filter((t) => t.completedAt !== null).length;
@@ -72,7 +89,7 @@ function computeFollowThrough(tasks: TaskFixture[], start: Date, end: Date): num
 }
 
 /** (income − outgoings) ÷ income, clamped to 0–100, over [start, end]. */
-function computeSurplusRate(transactions: TransactionFixture[], start: Date, end: Date): number {
+export function computeSurplusRate(transactions: TransactionFixture[], start: Date, end: Date): number {
   const inRangeTx = transactions.filter((t) => inRange(t.date, start, end));
   const income = inRangeTx.filter((t) => t.direction === "IN").reduce((sum, t) => sum + t.amount, 0);
   const outgoings = inRangeTx.filter((t) => t.direction === "OUT").reduce((sum, t) => sum + t.amount, 0);

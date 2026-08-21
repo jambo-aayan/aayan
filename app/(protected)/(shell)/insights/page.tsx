@@ -4,7 +4,8 @@ import pageStyles from "@/components/page-header.module.css";
 import { PageTitle } from "@/components/page-title";
 import { RangeControl } from "@/components/insights/range-control";
 import { MomentumCard } from "@/components/insights/momentum-card";
-import { getMomentumSummary } from "@/lib/insights/data";
+import { KpiCard } from "@/components/insights/kpi-card";
+import { getMomentumSummary, getKpiSummary } from "@/lib/insights/data";
 import { parseInsightsRange } from "@/lib/insights/range";
 import styles from "./insights.module.css";
 
@@ -14,9 +15,9 @@ export default async function InsightsPage({
   searchParams: Promise<{ range?: string | string[] }>;
 }) {
   const range = parseInsightsRange((await searchParams).range);
-  // Momentum ignores `range` by design (fixed rolling 28 days) — later
-  // modules (#71 onward) read it to filter their own queries.
-  const momentum = await getMomentumSummary();
+  // Momentum ignores `range` by design (fixed rolling 28 days) — every KPI
+  // below does respond to it, per the Insights header's own instruction.
+  const [momentum, kpis] = await Promise.all([getMomentumSummary(), getKpiSummary(range)]);
 
   return (
     <>
@@ -37,6 +38,13 @@ export default async function InsightsPage({
         </div>
 
         <MomentumCard momentum={momentum} />
+
+        <div className={styles.kpiGrid}>
+          <KpiCard label="Habit adherence" unit="%" kpi={kpis.adherence} />
+          <KpiCard label="Task follow-through" unit="%" kpi={kpis.followThrough} />
+          <KpiCard label="Goal velocity" unit="%" kpi={kpis.goalVelocity} />
+          <KpiCard label="Surplus rate" unit="%" kpi={kpis.surplusRate} />
+        </div>
       </div>
     </>
   );

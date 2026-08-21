@@ -20,3 +20,10 @@
   color: var(--coral);
   white-space: nowrap;
 }
+
+.kpiGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(255px, 1fr));
+  gap: 14px;
+  margin-top: 20px;
+}
