@@ -76,7 +76,7 @@
   font-size: var(--text-task-title);
   font-weight: 500;
   line-height: 1.35;
-  color: var(--muted-2);
+  color: var(--task-done);
   text-decoration: line-through;
   transition: color 0.2s var(--ease);
 }
@@ -161,7 +161,7 @@
   width: 28px;
   height: 28px;
   border-radius: var(--radius-sm);
-  color: var(--faintest);
+  color: var(--star-off);
   flex-shrink: 0;
   transition: color var(--duration-fast) var(--ease), background var(--duration-fast) var(--ease);
 }

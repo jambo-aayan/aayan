@@ -29,6 +29,12 @@
   --border: rgba(34, 30, 26, 0.12);
   --border-soft: rgba(34, 30, 26, 0.1);
   --border-strong: rgba(34, 30, 26, 0.26);
+  --star-off: rgba(34, 30, 26, 0.2);
+
+  /* Handoff-exact one-off, distinct from the muted-2/faint scale above —
+   * per the design_handoff_aayan README's Task row anatomy: "Done → color
+   * #A79E93". Named so it isn't mistaken for a stray magic value. */
+  --task-done: #a79e93;
   --row-divider: rgba(34, 30, 26, 0.06);
   --section-divider: rgba(34, 30, 26, 0.07);
 

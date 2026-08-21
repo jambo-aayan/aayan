@@ -16,7 +16,7 @@
   display: flex;
   flex-direction: column;
   z-index: 61;
-  animation: ay-sheet var(--duration-base) var(--ease) both;
+  animation: ay-sheet 0.24s var(--ease) both;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -28,25 +28,12 @@
 .header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 10px;
   padding: 16px 16px 12px;
   border-bottom: 1px solid var(--row-divider);
   flex-shrink: 0;
 }
 
-.heading {
-  font-family: var(--font-serif), Georgia, serif;
-  font-size: 18px;
-  font-weight: 400;
-}
-
-.headerActions {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.star,
 .close {
   display: flex;
   align-items: center;
@@ -55,15 +42,11 @@
   height: 36px;
   border-radius: var(--radius-sm);
   color: var(--muted);
+  flex-shrink: 0;
 }
 
-.star:hover,
 .close:hover {
   background: var(--surface-hover);
-}
-
-.starActive {
-  color: var(--coral);
 }
 
 .body {
@@ -76,6 +59,8 @@
 }
 
 .titleInput {
+  flex: 1;
+  min-width: 0;
   font-family: var(--font-serif), Georgia, serif;
   font-size: 21px;
   font-weight: 400;
@@ -171,7 +156,10 @@
 }
 
 .dueChipActive {
-  background: var(--coral-soft);
+  /* Handoff-exact: "selected gets a coral border and .12 tint" — distinct
+   * from --coral-soft's .14, which is the generic accent-tint convention
+   * used elsewhere. */
+  background: rgba(201, 123, 95, 0.12);
   border-color: var(--coral);
   color: var(--coral);
 }
@@ -202,7 +190,7 @@
     max-height: 86vh;
     border-radius: 22px;
     box-shadow: var(--shadow-md);
-    animation: ay-in var(--duration-base) var(--ease) both;
+    animation: ay-in 0.22s var(--ease) both;
   }
 
   @media (prefers-reduced-motion: reduce) {

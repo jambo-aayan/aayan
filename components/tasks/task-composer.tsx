@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { X, Star } from "lucide-react";
+import { X } from "lucide-react";
 import { PrimaryButton } from "@/components/primary-button";
 import { REMINDER_LABEL, REPEAT_LABEL, type TaskReminderOffset, type TaskRepeatRule } from "@/lib/tasks/types";
 import type { Task } from "@/lib/tasks/types";
 import type { TaskListSummary } from "@/lib/tasks/data";
 import { TaskSteps } from "./task-steps";
+import { TaskCheckbox } from "./task-checkbox";
+import { resolveColorHex, type ColorKey } from "@/lib/colors";
 import styles from "./task-composer.module.css";
 
 export type TaskFormInput = {
@@ -61,11 +63,13 @@ export function TaskComposer({
   defaultListId,
   onClose,
   onSubmit,
+  onToggleComplete,
+  pending,
 }: {
   mode: "create" | "edit";
   task?: Task;
   lists: TaskListSummary[];
-  pillars: { id: string; name: string }[];
+  pillars: { id: string; name: string; color?: string | null }[];
   areas: { id: string; name: string; pillarId: string }[];
   goals: { id: string; name: string; areaId: string | null; pillarId?: string }[];
   tagSuggestions: string[];
@@ -76,6 +80,12 @@ export function TaskComposer({
   defaultListId?: string;
   onClose: () => void;
   onSubmit: (input: TaskFormInput) => Promise<{ ok: true } | { ok: false; error: string }>;
+  /** Toggles the task's completion, wired to the header checkbox — see the
+   * design_handoff_aayan README's Task detail header spec ("checkbox +
+   * editable title"). Undefined in create mode, where there's no saved
+   * task yet to complete. */
+  onToggleComplete?: () => void;
+  pending?: boolean;
 }) {
   const today = utcMidnight(new Date());
   const tomorrow = new Date(today);
@@ -93,9 +103,17 @@ export function TaskComposer({
   const [dueTime, setDueTime] = useState(task?.dueTime ?? "");
   const [reminderOffset, setReminderOffset] = useState<TaskReminderOffset | "">(task?.reminderOffset ?? "");
   const [repeatRule, setRepeatRule] = useState<TaskRepeatRule | "">(task?.repeatRule ?? "");
-  const [important, setImportant] = useState(task?.important ?? false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState(task?.status === "COMPLETED");
+
+  const pillarHex = resolveColorHex((pillars.find((p) => p.id === pillarId)?.color ?? null) as ColorKey | null);
+
+  function handleToggleDone() {
+    if (!onToggleComplete) return;
+    setDone((v) => !v);
+    onToggleComplete();
+  }
 
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
@@ -144,7 +162,7 @@ export function TaskComposer({
       dueTime: dueDate && dueTime ? dueTime : null,
       reminderOffset: reminderOffset || null,
       repeatRule: repeatRule || null,
-      important,
+      important: task?.important ?? false,
     });
     setSaving(false);
     if (!result.ok) {
@@ -159,24 +177,13 @@ export function TaskComposer({
       <div className={styles.overlay} onClick={onClose} aria-hidden />
       <div className={styles.sheet} role="dialog" aria-modal="true" aria-label={mode === "create" ? "New task" : "Edit task"}>
         <div className={styles.header}>
-          <h2 className={styles.heading}>{mode === "create" ? "New task" : "Edit task"}</h2>
-          <div className={styles.headerActions}>
-            <button
-              type="button"
-              className={`${styles.star} ${important ? styles.starActive : ""}`}
-              onClick={() => setImportant((v) => !v)}
-              aria-pressed={important}
-              aria-label={important ? "Unmark as important" : "Mark as important"}
-            >
-              <Star size={17} strokeWidth={2} fill={important ? "currentColor" : "none"} />
-            </button>
-            <button type="button" className={styles.close} onClick={onClose} aria-label="Close">
-              <X size={18} strokeWidth={2} />
-            </button>
-          </div>
-        </div>
-
-        <div className={styles.body}>
+          <TaskCheckbox
+            checked={done}
+            onToggle={handleToggleDone}
+            disabled={!onToggleComplete || pending}
+            label={done ? `Mark "${title || "task"}" not done` : `Mark "${title || "task"}" done`}
+            accentColor={pillarHex}
+          />
           <input
             type="text"
             className={styles.titleInput}
@@ -186,7 +193,12 @@ export function TaskComposer({
             autoFocus
             aria-label="Task title"
           />
+          <button type="button" className={styles.close} onClick={onClose} aria-label="Close">
+            <X size={18} strokeWidth={2} />
+          </button>
+        </div>
 
+        <div className={styles.body}>
           <div className={styles.grid}>
             <label className={styles.field}>
               <span className={styles.label}>List</span>

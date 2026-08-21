@@ -397,6 +397,8 @@ export function MyDayTasks({
           tagSuggestions={tagSuggestions}
           onClose={() => setComposer(null)}
           onSubmit={handleComposerSubmit}
+          onToggleComplete={composer.task ? () => handleToggleComplete(composer.task!) : undefined}
+          pending={composer.task ? pendingIds.has(composer.task.id) : false}
         />
       )}
     </div>
