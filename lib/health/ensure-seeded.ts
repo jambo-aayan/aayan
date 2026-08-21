@@ -12,7 +12,7 @@ import { HEALTH_AREAS_SEED, HEALTH_PILLAR_ID, HEALTH_PILLAR_NAME } from "./seed-
 export async function ensureHealthAreasSeeded(): Promise<void> {
   await prisma.pillar.upsert({
     where: { id: HEALTH_PILLAR_ID },
-    create: { id: HEALTH_PILLAR_ID, name: HEALTH_PILLAR_NAME },
+    create: { id: HEALTH_PILLAR_ID, name: HEALTH_PILLAR_NAME, desc: "Habits, Areas, and Pain & Mobility tracking" },
     update: {},
   });
 

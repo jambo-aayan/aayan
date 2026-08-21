@@ -12,7 +12,10 @@ export function PageHeader({
   backHref,
   accentColor,
 }: {
-  title: string;
+  /** Omit when the page renders its own heading (e.g. via PageTitle's
+   * eyebrow-above-title pattern) — PageHeader then contributes only the
+   * mobile back button. */
+  title?: string;
   backHref?: string;
   /** A Pillar's chosen color (resolved hex), when this page belongs to one
    * — tints the title, one of the color system's subtle propagation
@@ -26,9 +29,11 @@ export function PageHeader({
           <ArrowLeft size={17} strokeWidth={2} />
         </Link>
       )}
-      <h2 className={styles.title} style={accentColor ? { color: accentColor } : undefined}>
-        {title}
-      </h2>
+      {title && (
+        <h2 className={styles.title} style={accentColor ? { color: accentColor } : undefined}>
+          {title}
+        </h2>
+      )}
     </div>
   );
 }

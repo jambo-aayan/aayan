@@ -20,7 +20,7 @@ export function ColorSwatchPicker({ value, onChange }: { value: string | null; o
           key={c.key}
           type="button"
           className={`${styles.swatch} ${value === c.key ? styles.swatchActive : ""}`}
-          style={{ background: c.hex }}
+          style={{ background: c.hex, "--swatch-ring-color": c.hex } as React.CSSProperties}
           aria-label={c.label}
           onClick={() => onChange(c.key)}
         />

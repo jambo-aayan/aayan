@@ -33,6 +33,13 @@ model Pillar {
   name      String
   color     String?
   northStar String?
+  /// Shown on the Pillars card per the handoff — not user-editable (per
+  /// #49's grilling Q13/#58 scope, a new Pillar is just its row + accent
+  /// color, no description-authoring flow).
+  desc      String?
+  /// A percentage (independent per Pillar, no enforced sum-to-100 — see
+  /// #49's grilling Q13). Feeds Insights' Attention Balance module (#63).
+  intendedTimeShare Int?
   areas     Area[]
   thoughts  Thought[]
   tasks     Task[]
