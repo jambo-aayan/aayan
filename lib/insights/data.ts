@@ -22,6 +22,7 @@ import {
 } from "./kpis";
 import { insightsWindows, RANGE_DAYS, type InsightsRange } from "./range";
 import { computeConsistencyGrid, CONSISTENCY_GRID_MAX_DAYS } from "./consistency";
+import { computeNeglectRadar, type NeglectFixture } from "./neglect";
 import { resolveColorHex, type ColorKey } from "@/lib/colors";
 
 // Momentum's history strip needs 12 rolling 28-day windows, and its delta
@@ -234,3 +235,70 @@ export async function getConsistencyGridSummary(range: InsightsRange, asOf: Date
 }
 
 export type ConsistencyGridSummary = Awaited<ReturnType<typeof getConsistencyGridSummary>>;
+
+function latestOf(dates: (Date | null | undefined)[]): Date | null {
+  const times = dates.filter((d): d is Date => d != null).map((d) => d.getTime());
+  return times.length === 0 ? null : new Date(Math.max(...times));
+}
+
+/** Covers Areas, Goals, Lists, and Thoughts (as one aggregate row) — the
+ * design_handoff_aayan README's Neglect radar spec. "Last activity" per
+ * kind: an Area's own tasks/thoughts/habit check-ins; a Goal's linked
+ * task completions/habit check-ins (same definition as Goal velocity in
+ * lib/insights/kpis.ts); a List's own tasks; Thoughts' single row uses
+ * the most recent Thought across the whole app, not scoped to any Area. */
+export async function getNeglectRadar(asOf: Date = new Date()) {
+  const [areas, goals, lists, latestThought] = await Promise.all([
+    prisma.area.findMany({
+      select: {
+        id: true,
+        name: true,
+        tasks: { select: { createdAt: true, completedAt: true } },
+        thoughts: { select: { createdAt: true } },
+        habits: { select: { checkIns: { select: { date: true } } } },
+      },
+    }),
+    prisma.lifeGoal.findMany({
+      where: { status: "ACTIVE" },
+      select: {
+        id: true,
+        name: true,
+        tasks: { select: { completedAt: true }, where: { completedAt: { not: null } } },
+        habits: { select: { habit: { select: { checkIns: { select: { date: true } } } } } },
+      },
+    }),
+    prisma.taskList.findMany({
+      where: { archivedAt: null },
+      select: { id: true, name: true, tasks: { select: { createdAt: true, completedAt: true } } },
+    }),
+    prisma.thought.findFirst({ orderBy: { createdAt: "desc" }, select: { createdAt: true } }),
+  ]);
+
+  const fixtures: NeglectFixture[] = [
+    ...areas.map((a): NeglectFixture => ({
+      kind: "area",
+      id: a.id,
+      label: a.name,
+      lastActivityAt: latestOf([
+        ...a.tasks.flatMap((t) => [t.createdAt, t.completedAt]),
+        ...a.thoughts.map((t) => t.createdAt),
+        ...a.habits.flatMap((h) => h.checkIns.map((c) => c.date)),
+      ]),
+    })),
+    ...goals.map((g): NeglectFixture => ({
+      kind: "goal",
+      id: g.id,
+      label: g.name,
+      lastActivityAt: latestOf([...g.tasks.map((t) => t.completedAt), ...g.habits.flatMap((hg) => hg.habit.checkIns.map((c) => c.date))]),
+    })),
+    ...lists.map((l): NeglectFixture => ({
+      kind: "list",
+      id: l.id,
+      label: l.name,
+      lastActivityAt: latestOf(l.tasks.flatMap((t) => [t.createdAt, t.completedAt])),
+    })),
+    { kind: "thoughts", id: "thoughts", label: "Thoughts", lastActivityAt: latestThought?.createdAt ?? null },
+  ];
+
+  return computeNeglectRadar(fixtures, asOf);
+}
