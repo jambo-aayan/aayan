@@ -67,7 +67,7 @@ export function TaskSteps({ taskId, initialSteps }: { taskId: string; initialSte
     <div>
       {steps.length > 0 && (
         <div className={styles.progress}>
-          {doneCount}/{steps.length} steps
+          {doneCount} of {steps.length} · parent stays open
         </div>
       )}
       <ul className={styles.list}>

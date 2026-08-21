@@ -41,6 +41,7 @@ export function TaskRow({
   // we don't also show its (usually redundant) Pillar — see task row spec:
   // "Pillar usually hidden if Area already communicates context".
   const secondaryLabel = task.areaName ?? task.pillarName;
+  const hasMeta = task.listName || secondaryLabel || task.tags.length > 0 || due;
 
   return (
     <li
@@ -48,19 +49,26 @@ export function TaskRow({
       ref={drag ? (el) => drag.registerRow(el) : undefined}
       style={pillarHex ? { borderLeft: `3px solid ${pillarHex}55` } : undefined}
     >
-      {drag && (
-        <button
-          type="button"
-          className={styles.grip}
-          aria-label={`Reorder "${task.title}"`}
-          onPointerDown={drag.onHandlePointerDown}
-          onPointerMove={drag.onHandlePointerMove}
-          onPointerUp={drag.onHandlePointerUp}
-          onPointerCancel={drag.onHandlePointerUp}
-        >
-          <GripVertical size={15} strokeWidth={2} />
-        </button>
-      )}
+      {/* Grip space is always reserved, even in mixed views where dragging
+       * doesn't apply — a row with no grip button would visually shift left
+       * relative to a row with one, which reads as misaligned when the two
+       * kinds of view sit near each other. See task row spec: "Hidden
+       * (transparent) in mixed views where ordering is meaningless". */}
+      <div className={styles.gripCol}>
+        {drag && (
+          <button
+            type="button"
+            className={styles.grip}
+            aria-label={`Reorder "${task.title}"`}
+            onPointerDown={drag.onHandlePointerDown}
+            onPointerMove={drag.onHandlePointerMove}
+            onPointerUp={drag.onHandlePointerUp}
+            onPointerCancel={drag.onHandlePointerUp}
+          >
+            <GripVertical size={13} strokeWidth={2} />
+          </button>
+        )}
+      </div>
       <div className={styles.checkboxCol}>
         <TaskCheckbox
           checked={done}
@@ -74,43 +82,39 @@ export function TaskRow({
         <div className={styles.titleRow}>
           <span className={done ? styles.titleDone : styles.title}>{task.title}</span>
         </div>
-        {(task.listName || secondaryLabel || task.tags.length > 0) && (
+        {hasMeta && (
           <div className={styles.meta}>
             {task.listName && (
               <span
                 className={`${styles.metaItem} ${styles.listPill}`}
-                style={listHex ? { background: `${listHex}22`, color: listHex } : undefined}
+                style={listHex ? { background: `${listHex}22`, borderColor: `${listHex}38`, color: listHex } : undefined}
               >
                 {task.listName}
               </span>
             )}
             {secondaryLabel && (
-              <span className={styles.metaItem} style={pillarHex ? { color: pillarHex } : undefined}>
+              <span className={`${styles.metaItem} ${styles.area}`} style={pillarHex ? { color: pillarHex } : undefined}>
                 {secondaryLabel}
               </span>
             )}
-            {task.tags.length > 0 && (
-              <span className={styles.metaItem}>
-                {task.tags.map((t) => (
-                  <span key={t.id} className={styles.tag}>
-                    #{t.name}{" "}
-                  </span>
-                ))}
+            {task.tags.map((t) => (
+              <span key={t.id} className={`${styles.metaItem} ${styles.tag}`}>
+                #{t.name}
+              </span>
+            ))}
+            {due && (
+              <span
+                className={`${styles.metaItem} ${styles.due} ${due.variant === "overdue" ? styles.dueOverdue : ""} ${
+                  due.variant === "today" ? styles.dueToday : ""
+                }`}
+              >
+                {due.label}
               </span>
             )}
           </div>
         )}
       </button>
       <div className={styles.side}>
-        {due && (
-          <span
-            className={`${styles.due} ${due.variant === "overdue" ? styles.dueOverdue : ""} ${
-              due.variant === "today" ? styles.dueToday : ""
-            }`}
-          >
-            {due.label}
-          </span>
-        )}
         <button
           type="button"
           className={`${styles.star} ${task.important ? styles.starActive : ""}`}
@@ -118,7 +122,7 @@ export function TaskRow({
           aria-pressed={task.important}
           aria-label={task.important ? "Unmark as important" : "Mark as important"}
         >
-          <Star size={15} strokeWidth={2} fill={task.important ? "currentColor" : "none"} />
+          <Star size={14} strokeWidth={2} fill={task.important ? "currentColor" : "none"} />
         </button>
         <TaskMenu items={extraMenuItems} />
       </div>

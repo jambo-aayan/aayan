@@ -1,7 +1,7 @@
 .overlay {
   position: fixed;
   inset: 0;
-  background: rgba(33, 29, 25, 0.36);
+  background: var(--scrim);
   z-index: 60;
 }
 
@@ -11,20 +11,17 @@
   right: 0;
   bottom: 0;
   max-height: 88vh;
-  background: var(--card);
-  border-radius: 20px 20px 0 0;
+  background: var(--surface);
+  border-radius: 22px 22px 0 0;
   display: flex;
   flex-direction: column;
   z-index: 61;
-  animation: slideUp var(--duration-base) var(--ease);
+  animation: ay-sheet 0.24s var(--ease) both;
 }
 
-@keyframes slideUp {
-  from {
-    transform: translateY(100%);
-  }
-  to {
-    transform: translateY(0);
+@media (prefers-reduced-motion: reduce) {
+  .sheet {
+    animation: none;
   }
 }
 
@@ -33,13 +30,14 @@
   align-items: center;
   justify-content: space-between;
   padding: 16px 16px 12px;
-  border-bottom: 1px solid var(--border-soft);
+  border-bottom: 1px solid var(--row-divider);
   flex-shrink: 0;
 }
 
 .heading {
-  font-size: 16px;
-  font-weight: 600;
+  font-family: var(--font-serif), Georgia, serif;
+  font-size: 18px;
+  font-weight: 400;
 }
 
 .headerActions {
@@ -65,7 +63,7 @@
 }
 
 .starActive {
-  color: var(--amber);
+  color: var(--coral);
 }
 
 .body {
@@ -78,8 +76,10 @@
 }
 
 .titleInput {
-  font-size: 16px;
-  font-weight: 600;
+  font-family: var(--font-serif), Georgia, serif;
+  font-size: 21px;
+  font-weight: 400;
+  letter-spacing: -0.015em;
   border: none;
   padding: 4px 0;
   background: none;
@@ -92,20 +92,22 @@
 
 .grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
   gap: 12px;
 }
 
 .field {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 5px;
 }
 
 .label {
-  font-size: 12px;
+  font-size: var(--text-eyebrow);
   font-weight: 500;
-  color: var(--muted);
+  color: var(--muted-2);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
 }
 
 .select,
@@ -113,11 +115,19 @@
   padding: 9px 10px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border);
-  font-size: 13.5px;
-  background: var(--bg);
+  font-size: 13px;
+  background: var(--surface);
   color: var(--ink);
-  min-height: 40px;
+  min-height: 38px;
   transition: border-color var(--duration-fast) var(--ease);
+}
+
+.select {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='9' height='9' viewBox='0 0 9 9'%3E%3Cpath d='M1 3l3.5 3L8 3' stroke='%23B6ADA2' stroke-width='1.4' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  padding-right: 26px;
 }
 
 .select:focus-visible,
@@ -129,11 +139,11 @@
 
 .textarea {
   padding: 10px 12px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
-  font-size: 14px;
+  border-radius: 12px;
+  border: 1px solid var(--border-soft);
+  font-size: var(--text-body);
   font-family: inherit;
-  background: var(--bg);
+  background: var(--surface-sunken);
   color: var(--ink);
   resize: vertical;
 }
@@ -147,11 +157,13 @@
 .dueChip {
   font-size: 12.5px;
   font-weight: 500;
-  color: var(--ink);
-  background: var(--bg2);
+  color: var(--ink-2);
+  background: var(--surface-sunken);
+  border: 1px solid transparent;
   padding: 7px 12px;
   border-radius: var(--radius-pill);
-  transition: background var(--duration-fast) var(--ease), color var(--duration-fast) var(--ease);
+  transition: background var(--duration-fast) var(--ease), border-color var(--duration-fast) var(--ease),
+    color var(--duration-fast) var(--ease);
 }
 
 .dueChip:hover {
@@ -159,8 +171,9 @@
 }
 
 .dueChipActive {
-  background: var(--ink);
-  color: var(--bg);
+  background: rgba(201, 123, 95, 0.12);
+  border-color: var(--coral);
+  color: var(--coral);
 }
 
 .error {
@@ -170,7 +183,7 @@
 
 .footer {
   padding: 12px 16px calc(16px + env(safe-area-inset-bottom));
-  border-top: 1px solid var(--border-soft);
+  border-top: 1px solid var(--row-divider);
   flex-shrink: 0;
 }
 
@@ -185,11 +198,17 @@
     bottom: auto;
     top: 50%;
     transform: translate(-50%, -50%);
-    width: min(480px, calc(100vw - 48px));
-    max-height: 85vh;
-    border-radius: var(--radius-lg);
+    width: min(520px, 92vw);
+    max-height: 86vh;
+    border-radius: 22px;
     box-shadow: var(--shadow-md);
-    animation: none;
+    animation: ay-in 0.22s var(--ease) both;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .sheet {
+      animation: none;
+    }
   }
 
   .footer > :global(button) {

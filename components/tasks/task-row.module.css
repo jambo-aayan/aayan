@@ -1,11 +1,11 @@
 .row {
   display: flex;
   align-items: flex-start;
-  gap: 12px;
-  padding: 11px 2px 11px 5px;
-  border-top: 1px solid var(--border);
+  gap: 10px;
+  padding: var(--row-padding-y) 2px;
+  border-top: 1px solid var(--row-divider);
   border-left: 3px solid transparent;
-  background: var(--card);
+  background: var(--surface);
 }
 
 .row:first-child {
@@ -15,19 +15,26 @@
 .dragging {
   position: relative;
   z-index: 5;
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--shadow-sm);
   border-radius: var(--radius-sm);
+}
+
+.gripCol {
+  width: 16px;
+  height: 22px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .grip {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 30px;
-  margin-top: 1px;
-  flex-shrink: 0;
-  color: var(--border);
+  width: 16px;
+  height: 22px;
+  color: var(--faintest);
   touch-action: none;
   cursor: grab;
 }
@@ -37,7 +44,7 @@
 }
 
 .checkboxCol {
-  padding-top: 1px;
+  padding-top: 2px;
 }
 
 .body {
@@ -60,25 +67,26 @@
 }
 
 .title {
-  font-size: 14px;
-  font-weight: 600;
+  font-size: var(--text-task-title);
+  font-weight: 500;
+  line-height: 1.35;
 }
 
 .titleDone {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--muted);
+  font-size: var(--text-task-title);
+  font-weight: 500;
+  line-height: 1.35;
+  color: #a79e93;
   text-decoration: line-through;
+  transition: color 0.2s var(--ease);
 }
 
 .meta {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   flex-wrap: wrap;
   margin-top: 4px;
-  font-size: 11.5px;
-  color: var(--muted);
 }
 
 .metaItem {
@@ -86,25 +94,46 @@
   align-items: center;
 }
 
-.metaItem:not(.listPill)::before {
-  content: "·";
-  margin-right: 5px;
-  color: var(--border);
-}
-
 /* The List pill is the one piece of metadata that's always visually
  * distinguished (colored, pill-shaped) — see task row spec: "List visually
  * distinguishable" and prioritized ahead of Area/Pillar/Tags. */
 .listPill {
-  font-weight: 600;
-  background: var(--bg2);
-  color: var(--muted);
+  font-size: var(--text-pill);
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border-soft);
+  color: var(--muted-2);
   padding: 2px 8px;
   border-radius: var(--radius-pill);
 }
 
+.area {
+  font-size: 11px;
+  color: var(--muted-2);
+}
+
 .tag {
-  color: var(--thoughts);
+  font-size: var(--text-pill);
+  color: var(--ink-2);
+  background: rgba(34, 30, 26, 0.05);
+  padding: 1px 6px;
+  border-radius: 5px;
+}
+
+.due {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--muted-2);
+  white-space: nowrap;
+}
+
+.dueOverdue {
+  color: var(--danger);
+}
+
+.dueToday {
+  color: var(--coral);
 }
 
 /* Mobile caps visible metadata to the List pill + one more item, so a task
@@ -120,34 +149,19 @@
 .side {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
   flex-shrink: 0;
   padding-top: 2px;
-}
-
-.due {
-  font-size: 11.5px;
-  font-weight: 600;
-  color: var(--muted);
-  white-space: nowrap;
-}
-
-.dueOverdue {
-  color: var(--danger);
-}
-
-.dueToday {
-  color: var(--coral);
 }
 
 .star {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 30px;
+  width: 28px;
+  height: 28px;
   border-radius: var(--radius-sm);
-  color: var(--border);
+  color: rgba(34, 30, 26, 0.2);
   flex-shrink: 0;
   transition: color var(--duration-fast) var(--ease), background var(--duration-fast) var(--ease);
 }
@@ -158,9 +172,9 @@
 }
 
 .starActive {
-  color: var(--amber);
+  color: var(--coral);
 }
 
 .starActive:hover {
-  color: var(--amber);
+  color: var(--coral);
 }
