@@ -577,3 +577,25 @@ model Nudge {
   @@index([readAt])
   @@index([snoozedUntil])
 }
+
+/// Singleton session state for the Weekly review's 5-step flow (#80) —
+/// same idempotent-singleton pattern as AppSettings: seeded by its own
+/// migration's INSERT ... ON CONFLICT DO NOTHING rather than upserted on
+/// read, so concurrent first-reads (e.g. parallel static prerendering)
+/// never race to insert it themselves. Exists so the flow is resumable
+/// across visits — closing the tab mid-review and coming back later
+/// picks up at the same step with the same draft/verdicts/order, rather
+/// than losing progress. `verdicts` maps habitId -> "KEEP" | "PAUSE" |
+/// "REWORK" (Json rather than a join table — it's read/written as one
+/// blob per step, never queried per-habit). `rankOrder` is Step 3's
+/// drag-reordered Task ids, oldest-first; the top 3 become next week's
+/// My Day defaults on Finish.
+model WeeklyReviewSession {
+  id          String   @id
+  step        Int      @default(0)
+  draftDigest String?
+  verdicts    Json     @default("{}")
+  rankOrder   String[] @default([])
+  startedAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}

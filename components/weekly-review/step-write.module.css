@@ -1,0 +1,45 @@
+.panel {
+  background: color-mix(in srgb, var(--lavender) 8%, var(--surface));
+  border: 1px solid rgba(142, 133, 176, 0.28);
+  border-radius: var(--radius-lg);
+  padding: 18px;
+}
+
+.textarea {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  padding: 14px;
+  font-family: var(--font-serif), Georgia, serif;
+  font-size: 16.5px;
+  line-height: 1.55;
+  color: var(--ink);
+  resize: vertical;
+}
+
+.textarea:focus-visible {
+  outline: 2px solid var(--lavender);
+  outline-offset: 1px;
+}
+
+.actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
+  flex-wrap: wrap;
+}
+
+.outlineButton {
+  padding: 10px 18px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--ink-2);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.outlineButton:disabled {
+  opacity: 0.6;
+}

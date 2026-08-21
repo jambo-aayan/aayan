@@ -1,18 +1,29 @@
-import { PageHeader } from "@/components/page-header";
 import pageStyles from "@/components/page-header.module.css";
-import { Card } from "@/components/card";
+import { WeeklyReviewFlow } from "@/components/weekly-review/weekly-review-flow";
+import { getWeeklyReviewSession } from "@/lib/weekly-review/session";
+import { getStaleTasks, getHabitReviewCards, getRankCandidates, getReviewNumbers, getReviewDigestDraft } from "@/lib/weekly-review/data";
 
-/** Stub landing page — the sidebar's Weekly-review CTA needs somewhere real
- * to point per #54's spec, but the guided 5-step flow is its own ticket
- * (#80). */
-export default function WeeklyReviewPage() {
+export default async function WeeklyReviewPage() {
+  const session = await getWeeklyReviewSession();
+  const [staleTasks, habitCards, rankCandidates, numbers, digestDraft] = await Promise.all([
+    getStaleTasks(),
+    getHabitReviewCards(session.verdicts),
+    getRankCandidates(session.rankOrder),
+    getReviewNumbers(),
+    session.draftDigest !== null ? Promise.resolve(session.draftDigest) : getReviewDigestDraft(),
+  ]);
+
   return (
     <>
-      <PageHeader title="Weekly review" backHref="/today" />
       <div className={pageStyles.content}>
-        <Card title="Coming soon">
-          <p>The guided 5-step Weekly Review ritual lands in its own ticket.</p>
-        </Card>
+        <WeeklyReviewFlow
+          initialStep={session.step}
+          staleTasks={staleTasks}
+          habitCards={habitCards}
+          rankCandidates={rankCandidates}
+          numbers={numbers}
+          digestDraft={digestDraft}
+        />
       </div>
     </>
   );

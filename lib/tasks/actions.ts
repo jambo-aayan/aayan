@@ -205,6 +205,20 @@ export async function uncompleteTask(id: string): Promise<ActionResult> {
   return { ok: true };
 }
 
+/** Sets dueDate directly without touching anything else — the Weekly
+ * review's Step 1 "Next week" pill needs exactly this (dueDate = today +
+ * 7, not the old dueDate + 7), and going through updateTask's full
+ * TaskInput would force re-sending every other field just to change one. */
+export async function rescheduleTask(id: string, dueDate: Date): Promise<ActionResult> {
+  try {
+    await prisma.task.update({ where: { id }, data: { dueDate } });
+  } catch {
+    return { ok: false, error: SAVE_ERROR };
+  }
+  revalidateTaskPaths();
+  return { ok: true };
+}
+
 export async function setTaskImportant(id: string, important: boolean): Promise<ActionResult> {
   try {
     await prisma.task.update({ where: { id }, data: { important } });
