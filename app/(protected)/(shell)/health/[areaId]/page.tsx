@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/page-header";
 import pageStyles from "@/components/page-header.module.css";
+import { PageTitle } from "@/components/page-title";
+import { BackLink } from "@/components/back-link";
 import { Card } from "@/components/card";
 import { EditableText } from "@/components/editable-text";
 import { HabitsList } from "@/components/habits-list";
@@ -15,6 +17,7 @@ import { getGoalOptions } from "@/lib/goals/data";
 import { getPainMobilityLogs } from "@/lib/pain-mobility/data";
 import { PAIN_MOBILITY_AREA_ID } from "@/lib/pain-mobility/scope";
 import { resolveColorHex, type ColorKey } from "@/lib/colors";
+import styles from "./area-detail.module.css";
 
 export default async function AreaPage({
   params,
@@ -40,22 +43,31 @@ export default async function AreaPage({
 
   return (
     <>
-      <PageHeader title={area.name} backHref="/health" accentColor={accentColor} />
+      <PageHeader backHref="/health" accentColor={accentColor} />
       <div className={pageStyles.content}>
-        <Card>
-          <EditableText
-            label="Current state"
-            initialValue={area.currentState}
-            placeholder="No current state set yet"
-            onSave={updateAreaCurrentState.bind(null, area.id)}
-          />
-          <EditableText
-            label="North Star"
-            initialValue={area.northStar}
-            placeholder="No North Star set yet"
-            onSave={updateAreaNorthStar.bind(null, area.id)}
-          />
-        </Card>
+        <BackLink href="/health" label="Health" />
+        <PageTitle eyebrow="Area" title={area.name} />
+
+        <div className={styles.fieldsGrid}>
+          <Card>
+            <EditableText
+              label="Current state"
+              initialValue={area.currentState}
+              placeholder="No current state set yet"
+              onSave={updateAreaCurrentState.bind(null, area.id)}
+            />
+          </Card>
+          <Card>
+            <EditableText
+              label="North Star"
+              initialValue={area.northStar}
+              placeholder="No North Star set yet"
+              fraunces={16}
+              onSave={updateAreaNorthStar.bind(null, area.id)}
+            />
+          </Card>
+        </div>
+
         <Card title="Habits">
           <HabitsList areaId={area.id} pillarId={area.pillarId} initialHabits={habits} pillarColor={accentColor} />
         </Card>

@@ -60,6 +60,31 @@
   width: 110px;
 }
 
+.sliderRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.slider {
+  width: 140px;
+}
+
+.sliderPain {
+  accent-color: var(--coral);
+}
+
+.sliderMobility {
+  accent-color: var(--green);
+}
+
+.sliderValue {
+  font-family: var(--font-serif), Georgia, serif;
+  font-size: 16px;
+  min-width: 1.5ch;
+  text-align: right;
+}
+
 .save {
   border: none;
   border-radius: 999px;

@@ -122,25 +122,31 @@ export function PainMobilityTracker({ areaId, initialLogs }: { areaId: string; i
         </label>
         <label className={styles.field}>
           <span className={styles.label}>Pain (0–10)</span>
-          <input
-            type="number"
-            min={0}
-            max={10}
-            className={styles.input}
-            value={pain}
-            onChange={(e) => setPain(Number(e.target.value))}
-          />
+          <div className={styles.sliderRow}>
+            <input
+              type="range"
+              min={0}
+              max={10}
+              className={`${styles.slider} ${styles.sliderPain}`}
+              value={pain}
+              onChange={(e) => setPain(Number(e.target.value))}
+            />
+            <span className={styles.sliderValue}>{pain}</span>
+          </div>
         </label>
         <label className={styles.field}>
           <span className={styles.label}>Mobility (0–10)</span>
-          <input
-            type="number"
-            min={0}
-            max={10}
-            className={styles.input}
-            value={mobility}
-            onChange={(e) => setMobility(Number(e.target.value))}
-          />
+          <div className={styles.sliderRow}>
+            <input
+              type="range"
+              min={0}
+              max={10}
+              className={`${styles.slider} ${styles.sliderMobility}`}
+              value={mobility}
+              onChange={(e) => setMobility(Number(e.target.value))}
+            />
+            <span className={styles.sliderValue}>{mobility}</span>
+          </div>
         </label>
         <button type="button" className={styles.save} onClick={handleLog} disabled={saving}>
           {saving ? "Saving…" : "Log"}

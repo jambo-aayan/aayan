@@ -3,71 +3,48 @@
 }
 
 .label {
-  font-size: 12px;
+  font-size: var(--text-eyebrow);
   font-weight: 500;
-  color: var(--muted);
-  margin-bottom: 6px;
-}
-
-.display {
-  display: block;
-  width: 100%;
-  text-align: left;
-  border: none;
-  background: none;
-  padding: 0;
-  font-size: 14px;
-  color: var(--ink);
-  cursor: pointer;
-}
-
-.placeholder {
-  color: var(--muted);
-  font-style: italic;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted-2);
+  margin-bottom: 8px;
 }
 
 .textarea {
   width: 100%;
   font: inherit;
-  font-size: 14px;
+  font-size: 13.5px;
   padding: 10px 12px;
   border-radius: 12px;
-  border: 1px solid var(--bg2);
-  background: var(--bg);
+  border: 1px solid var(--border-soft);
+  background: var(--surface-sunken);
   color: var(--ink);
   resize: vertical;
+  transition: border-color var(--duration-fast) var(--ease);
 }
 
-.actions {
-  display: flex;
-  gap: 8px;
-  margin-top: 8px;
+.textarea:focus-visible {
+  outline: none;
+  border-color: var(--ink);
 }
 
-.save,
-.cancel {
-  border: none;
-  border-radius: 999px;
-  padding: 8px 16px;
-  font-size: 12.5px;
-  font-weight: 600;
-  cursor: pointer;
+.textareaTitle {
+  font-family: var(--font-serif), Georgia, serif;
+  font-weight: 400;
+  letter-spacing: -0.015em;
 }
 
-.save {
-  background: var(--ink);
-  color: var(--bg);
+.hint {
+  font-size: 11.5px;
+  color: var(--faint);
+  margin-top: 6px;
 }
 
-.save:disabled,
-.cancel:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.cancel {
-  background: var(--bg2);
-  color: var(--ink);
+.status {
+  font-size: 11.5px;
+  color: var(--muted-2);
+  margin-top: 6px;
 }
 
 .error {
