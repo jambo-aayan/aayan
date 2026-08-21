@@ -13,6 +13,17 @@ model Session {
   expiresAt DateTime
 }
 
+/// Singleton tracking failed login attempts against the single shared app
+/// password, for the rate-limit lockout (see lib/auth/rate-limit.ts and
+/// ADR-0004). id is always LOGIN_LOCKOUT_ID. failedCount resets to 0 on any
+/// successful login.
+model LoginLockout {
+  id          String    @id
+  failedCount Int       @default(0)
+  lockedUntil DateTime?
+  updatedAt   DateTime  @updatedAt
+}
+
 /// A top-level life domain (Health, Finances, ...). id is a stable slug,
 /// not a cuid, so seeding can upsert by a human-readable, idempotent key.
 /// color propagates to every Area/Goal/Habit/Task under it (see lib/colors.ts)
