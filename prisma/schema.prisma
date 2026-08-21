@@ -525,3 +525,48 @@ model TaskStep {
 
   @@index([taskId])
 }
+
+enum NudgeType {
+  HABIT_DUE
+  TASK_OVERDUE
+  STREAK_AT_RISK
+  WEEKLY_REVIEW_READY
+  METRIC_OFF_TARGET
+  MORNING_BRIEF
+}
+
+enum NudgeTargetType {
+  HABIT
+  TASK
+  NONE
+}
+
+/// A delivered notification record — see docs/adr/0002-nudges-delivery-rules.md
+/// and lib/nudges/eligibility.ts, which is the actual source of truth for
+/// when/whether one of these gets created. `dedupKey` is what makes the
+/// scheduled job idempotent and enforces "one per habit per day, highest
+/// severity wins": each eligible trigger computes the same key on every
+/// run (e.g. `habit:<id>:<date>`), so a rerun either no-ops (same/lower
+/// severity already stored) or upgrades the existing row in place (higher
+/// severity superseding a lower one) rather than inserting a duplicate.
+/// `severity` is stored (not just derived from `type`) so dedup/upgrade
+/// comparisons don't need a second lookup table at read time. Read state
+/// changes only via "Mark all read" or acting on a card — never by
+/// opening the page (see the ADR) — so `readAt` is set explicitly by
+/// lib/nudges/actions.ts, not by any page-view side effect.
+model Nudge {
+  id           String          @id @default(cuid())
+  dedupKey     String          @unique
+  type         NudgeType
+  severity     Int
+  targetType   NudgeTargetType @default(NONE)
+  targetId     String?
+  title        String
+  body         String
+  createdAt    DateTime        @default(now())
+  readAt       DateTime?
+  snoozedUntil DateTime?
+
+  @@index([readAt])
+  @@index([snoozedUntil])
+}

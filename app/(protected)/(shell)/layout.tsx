@@ -4,9 +4,14 @@ import { getHabitOccurrencesForDate } from "@/lib/habits/data";
 import { resolveColorHex, type ColorKey } from "@/lib/colors";
 import { getPaletteItems } from "@/lib/palette/data";
 import { PALETTE_PAGES } from "@/lib/palette/pages";
+import { getUnreadNudgeCount } from "@/lib/nudges/data";
 
 export default async function ShellLayout({ children }: { children: React.ReactNode }) {
-  const [habits, paletteEntities] = await Promise.all([getHabitOccurrencesForDate(new Date()), getPaletteItems()]);
+  const [habits, paletteEntities, nudgesUnreadCount] = await Promise.all([
+    getHabitOccurrencesForDate(new Date()),
+    getPaletteItems(),
+    getUnreadNudgeCount(),
+  ]);
   const dailyFocusHabits = habits.map((h) => ({
     id: h.id,
     name: h.name,
@@ -17,9 +22,7 @@ export default async function ShellLayout({ children }: { children: React.ReactN
 
   return (
     <ToastProvider>
-      {/* Nudges' eligibility engine + real unread count land in #69 — 0 is
-       * this ticket's spec'd stub value until then. */}
-      <AppShell dailyFocusHabits={dailyFocusHabits} nudgesUnreadCount={0} paletteItems={paletteItems}>
+      <AppShell dailyFocusHabits={dailyFocusHabits} nudgesUnreadCount={nudgesUnreadCount} paletteItems={paletteItems}>
         {children}
       </AppShell>
     </ToastProvider>

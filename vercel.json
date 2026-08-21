@@ -1,0 +1,7 @@
+{
+  "crons": [
+    { "path": "/api/cron/nudges?run=morning", "schedule": "30 7 * * *" },
+    { "path": "/api/cron/nudges?run=evening", "schedule": "30 20 * * *" },
+    { "path": "/api/cron/nudges?run=weekly-review", "schedule": "0 18 * * 0" }
+  ]
+}

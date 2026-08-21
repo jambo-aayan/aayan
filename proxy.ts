@@ -24,12 +24,15 @@ export const config = {
      * Match all paths except:
      * - /login (the login page itself)
      * - /api/login, /api/health (public API routes)
+     * - /api/cron/* (Vercel Cron hits these with no session cookie — see
+     *   app/api/cron/nudges/route.ts, which authenticates via CRON_SECRET
+     *   instead)
      * - static assets, PWA files, Next internals
      *
      * /brand/ must stay excluded too — next/image's optimizer fetches the
      * source file via an internal same-origin request, which otherwise hits
      * this same gate and gets redirected to /login (HTML, not image bytes).
      */
-    "/((?!login|api/login|api/health|_next/static|_next/image|favicon.ico|manifest.json|sw.js|icons/|brand/).*)",
+    "/((?!login|api/login|api/health|api/cron/|_next/static|_next/image|favicon.ico|manifest.json|sw.js|icons/|brand/).*)",
   ],
 };
