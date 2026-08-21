@@ -86,6 +86,18 @@ Two parts: the user's day job (e.g. sample-apps work) and Jumbo Labs (his startu
 ## Goals
 Superseded by the Task/Habit/Goal split above — a Goal is now an outcome (`Active`/`Paused`/`Completed`/`Archived`), not a one-off unit of work with a `dueDate` or a `myday` flag. Day-to-day one-off work now lives on Task instead; Task carries `myDay` (see "My Day" above), Goal does not. The old "All Actions" cross-cutting list is superseded by "All Tasks" (which itself is being redesigned into a Lists-first Tasks page per the Claude Design handoff — see `docs/adr/` once that decision lands).
 
+## Insights & Nudges
+New Pillar-independent surfaces from the Claude Design handoff (v2), not yet built:
+
+**Insight**:
+A derived, computed reading of the user's own data — never stored, always recalculated. Covers **Momentum** (a single `0–100` composite score: `0.5×adherence + 0.3×followThrough + 0.2×surplusRate` over a rolling 28 days), per-metric KPI cards, the habit consistency grid, Attention Balance (actual time-share per Pillar vs. a user-stated intended share, set per-Pillar alongside its Accent color), Neglect radar, Task flow, correlations (Pearson's r between paired daily series; suppressed below `n=14`), and Trajectory (projected date to a Pillar's North Star at current pace). See `docs/adr/` for delivery-rule decisions once Insights lands.
+
+**Nudge**:
+A reminder the app surfaces proactively (habit due, task overdue, streak at risk, weekly review ready, metric off target) — distinct from a notification a user has to go looking for. See [ADR-0002](./docs/adr/0002-nudges-delivery-rules.md) for delivery behavior (quiet hours, dedup, coalescing, snooze, read-state).
+
+**Weekly review**:
+A guided, five-step Sunday ritual (close out stale Tasks, log/triage Habits, re-rank next week's priorities, review the week's numbers, write a digest) — not just a report. The digest can be saved as a Thought.
+
 ## Thoughts
 Free-text, dated journal entries. **Cross-cutting, not Pillar-bound** — a quick-add reachable from the homepage (same pattern as the old "My Day" quick-add), for a general daily journal that can be about anything. Tagging a Thought to a specific Pillar or Area is *optional*, not mandatory — use it when a Thought is actually about Health, or Finances specifically; leave it untagged for a general entry. Optionally prompted (dismissible, never forced) after a habit check-in or goal status change. In MVP scope.
 
