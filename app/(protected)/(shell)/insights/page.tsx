@@ -8,7 +8,15 @@ import { KpiCard } from "@/components/insights/kpi-card";
 import { ConsistencyGrid } from "@/components/insights/consistency-grid";
 import { NeglectRadar } from "@/components/insights/neglect-radar";
 import { AttentionBalance } from "@/components/insights/attention-balance";
-import { getMomentumSummary, getKpiSummary, getConsistencyGridSummary, getNeglectRadar, getAttentionBalance } from "@/lib/insights/data";
+import { TaskFlowCard } from "@/components/insights/task-flow-card";
+import {
+  getMomentumSummary,
+  getKpiSummary,
+  getConsistencyGridSummary,
+  getNeglectRadar,
+  getAttentionBalance,
+  getTaskFlowSummary,
+} from "@/lib/insights/data";
 import { parseInsightsRange } from "@/lib/insights/range";
 import styles from "./insights.module.css";
 
@@ -18,16 +26,18 @@ export default async function InsightsPage({
   searchParams: Promise<{ range?: string | string[] }>;
 }) {
   const range = parseInsightsRange((await searchParams).range);
-  // Momentum and the Neglect radar both ignore `range` by design — Momentum
-  // is a fixed rolling 28 days, and "days since activity" is inherently
-  // as-of-now, not something a lookback window redefines. Every KPI, the
-  // Consistency grid, and Attention balance do respond to it.
-  const [momentum, kpis, consistencyGrid, neglectRows, attentionRows] = await Promise.all([
+  // Momentum, the Neglect radar, and Task flow all ignore `range` by
+  // design — Momentum is a fixed rolling 28 days, "days since activity"
+  // is inherently as-of-now, and Task flow is spec'd as a fixed 8-week
+  // chart. Every KPI, the Consistency grid, and Attention balance do
+  // respond to it.
+  const [momentum, kpis, consistencyGrid, neglectRows, attentionRows, taskFlow] = await Promise.all([
     getMomentumSummary(),
     getKpiSummary(range),
     getConsistencyGridSummary(range),
     getNeglectRadar(),
     getAttentionBalance(range),
+    getTaskFlowSummary(),
   ]);
 
   return (
@@ -67,6 +77,10 @@ export default async function InsightsPage({
 
         <div className={styles.section}>
           <AttentionBalance rows={attentionRows} />
+        </div>
+
+        <div className={styles.section}>
+          <TaskFlowCard flow={taskFlow} />
         </div>
       </div>
     </>

@@ -24,6 +24,8 @@ import { insightsWindows, RANGE_DAYS, type InsightsRange } from "./range";
 import { computeConsistencyGrid, CONSISTENCY_GRID_MAX_DAYS } from "./consistency";
 import { computeNeglectRadar, type NeglectFixture } from "./neglect";
 import { computeAttentionBalance, type ActivityFixture, type PillarFixture } from "./attention-balance";
+import { computeTaskFlow, TASK_FLOW_WEEKS } from "./task-flow";
+import { mondayOf } from "@/lib/habits/streak";
 import { resolveColorHex, type ColorKey } from "@/lib/colors";
 
 // Momentum's history strip needs 12 rolling 28-day windows, and its delta
@@ -334,4 +336,39 @@ export async function getAttentionBalance(range: InsightsRange, asOf: Date = new
   ];
 
   return computeAttentionBalance(pillarFixtures, activities);
+}
+
+const DAY_MS_TASK_FLOW = 24 * 60 * 60 * 1000;
+
+/** Fixed at 8 weeks regardless of the range control, same as Momentum and
+ * the Neglect radar — the module's own spec is "per week over 8 weeks,"
+ * not a variable-width chart. */
+export async function getTaskFlowSummary(asOf: Date = new Date()) {
+  const currentWeekStart = mondayOf(asOf);
+  const weekStarts = Array.from(
+    { length: TASK_FLOW_WEEKS },
+    (_, i) => new Date(currentWeekStart.getTime() - (TASK_FLOW_WEEKS - 1 - i) * 7 * DAY_MS_TASK_FLOW)
+  );
+  const windowStart = weekStarts[0];
+  const windowEnd = new Date(currentWeekStart.getTime() + 7 * DAY_MS_TASK_FLOW);
+
+  const [windowTasks, openTasks] = await Promise.all([
+    prisma.task.findMany({
+      where: {
+        deletedAt: null,
+        OR: [
+          { createdAt: { gte: windowStart, lt: windowEnd } },
+          { completedAt: { gte: windowStart, lt: windowEnd } },
+          { dueDate: { gte: windowStart, lt: windowEnd } },
+        ],
+      },
+      select: { createdAt: true, dueDate: true, completedAt: true },
+    }),
+    prisma.task.findMany({
+      where: { status: "ACTIVE", deletedAt: null, archivedAt: null },
+      select: { createdAt: true },
+    }),
+  ]);
+
+  return computeTaskFlow(windowTasks, openTasks, weekStarts, asOf);
 }
