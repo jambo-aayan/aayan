@@ -1,0 +1,22 @@
+.head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.exportLink {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--coral);
+  white-space: nowrap;
+}
