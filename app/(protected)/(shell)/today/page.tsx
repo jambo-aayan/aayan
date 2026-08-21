@@ -7,11 +7,14 @@ import { TodaySectionPills } from "@/components/nav-pills";
 import { Card } from "@/components/card";
 import { ThoughtQuickAdd } from "@/components/thoughts/thought-quick-add";
 import { MyDayTasks } from "@/components/tasks/my-day-tasks";
+import { DayOne } from "@/components/day-one/day-one";
 import { getHabitOccurrencesForDate } from "@/lib/habits/data";
 import { getAllGoals } from "@/lib/goals/data";
 import { getTagOptions } from "@/lib/thoughts/data";
 import { habitsNotCheckedIn } from "@/lib/home/today";
 import { resolveColorHex, type ColorKey } from "@/lib/colors";
+import { getDayOneStatus } from "@/lib/onboarding/data";
+import { getAppSettings } from "@/lib/settings/data";
 import {
   getMyDayTasks,
   getTodayCompletedTasks,
@@ -35,6 +38,20 @@ function goalsClause(activeCount: number): string {
 
 export default async function TodayPage() {
   const now = new Date();
+  const [dayOne, appSettings] = await Promise.all([getDayOneStatus(), getAppSettings()]);
+
+  // Empty-app mode forces Home to look empty for demos/screenshots (see
+  // Settings) even when there's real data underneath — Day-one is already
+  // the "nothing here" screen, so it doubles as that view rather than
+  // this page separately zeroing every count/list it renders.
+  if (dayOne.isEmpty || appSettings.emptyAppMode) {
+    return (
+      <div className={pageStyles.content}>
+        <DayOne steps={dayOne.steps} />
+      </div>
+    );
+  }
+
   const [
     todaysHabits,
     activeGoals,

@@ -29,7 +29,7 @@ export function SettingsToggles({ initialSettings }: { initialSettings: AppSetti
       notifyError(result.error, { onRetry: () => handleToggle(key, next) });
       return;
     }
-    if (key === "reduceMotion") router.refresh();
+    if (key === "reduceMotion" || key === "emptyAppMode") router.refresh();
   }
 
   return (
