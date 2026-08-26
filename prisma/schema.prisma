@@ -128,6 +128,7 @@ enum HabitScheduleType {
   EVERY_N_WEEKS
   MONTHLY
   CUSTOM
+  PER_WEEK
 }
 
 /// A recurring behaviour. Restricted to one Pillar (areaId is the optional
@@ -154,6 +155,10 @@ model Habit {
   scheduleIntervalN  Int?
   scheduleAnchorDate DateTime?         @db.Date
   scheduleCustomText String?
+  /// Only meaningful for PER_WEEK — "N times a week", a count, not an
+  /// interval (see scheduleIntervalN, which means "every N days/weeks").
+  /// Kept as a separate field so the two meanings can never be conflated.
+  scheduleTargetCount Int?
 
   /// Superseded by scheduleType, kept non-null for old rows' sake until a
   /// future cleanup migration; no app code reads this anymore.

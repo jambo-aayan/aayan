@@ -10,10 +10,12 @@ import styles from "./health-mindmap.module.css";
 const NODE_POSITION: Record<string, { left: number; top: number }> = {
   sleep: { left: 50, top: 16 },
   diet: { left: 80, top: 29 },
-  "blood-pressure": { left: 79, top: 59 },
   "body-composition": { left: 62, top: 81 },
   looks: { left: 36, top: 80 },
-  "healthcare-navigation": { left: 21, top: 56 },
+  // Care merged Blood Pressure + Healthcare Navigation (see
+  // docs/adr/0005-v2-phase1-foundations-migration.md) — placed between
+  // their two former positions rather than picking one over the other.
+  care: { left: 50, top: 58 },
   [ANKYLOSING_SPONDYLITIS_AREA_ID]: { left: 28, top: 27 },
 };
 

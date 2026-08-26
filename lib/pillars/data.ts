@@ -2,6 +2,7 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { ensureHealthAreasSeeded } from "@/lib/health/ensure-seeded";
 import { ensureFinancePillarSeeded } from "@/lib/finance/ensure-seeded";
+import { ensureMiscellaneousPillarSeeded } from "@/lib/miscellaneous/ensure-seeded";
 
 export type PillarWithStats = {
   id: string;
@@ -16,6 +17,7 @@ export type PillarWithStats = {
 export async function getPillarsWithStats(): Promise<PillarWithStats[]> {
   await ensureHealthAreasSeeded();
   await ensureFinancePillarSeeded();
+  await ensureMiscellaneousPillarSeeded();
 
   const pillars = await prisma.pillar.findMany({
     orderBy: { createdAt: "asc" },

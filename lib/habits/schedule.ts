@@ -9,7 +9,8 @@ export type HabitScheduleType =
   | "EVERY_N_DAYS"
   | "EVERY_N_WEEKS"
   | "MONTHLY"
-  | "CUSTOM";
+  | "CUSTOM"
+  | "PER_WEEK";
 
 export type HabitSchedule = {
   scheduleType: HabitScheduleType;
@@ -69,6 +70,11 @@ export function habitOccursOn(schedule: HabitSchedule, date: Date, doneThisWeek:
       // No automatic occurrence — same documented limitation as Task's
       // CUSTOM repeat rule (see lib/tasks/recurrence.ts).
       return false;
+    case "PER_WEEK":
+      // Count-based ("4x a week"): every day is eligible, since the target
+      // is a count, not a set of fixed days. The actual count-vs-target
+      // math (expectedCount/doneCount) lands in #84.
+      return true;
   }
 }
 
@@ -98,5 +104,11 @@ export function formatScheduleLabel(schedule: HabitSchedule): string {
       return "Monthly";
     case "CUSTOM":
       return "Custom";
+    case "PER_WEEK":
+      // Placeholder pending #84, which threads scheduleTargetCount through
+      // HabitSchedule to render the real count ("4× a week"). Unreachable
+      // in production until then — nothing can create a PER_WEEK habit
+      // before Phase 2's UI exists.
+      return "N× a week";
   }
 }

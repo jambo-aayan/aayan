@@ -128,9 +128,9 @@ describe("mapLegacyExport", () => {
       "sleep",
       "diet",
       "body-composition",
-      "blood-pressure",
+      "care",
       "looks",
-      "healthcare-navigation",
+      "care",
     ]);
   });
 

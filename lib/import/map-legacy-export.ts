@@ -87,15 +87,20 @@ export type MappedImport = {
  * "productivity" and "religion" (no MVP home yet) and "money" (superseded
  * by the richer `data.finance` import below) — is reported in `skipped`
  * rather than silently dropped.
+ *
+ * "bp" and "healthcare" both map to "care" — the v2 Phase 1 restructure
+ * merged Blood Pressure and Healthcare Navigation into a single Care Area
+ * (see docs/adr/0005-v2-phase1-foundations-migration.md); a legacy import
+ * run after that migration must land in the Area that actually exists.
  */
 const BUCKET_TO_AREA_ID: Record<string, string> = {
   spine: "ankylosing-spondylitis",
   sleep: "sleep",
   diet: "diet",
   bodycomp: "body-composition",
-  bp: "blood-pressure",
+  bp: "care",
   dental: "looks",
-  healthcare: "healthcare-navigation",
+  healthcare: "care",
 };
 
 const STATUS_MAP: Record<string, "NOT_STARTED" | "IN_PROGRESS" | "DONE"> = {
