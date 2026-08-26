@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { correlate } from "@/lib/pain-mobility/correlation";
+import { splitMean } from "@/lib/insights/split-mean";
 import styles from "./correlation-view.module.css";
 
 type Habit = { id: string; name: string; checkInDates: Date[] };
@@ -15,7 +15,10 @@ export function CorrelationView({ habits, painLogs }: { habits: Habit[]; painLog
   }
 
   const habit = habits.find((h) => h.id === habitId) ?? habits[0];
-  const result = correlate(painLogs, habit.checkInDates);
+  const result = splitMean(
+    painLogs.map((l) => ({ date: l.date, value: l.pain })),
+    habit.checkInDates
+  );
 
   return (
     <div>
@@ -36,9 +39,9 @@ export function CorrelationView({ habits, painLogs }: { habits: Habit[]; painLog
       ) : (
         <div>
           <p className={styles.notice}>
-            On days you did &ldquo;{habit.name}&rdquo; ({result.habitDoneDays} logged), average pain was{" "}
-            <strong>{result.habitDoneAvgPain.toFixed(1)}</strong>. On days you didn&rsquo;t (
-            {result.habitNotDoneDays} logged), it was <strong>{result.habitNotDoneAvgPain.toFixed(1)}</strong>
+            On days you did &ldquo;{habit.name}&rdquo; ({result.trueDays} logged), average pain was{" "}
+            <strong>{result.trueAvg.toFixed(1)}</strong>. On days you didn&rsquo;t (
+            {result.falseDays} logged), it was <strong>{result.falseAvg.toFixed(1)}</strong>
             .
           </p>
           <p className={styles.disclaimer}>

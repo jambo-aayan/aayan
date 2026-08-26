@@ -1,4 +1,7 @@
-export const CORRELATION_MIN_N = 14;
+/** Matches the v2 handoff prototype's `correlate()` gate exactly (`if (n < 5)
+ * return null` — gated on total n, not per-side; see
+ * docs/adr/0005-v2-phase1-foundations-migration.md). */
+export const CORRELATION_MIN_N = 5;
 
 export type CorrelationStrength = "strong" | "moderate" | "weak";
 

@@ -395,7 +395,8 @@ function eachDayCorr(start: Date, end: Date): Date[] {
 
 /** Correlations between paired daily series — responds to the range
  * control (a longer range gives Pearson's r more points to work with,
- * which is exactly what the n < 14 suppression is calibrated for). Pairs
+ * which is exactly what the n < CORRELATION_MIN_N suppression is
+ * calibrated for). Pairs
  * only include days where *both* series have a real observation — a
  * missing pain log or a day with no transactions is excluded from both
  * sides, not defaulted to 0, since that would fabricate a data point that

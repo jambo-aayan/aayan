@@ -51,22 +51,36 @@ describe("correlationClaim", () => {
 });
 
 describe("computeCorrelation", () => {
-  const seriesA = Array.from({ length: 14 }, (_, i) => i);
-  const seriesB = Array.from({ length: 14 }, (_, i) => i * 2);
+  const seriesA = Array.from({ length: 5 }, (_, i) => i);
+  const seriesB = Array.from({ length: 5 }, (_, i) => i * 2);
 
-  it("computes r, n, strength, claim, and scatter points for n >= 14", () => {
+  it("computes r, n, strength, claim, and scatter points for n >= 5", () => {
     const pair: CorrelationPair = { id: "p1", labelA: "A", labelB: "B", seriesA, seriesB };
     const result = computeCorrelation(pair);
     expect(result).not.toBeNull();
-    expect(result!.n).toBe(14);
+    expect(result!.n).toBe(5);
     expect(result!.r).toBe(1);
     expect(result!.strength).toBe("strong");
-    expect(result!.points).toHaveLength(14);
+    expect(result!.points).toHaveLength(5);
   });
 
-  it("suppresses entirely (returns null) below n=14, rather than showing a Weak card", () => {
-    const pair: CorrelationPair = { id: "p1", labelA: "A", labelB: "B", seriesA: seriesA.slice(0, 13), seriesB: seriesB.slice(0, 13) };
+  it("suppresses entirely (returns null) below n=5, rather than showing a Weak card", () => {
+    const pair: CorrelationPair = { id: "p1", labelA: "A", labelB: "B", seriesA: seriesA.slice(0, 4), seriesB: seriesB.slice(0, 4) };
     expect(computeCorrelation(pair)).toBeNull();
+  });
+
+  it("is gated on total n (5), not the old n=14 threshold", () => {
+    const fourteenPointPair: CorrelationPair = {
+      id: "p2",
+      labelA: "A",
+      labelB: "B",
+      seriesA: Array.from({ length: 4 }, (_, i) => i),
+      seriesB: Array.from({ length: 4 }, (_, i) => i * 2),
+    };
+    // 4 points used to be suppressed only because it's below the old n=14
+    // gate; it's still correctly suppressed under n=5 (4 < 5), but for the
+    // right reason — this pins the gate at 5, not any other lingering value.
+    expect(computeCorrelation(fourteenPointPair)).toBeNull();
   });
 });
 
@@ -76,8 +90,8 @@ describe("computeCorrelations", () => {
       id: "strong",
       labelA: "A",
       labelB: "B",
-      seriesA: Array.from({ length: 14 }, (_, i) => i),
-      seriesB: Array.from({ length: 14 }, (_, i) => i * 2),
+      seriesA: Array.from({ length: 5 }, (_, i) => i),
+      seriesB: Array.from({ length: 5 }, (_, i) => i * 2),
     };
     const thinPair: CorrelationPair = { id: "thin", labelA: "C", labelB: "D", seriesA: [1, 2, 3], seriesB: [1, 2, 3] };
     const results = computeCorrelations([strongPair, thinPair]);
