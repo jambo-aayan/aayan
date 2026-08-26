@@ -84,6 +84,10 @@ export function computeConsistencyGrid(habits: ConsistencyHabitFixture[], start:
     let logged = 0;
     const cells: ConsistencyCellState[] = days.map((day) => {
       const weekStart = mondayOf(day);
+      // Self-inclusive (<=, not <) — deliberately different from
+      // lib/habits/schedule.ts's doneEarlierThisWeek (strict-before), which
+      // isn't wired in here yet (see #84). Reconcile which semantics is
+      // correct before rewiring this call site onto expectedCount/doneCount.
       const doneThisWeek = habit.checkIns.some(
         (c) => mondayOf(c.date).getTime() === weekStart.getTime() && c.date.getTime() <= day.getTime()
       );

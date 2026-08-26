@@ -17,6 +17,13 @@ export type HabitSchedule = {
   scheduleWeekdays: number[];
   scheduleIntervalN: number | null;
   scheduleAnchorDate: Date | null;
+  /// Only meaningful for PER_WEEK — "N times a week", a count, not an
+  /// interval (scheduleIntervalN means "every N days/weeks"). Optional,
+  /// unlike its siblings above: nothing can construct a PER_WEEK habit yet
+  /// (Phase 2's UI), so every existing HabitSchedule call site legitimately
+  /// has nothing to pass here — making it required would force an
+  /// always-null field onto call sites this ticket has no reason to touch.
+  scheduleTargetCount?: number | null;
 };
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -105,10 +112,54 @@ export function formatScheduleLabel(schedule: HabitSchedule): string {
     case "CUSTOM":
       return "Custom";
     case "PER_WEEK":
-      // Placeholder pending #84, which threads scheduleTargetCount through
-      // HabitSchedule to render the real count ("4× a week"). Unreachable
-      // in production until then — nothing can create a PER_WEEK habit
-      // before Phase 2's UI exists.
-      return "N× a week";
+      return schedule.scheduleTargetCount ? `${schedule.scheduleTargetCount}× a week` : "× a week";
   }
+}
+
+/**
+ * Was this WEEKLY/EVERY_N_WEEKS habit already satisfied earlier in `date`'s
+ * Mon-Sun week — strictly *before* `date` itself, not including it. A
+ * habit's own completion on a given day doesn't retroactively make that
+ * same day "not due" (see the WEEKLY habitOccursOn test: it "occurs until
+ * done once this week, then stops" — stops on subsequent days, not
+ * simultaneously with the completion that satisfies it).
+ */
+function doneEarlierThisWeek(date: Date, loggedDays: Date[]): boolean {
+  const weekStart = mondayOf(date).getTime();
+  const dayTime = utcMidnight(date).getTime();
+  return loggedDays.some((logged) => mondayOf(logged).getTime() === weekStart && utcMidnight(logged).getTime() < dayTime);
+}
+
+/**
+ * Expected occurrences over `days` — the schedule engine's half of
+ * "adherence is always doneCount / expectedCount, never logged ÷ calendar
+ * days" (see docs/adr/0005-v2-phase1-foundations-migration.md). PER_WEEK is
+ * proportional to the window (`round(days.length / 7 * target)`); every
+ * other type is a straight count of days habitOccursOn says are due, with
+ * `loggedDays` supplying the WEEKLY/EVERY_N_WEEKS "already satisfied this
+ * week" fact those types need (habitOccursOn itself stays pure and
+ * per-day — see its own doc comment).
+ */
+export function expectedCount(schedule: HabitSchedule, days: Date[], loggedDays: Date[]): number {
+  if (schedule.scheduleType === "PER_WEEK") {
+    return Math.round((days.length / 7) * (schedule.scheduleTargetCount ?? 0));
+  }
+  return days.filter((day) => habitOccursOn(schedule, day, doneEarlierThisWeek(day, loggedDays))).length;
+}
+
+/**
+ * Logged occurrences over `days`, restricted to due days — except PER_WEEK,
+ * where every day is eligible (no isDue gate), so `doneCount > expectedCount`
+ * is legal: a count-based habit can be over-performed, and that must stay
+ * visible rather than clamped here (display-layer clamping to 100% for a
+ * percentage is a caller concern, not this function's).
+ */
+export function doneCount(schedule: HabitSchedule, days: Date[], loggedDays: Date[]): number {
+  const loggedKeys = new Set(loggedDays.map((d) => utcMidnight(d).getTime()));
+  const isLogged = (day: Date) => loggedKeys.has(utcMidnight(day).getTime());
+
+  if (schedule.scheduleType === "PER_WEEK") {
+    return days.filter(isLogged).length;
+  }
+  return days.filter((day) => isLogged(day) && habitOccursOn(schedule, day, doneEarlierThisWeek(day, loggedDays))).length;
 }
