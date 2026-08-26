@@ -72,6 +72,35 @@
   --panel-gold-bg: #f1eadc;
   --panel-gold-border: rgba(176, 138, 62, 0.29);
 
+  /* Net worth by class — DESIGN_TOKENS.md's "Class colours" section.
+   * Finance's `cls` field is user-editable free text (#49's grilling), so
+   * these six are the named starting classes, not a fixed enum. */
+  --class-cash: var(--gold);
+  --class-investment: var(--green);
+  --class-retirement: var(--slate);
+  --class-debt: var(--coral);
+  --class-property: var(--plum);
+  --class-other: #9a8f7e;
+
+  /* Seven-colour hash-fallback rotation for a class name the six above
+   * don't cover (a user-invented class) — the six named class colours plus
+   * lavender (otherwise unused by Finance's fixed classes), giving every
+   * class-name hash a stable slot: pick index `hash(name) % 7`, 0-based
+   * into fallback-1..7. Not yet consumed anywhere — Phase 5's Finance UI
+   * is what actually hashes a class name into one of these. */
+  --class-fallback-1: var(--class-cash);
+  --class-fallback-2: var(--class-investment);
+  --class-fallback-3: var(--class-retirement);
+  --class-fallback-4: var(--class-debt);
+  --class-fallback-5: var(--class-property);
+  --class-fallback-6: var(--class-other);
+  /* DESIGN_TOKENS.md names exactly 6 classes and says unrecognized ones
+   * "hash to a seven-colour fallback set" without listing a 7th value —
+   * this slot is a reasoned placeholder (lavender is otherwise unused by
+   * Finance's fixed classes), not a confirmed design value. Flag for
+   * design confirmation before Phase 5 ships with it. */
+  --class-fallback-7: var(--lavender); /* TODO: unconfirmed — see comment above */
+
   /* Radii */
   --radius-hero: 21px;
   --radius-lg: 17px;
@@ -93,6 +122,32 @@
   --ease: cubic-bezier(0.4, 0, 0.2, 1);
   --duration-fast: 150ms;
   --duration-base: 200ms;
+
+  /* Charts and data display — DESIGN_TOKENS.md's "Charts and data display"
+   * section, its own group there just as it is here. --chart-baseline/
+   * --chart-track intentionally equal --section-divider's existing
+   * rgba(34,30,26,.07): same value, named for chart code so it doesn't have
+   * to know it's reusing a divider token. The half-fill gradient stop is
+   * two tokens, not one gradient value, because the accent colour a half
+   * cell fills with is contextual (per pillar/series) — a consumer composes
+   * `linear-gradient(180deg, <accent> var(--grid-cell-half-fill-stop),
+   * var(--grid-cell-half-fill-base) var(--grid-cell-half-fill-stop))`. */
+  --chart-stroke-width: 1.5px;
+  --chart-baseline: var(--section-divider);
+  --chart-track: var(--section-divider);
+  --bar-radius: 3px 3px 1px 1px;
+  --grid-cell-height-min: 13px;
+  --grid-cell-height-max: 16px;
+  --grid-cell-radius: 3px;
+  --grid-cell-gap-min: 2px;
+  --grid-cell-gap-max: 3px;
+  --grid-cell-half-fill-stop: 50%;
+  --grid-cell-half-fill-base: var(--section-divider);
+  --progress-bar-height-min: 5px;
+  --progress-bar-height-max: 7px;
+  --progress-bar-radius: 99px;
+  --axis-label-size: 10px;
+  --axis-label-color: var(--faint);
 
   /* Spacing — 4px base, but the real scale in use is exactly these values
    * (not every multiple of 4). Page gap / card / row padding are named
@@ -137,6 +192,13 @@
   --text-meta: 11.5px;
   --text-eyebrow: 11px;
   --text-pill: 10.5px;
+
+  /* Micro label tracking (page eyebrows, uppercase section labels) — the
+   * value already used inline, consistently, wherever --text-eyebrow
+   * appears; named here so new micro-label CSS can reach for a token
+   * instead of retyping 0.1em. Existing call sites are unchanged — this
+   * doesn't touch them, just makes the value available under a name. */
+  --letter-spacing-micro: 0.1em;
 }
 
 @media (min-width: 860px) {
