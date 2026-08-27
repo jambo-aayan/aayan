@@ -10,13 +10,16 @@ import {
   addChecklistStep,
   addCheckpointStep,
   captureCheckpoint,
+  addMilestoneStep,
+  addMeasureStep,
+  captureMeasureValue,
   updateChecklistStep,
   toggleSystemStep,
   backdateSystemStep,
   deleteSystemStep,
   addSystemDecision,
 } from "@/lib/systems/actions";
-import { ratingTrend, ratingHistogram } from "@/lib/systems/widgets";
+import { ratingTrend, ratingHistogram, milestoneList, numericTrend, targetGauge, distinctMetricNames } from "@/lib/systems/widgets";
 import { withRetry } from "@/lib/with-retry";
 import { useToast } from "@/components/toast/toast-provider";
 import styles from "./systems-list.module.css";
@@ -29,6 +32,11 @@ export type SystemStepRow = {
   doneOn: Date | null;
   rating: number | null;
   comment: string | null;
+  date: Date | null;
+  value: number | null;
+  unit: string | null;
+  target: number | null;
+  metricName: string | null;
 };
 export type SystemDecisionRow = { id: string; when: Date; body: string };
 export type AreaSystem = {
@@ -176,7 +184,11 @@ export function SystemsList({
 
 function SystemCard({ system, onChange }: { system: AreaSystem; onChange: (next: AreaSystem) => void }) {
   const [stepText, setStepText] = useState("");
-  const [stepType, setStepType] = useState<"CHECKLIST" | "CHECKPOINT">("CHECKLIST");
+  const [stepType, setStepType] = useState<"CHECKLIST" | "CHECKPOINT" | "MILESTONE" | "MEASURE">("CHECKLIST");
+  const [stepDate, setStepDate] = useState("");
+  const [stepMetricName, setStepMetricName] = useState("");
+  const [stepUnit, setStepUnit] = useState("");
+  const [stepTarget, setStepTarget] = useState("");
   const [decisionText, setDecisionText] = useState("");
   const [referenceDraft, setReferenceDraft] = useState(system.reference ?? "");
   const [editingReference, setEditingReference] = useState(false);
@@ -185,6 +197,7 @@ function SystemCard({ system, onChange }: { system: AreaSystem; onChange: (next:
   const [capturingStepId, setCapturingStepId] = useState<string | null>(null);
   const [captureRating, setCaptureRating] = useState("");
   const [captureComment, setCaptureComment] = useState("");
+  const [captureValue, setCaptureValue] = useState("");
   const [backdatingStepId, setBackdatingStepId] = useState<string | null>(null);
   const [backdateValue, setBackdateValue] = useState("");
   const { notifyError } = useToast();
@@ -211,12 +224,36 @@ function SystemCard({ system, onChange }: { system: AreaSystem; onChange: (next:
     if (!result.ok) notifyError(result.error, { onRetry: handleDuplicate });
   }
 
+  const EMPTY_STEP: Omit<SystemStepRow, "id" | "type" | "text"> = {
+    done: false,
+    doneOn: null,
+    rating: null,
+    comment: null,
+    date: null,
+    value: null,
+    unit: null,
+    target: null,
+    metricName: null,
+  };
+
   async function handleAddStep() {
     const text = stepText.trim();
     if (!text) return;
-    const result = await withRetry(() =>
-      stepType === "CHECKLIST" ? addChecklistStep(system.id, text) : addCheckpointStep(system.id, text, null)
-    );
+
+    if (stepType === "MILESTONE" && !stepDate) return;
+    if (stepType === "MEASURE" && !stepMetricName.trim()) return;
+
+    const result = await withRetry(() => {
+      if (stepType === "CHECKLIST") return addChecklistStep(system.id, text);
+      if (stepType === "CHECKPOINT") return addCheckpointStep(system.id, text, null);
+      if (stepType === "MILESTONE") return addMilestoneStep(system.id, text, new Date(stepDate));
+      return addMeasureStep(system.id, {
+        text,
+        metricName: stepMetricName,
+        unit: stepUnit.trim() || null,
+        target: stepTarget ? Number(stepTarget) : null,
+      });
+    });
     if (!result.ok) {
       notifyError(result.error, { onRetry: handleAddStep });
       return;
@@ -225,10 +262,23 @@ function SystemCard({ system, onChange }: { system: AreaSystem; onChange: (next:
       ...system,
       steps: [
         ...system.steps,
-        { id: result.id, type: stepType, text, done: false, doneOn: null, rating: null, comment: null },
+        {
+          id: result.id,
+          type: stepType,
+          text,
+          ...EMPTY_STEP,
+          date: stepType === "MILESTONE" ? new Date(stepDate) : null,
+          unit: stepType === "MEASURE" ? stepUnit.trim() || null : null,
+          target: stepType === "MEASURE" && stepTarget ? Number(stepTarget) : null,
+          metricName: stepType === "MEASURE" ? stepMetricName.trim() : null,
+        },
       ],
     });
     setStepText("");
+    setStepDate("");
+    setStepMetricName("");
+    setStepUnit("");
+    setStepTarget("");
   }
 
   async function handleToggleStep(step: SystemStepRow) {
@@ -251,7 +301,27 @@ function SystemCard({ system, onChange }: { system: AreaSystem; onChange: (next:
       setCapturingStepId(step.id);
       setCaptureRating("");
       setCaptureComment("");
+    } else if (nowDone && step.type === "MEASURE") {
+      setCapturingStepId(step.id);
+      setCaptureValue("");
     }
+  }
+
+  async function handleSaveMeasureCapture(stepId: string) {
+    if (!captureValue) {
+      setCapturingStepId(null);
+      return;
+    }
+    const value = Number(captureValue);
+    const prevSteps = system.steps;
+    onChange({ ...system, steps: system.steps.map((s) => (s.id === stepId ? { ...s, value } : s)) });
+    const result = await withRetry(() => captureMeasureValue(stepId, value));
+    if (!result.ok) {
+      onChange({ ...system, steps: prevSteps });
+      notifyError(result.error, { onRetry: () => handleSaveMeasureCapture(stepId) });
+      return;
+    }
+    setCapturingStepId(null);
   }
 
   async function handleSaveCapture(stepId: string) {
@@ -331,6 +401,18 @@ function SystemCard({ system, onChange }: { system: AreaSystem; onChange: (next:
   const note = STATE_NOTE[system.state];
   const ratingTrendData = ratingTrend(system.steps);
   const histogram = ratingHistogram(system.steps);
+  const milestones = milestoneList(system.steps);
+  const metricNames = distinctMetricNames(system.steps);
+  // Small multiples: a metric's own trend/gauge renders once per distinct
+  // metric, not just the first — otherwise a second metric's series would
+  // exist only as a name in a list, never as a chart (DATA_MODEL.md §5).
+  const singleMetric = metricNames ? null : (system.steps.find((s) => s.type === "MEASURE")?.metricName ?? null);
+  const metricsToPlot = metricNames ?? (singleMetric ? [singleMetric] : []);
+  const metricSeries = metricsToPlot.map((name) => ({
+    name,
+    trend: numericTrend(system.steps, name),
+    gauge: targetGauge(system.steps, name),
+  }));
 
   return (
     <div className={styles.systemCard}>
@@ -427,6 +509,45 @@ function SystemCard({ system, onChange }: { system: AreaSystem; onChange: (next:
           </p>
         </div>
       )}
+      {milestones && (
+        <div className={styles.section}>
+          <div className={styles.sectionLabel}>Milestones</div>
+          <ul className={styles.stepList}>
+            {milestones.map((m) => (
+              <li key={m.text + m.date!.getTime()} className={styles.stepRow}>
+                <span>{m.text}</span>
+                <span>{m.date!.toISOString().slice(0, 10)}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {metricSeries.map(
+        (series) =>
+          (series.trend || series.gauge) && (
+            <div key={series.name} className={styles.section}>
+              {series.trend && (
+                <>
+                  <div className={styles.sectionLabel}>{series.name} over time</div>
+                  <ul className={styles.stepList}>
+                    {series.trend.map((p) => (
+                      <li key={p.date.getTime()} className={styles.stepRow}>
+                        <span>{p.date.toISOString().slice(0, 10)}</span>
+                        <span>{p.value}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+              {series.gauge && (
+                <p className={styles.body}>
+                  {series.name}: start {series.gauge.start} → current {series.gauge.current} → target{" "}
+                  {series.gauge.target}
+                </p>
+              )}
+            </div>
+          )
+      )}
 
       <div className={styles.section}>
         <ul className={styles.stepList}>
@@ -456,7 +577,14 @@ function SystemCard({ system, onChange }: { system: AreaSystem; onChange: (next:
                   {step.done && step.rating !== null && (
                     <span className={styles.meta}> · rated {step.rating}</span>
                   )}
-                  {capturingStepId === step.id && (
+                  {step.done && step.type === "MEASURE" && step.value !== null && (
+                    <span className={styles.meta}>
+                      {" "}
+                      · {step.value}
+                      {step.unit ?? ""}
+                    </span>
+                  )}
+                  {capturingStepId === step.id && step.type === "CHECKPOINT" && (
                     <div className={styles.addForm}>
                       <select
                         className={styles.input}
@@ -477,6 +605,27 @@ function SystemCard({ system, onChange }: { system: AreaSystem; onChange: (next:
                         onChange={(e) => setCaptureComment(e.target.value)}
                       />
                       <button type="button" className={styles.link} onClick={() => handleSaveCapture(step.id)}>
+                        Save
+                      </button>
+                      <button type="button" className={styles.link} onClick={() => setCapturingStepId(null)}>
+                        Skip
+                      </button>
+                    </div>
+                  )}
+                  {capturingStepId === step.id && step.type === "MEASURE" && (
+                    <div className={styles.addForm}>
+                      <input
+                        className={styles.input}
+                        type="number"
+                        placeholder={`Value${step.unit ? ` (${step.unit})` : ""}`}
+                        value={captureValue}
+                        onChange={(e) => setCaptureValue(e.target.value)}
+                      />
+                      <button
+                        type="button"
+                        className={styles.link}
+                        onClick={() => handleSaveMeasureCapture(step.id)}
+                      >
                         Save
                       </button>
                       <button type="button" className={styles.link} onClick={() => setCapturingStepId(null)}>
@@ -543,11 +692,44 @@ function SystemCard({ system, onChange }: { system: AreaSystem; onChange: (next:
           <select
             className={styles.input}
             value={stepType}
-            onChange={(e) => setStepType(e.target.value as "CHECKLIST" | "CHECKPOINT")}
+            onChange={(e) => setStepType(e.target.value as "CHECKLIST" | "CHECKPOINT" | "MILESTONE" | "MEASURE")}
           >
             <option value="CHECKLIST">Checklist</option>
             <option value="CHECKPOINT">Checkpoint</option>
+            <option value="MILESTONE">Dated milestone</option>
+            <option value="MEASURE">Measure</option>
           </select>
+          {stepType === "MILESTONE" && (
+            <input
+              type="date"
+              className={styles.input}
+              value={stepDate}
+              onChange={(e) => setStepDate(e.target.value)}
+            />
+          )}
+          {stepType === "MEASURE" && (
+            <>
+              <input
+                className={styles.input}
+                placeholder="Metric name (e.g. Weight)"
+                value={stepMetricName}
+                onChange={(e) => setStepMetricName(e.target.value)}
+              />
+              <input
+                className={styles.input}
+                placeholder="Unit (optional)"
+                value={stepUnit}
+                onChange={(e) => setStepUnit(e.target.value)}
+              />
+              <input
+                type="number"
+                className={styles.input}
+                placeholder="Target (optional)"
+                value={stepTarget}
+                onChange={(e) => setStepTarget(e.target.value)}
+              />
+            </>
+          )}
           <button type="button" className={styles.link} onClick={handleAddStep}>
             + Add step
           </button>

@@ -7,6 +7,7 @@ import {
   canSetParent,
   resolveBackdate,
   isValidRating,
+  isValidMeasureNumber,
   type SystemType,
   type SystemState,
 } from "./logic";
@@ -197,6 +198,79 @@ export async function captureCheckpoint(
     const step = await prisma.systemStep.update({
       where: { id: stepId },
       data: { rating: input.rating, comment: input.comment?.trim() || null },
+      include: { system: true },
+    });
+    revalidateSystemPaths(step.system.areaId, step.system.pillarId);
+  } catch {
+    return { ok: false, error: SAVE_ERROR };
+  }
+  return { ok: true };
+}
+
+export type AddMilestoneStepResult = { ok: true; id: string } | { ok: false; error: string };
+
+export async function addMilestoneStep(systemId: string, text: string, date: Date): Promise<AddMilestoneStepResult> {
+  const trimmed = text.trim();
+  if (!trimmed) return { ok: false, error: "Give the milestone some text first." };
+
+  try {
+    const [system, count] = await Promise.all([
+      prisma.system.findUniqueOrThrow({ where: { id: systemId } }),
+      prisma.systemStep.count({ where: { systemId } }),
+    ]);
+    const step = await prisma.systemStep.create({
+      data: { systemId, type: "MILESTONE", text: trimmed, date, sortOrder: count },
+    });
+    revalidateSystemPaths(system.areaId, system.pillarId);
+    return { ok: true, id: step.id };
+  } catch {
+    return { ok: false, error: SAVE_ERROR };
+  }
+}
+
+export type AddMeasureStepInput = {
+  text: string;
+  metricName: string;
+  unit: string | null;
+  target: number | null;
+};
+
+export type AddMeasureStepResult = { ok: true; id: string } | { ok: false; error: string };
+
+export async function addMeasureStep(systemId: string, input: AddMeasureStepInput): Promise<AddMeasureStepResult> {
+  const text = input.text.trim();
+  const metricName = input.metricName.trim();
+  if (!text) return { ok: false, error: "Give the step some text first." };
+  if (!metricName) return { ok: false, error: "Name the metric first." };
+  if (input.target !== null && !isValidMeasureNumber(input.target)) {
+    return { ok: false, error: "Target must be a number." };
+  }
+
+  try {
+    const [system, count] = await Promise.all([
+      prisma.system.findUniqueOrThrow({ where: { id: systemId } }),
+      prisma.systemStep.count({ where: { systemId } }),
+    ]);
+    const step = await prisma.systemStep.create({
+      data: { systemId, type: "MEASURE", text, metricName, unit: input.unit, target: input.target, sortOrder: count },
+    });
+    revalidateSystemPaths(system.areaId, system.pillarId);
+    return { ok: true, id: step.id };
+  } catch {
+    return { ok: false, error: SAVE_ERROR };
+  }
+}
+
+/** Ticking a Measure step prompts for its numeric reading — the same
+ * tick-then-prompt shape as Checkpoint's rating capture (toggleSystemStep
+ * flips done/doneOn; this separately records the value). */
+export async function captureMeasureValue(stepId: string, value: number): Promise<ActionResult> {
+  if (!isValidMeasureNumber(value)) return { ok: false, error: "Value must be a number." };
+
+  try {
+    const step = await prisma.systemStep.update({
+      where: { id: stepId },
+      data: { value },
       include: { system: true },
     });
     revalidateSystemPaths(step.system.areaId, step.system.pillarId);

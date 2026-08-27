@@ -1,5 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { ratingTrend, ratingHistogram, type RatedStep } from "./widgets";
+import {
+  ratingTrend,
+  ratingHistogram,
+  milestoneList,
+  numericTrend,
+  targetGauge,
+  distinctMetricNames,
+  type RatedStep,
+  type MilestoneStep,
+  type MeasureStep,
+} from "./widgets";
 
 function step(rating: number | null, doneOn: string | null): RatedStep {
   return { rating, doneOn: doneOn ? new Date(doneOn) : null };
@@ -36,5 +46,68 @@ describe("ratingHistogram", () => {
     expect(result!.mean).toBeCloseTo(3.4);
     expect(result!.counts).toEqual({ 3: 4, 5: 1 });
     expect(result!.spread).toBeGreaterThan(0);
+  });
+});
+
+function milestone(text: string, date: string | null, done = false): MilestoneStep {
+  return { text, date: date ? new Date(date) : null, done };
+}
+
+describe("milestoneList", () => {
+  it("returns null when there are no dated milestones", () => {
+    expect(milestoneList([milestone("Undated", null)])).toBeNull();
+  });
+
+  it("returns dated milestones, excluding undated ones", () => {
+    const result = milestoneList([milestone("Undated", null), milestone("Launch", "2026-09-01")]);
+    expect(result).toEqual([milestone("Launch", "2026-09-01")]);
+  });
+});
+
+function measure(metricName: string | null, value: number | null, target: number | null, doneOn: string | null): MeasureStep {
+  return { metricName, value, target, doneOn: doneOn ? new Date(doneOn) : null };
+}
+
+describe("numericTrend", () => {
+  it("returns null below 2 readings of the metric", () => {
+    expect(numericTrend([measure("Weight", 80, null, "2026-08-01")], "Weight")).toBeNull();
+  });
+
+  it("ignores other metrics and returns sorted readings once 2+ exist", () => {
+    const steps = [
+      measure("Weight", 79, null, "2026-08-02"),
+      measure("Weight", 80, null, "2026-08-01"),
+      measure("Waist", 85, null, "2026-08-01"),
+    ];
+    expect(numericTrend(steps, "Weight")).toEqual([
+      { date: new Date("2026-08-01"), value: 80 },
+      { date: new Date("2026-08-02"), value: 79 },
+    ]);
+  });
+});
+
+describe("targetGauge", () => {
+  it("returns null when no reading of the metric has a target", () => {
+    const steps = [measure("Weight", 80, null, "2026-08-01")];
+    expect(targetGauge(steps, "Weight")).toBeNull();
+  });
+
+  it("returns start/current/target once a target exists", () => {
+    const steps = [
+      measure("Weight", 80, 75, "2026-08-01"),
+      measure("Weight", 78, null, "2026-08-05"),
+    ];
+    expect(targetGauge(steps, "Weight")).toEqual({ start: 80, current: 78, target: 75 });
+  });
+});
+
+describe("distinctMetricNames", () => {
+  it("returns null below 2 distinct metrics", () => {
+    expect(distinctMetricNames([measure("Weight", 80, null, "2026-08-01")])).toBeNull();
+  });
+
+  it("returns distinct metric names once 2+ exist", () => {
+    const steps = [measure("Weight", 80, null, "2026-08-01"), measure("Waist", 85, null, "2026-08-01")];
+    expect(distinctMetricNames(steps)).toEqual(["Weight", "Waist"]);
   });
 });

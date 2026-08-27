@@ -424,6 +424,16 @@ model SystemStep {
   rating     Int?
   comment    String?
 
+  /// Dated milestone only.
+  date DateTime? @db.Date
+
+  /// Measure only. Steps sharing the same metricName form one series
+  /// (DATA_MODEL.md §5) — a plain user-entered label, not a picker.
+  value      Float?
+  unit       String?
+  target     Float?
+  metricName String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

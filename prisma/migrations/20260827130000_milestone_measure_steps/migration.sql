@@ -1,0 +1,6 @@
+-- AlterTable
+ALTER TABLE "SystemStep" ADD COLUMN "date" DATE,
+ADD COLUMN "value" DOUBLE PRECISION,
+ADD COLUMN "unit" TEXT,
+ADD COLUMN "target" DOUBLE PRECISION,
+ADD COLUMN "metricName" TEXT;

@@ -43,3 +43,10 @@ export function resolveBackdate(candidate: Date, today: Date): { ok: true; date:
 export function isValidRating(rating: number): boolean {
   return Number.isInteger(rating) && rating >= 1 && rating <= 5;
 }
+
+/** A Measure step's value/target must be a real, finite number — guards
+ * against a blank or malformed numeric input parsing to NaN and getting
+ * silently persisted. */
+export function isValidMeasureNumber(value: number): boolean {
+  return Number.isFinite(value);
+}

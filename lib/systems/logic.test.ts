@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { validateCreateSystemInput, canSetParent, resolveBackdate, isValidRating } from "./logic";
+import { validateCreateSystemInput, canSetParent, resolveBackdate, isValidRating, isValidMeasureNumber } from "./logic";
 
 describe("validateCreateSystemInput", () => {
   it("rejects a blank name", () => {
@@ -89,5 +89,18 @@ describe("isValidRating", () => {
     expect(isValidRating(0)).toBe(false);
     expect(isValidRating(6)).toBe(false);
     expect(isValidRating(3.5)).toBe(false);
+  });
+});
+
+describe("isValidMeasureNumber", () => {
+  it("accepts finite numbers, including decimals and negatives", () => {
+    expect(isValidMeasureNumber(78.4)).toBe(true);
+    expect(isValidMeasureNumber(-5)).toBe(true);
+    expect(isValidMeasureNumber(0)).toBe(true);
+  });
+
+  it("rejects NaN and Infinity", () => {
+    expect(isValidMeasureNumber(NaN)).toBe(false);
+    expect(isValidMeasureNumber(Infinity)).toBe(false);
   });
 });
