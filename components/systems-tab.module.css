@@ -1,0 +1,204 @@
+.section {
+  margin-bottom: 20px;
+}
+
+.sectionLabel {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+.summary {
+  font-size: 13px;
+  margin-bottom: 10px;
+}
+
+.loadTrack {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: 13px;
+}
+
+.loadName {
+  min-width: 140px;
+}
+
+.loadBar {
+  flex: 1;
+  height: 6px;
+  background: var(--border-soft);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.loadFill {
+  height: 100%;
+  background: var(--coral);
+}
+
+.loadCount {
+  min-width: 24px;
+  text-align: right;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.timelineRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: 13px;
+}
+
+.timelineName {
+  min-width: 140px;
+}
+
+.timelineTrack {
+  flex: 1;
+  height: 8px;
+  background: var(--border-soft);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.timelineBarExperiment,
+.timelineBarProcess {
+  height: 100%;
+  border-radius: 4px;
+}
+
+.timelineBarExperiment {
+  background: var(--coral);
+}
+
+.timelineBarProcess {
+  background: var(--positive);
+}
+
+.rollupRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border-soft);
+  text-decoration: none;
+  color: inherit;
+}
+
+.rollupMain {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.rollupName {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.rollupMeta {
+  font-size: 11.5px;
+  color: var(--muted);
+}
+
+.typeBadge {
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 1px 6px;
+  margin-right: 6px;
+}
+
+.status {
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.addForm {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.input {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 13px;
+  background: var(--card);
+  color: inherit;
+  font-family: inherit;
+}
+
+.add {
+  border: 1px solid var(--coral);
+  background: var(--coral);
+  color: #fff;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.error {
+  color: var(--danger);
+  font-size: 12px;
+}
+
+.empty {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.verdictEntry {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border-soft);
+  font-size: 13px;
+}
+
+.verdictPill {
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  border-radius: 999px;
+  padding: 1px 8px;
+  margin-right: 6px;
+}
+
+.verdictContinue {
+  background: var(--positive);
+  color: #fff;
+}
+
+.verdictEscalate {
+  background: var(--coral);
+  color: #fff;
+}
+
+.verdictStop {
+  background: var(--muted);
+  color: #fff;
+}
+
+.verdictName {
+  font-weight: 600;
+}
+
+.verdictDetail {
+  font-size: 12.5px;
+  color: var(--muted);
+  margin-top: 2px;
+}

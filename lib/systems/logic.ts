@@ -1,5 +1,6 @@
 export type SystemType = "PROCESS" | "EXPERIMENT";
 export type SystemState = "ACTIVE" | "PAUSED" | "DRAFT" | "ARCHIVED";
+export type SystemVerdict = "CONTINUE" | "ESCALATE" | "STOP";
 
 export type CreateSystemInput = {
   name: string;
@@ -176,5 +177,93 @@ export function classifyOccurrences(expected: Date[], logged: Date[], today: Dat
     if (match !== undefined) return "LATE";
     const windowClosed = windowEnd !== Infinity ? true : todayMidnight.getTime() > windowStart;
     return windowClosed ? "SKIPPED" : "ON_TIME";
+  });
+}
+
+export type AreaLoad = { name: string; count: number };
+
+/** A one-line highlight of load distribution across Areas — the busiest
+ * Area's share plus a callout for one Area sitting at zero, not an
+ * exhaustive per-Area readout (the Load section's own rows already show
+ * that). Null when there are no active Systems anywhere yet — nothing to
+ * highlight. */
+export function describeLoad(areas: AreaLoad[]): string | null {
+  const total = areas.reduce((sum, a) => sum + a.count, 0);
+  if (total === 0) return null;
+
+  const busiest = [...areas].sort((a, b) => b.count - a.count)[0];
+  const empty = areas.find((a) => a.count === 0);
+  let text = `${busiest.count} of ${total} sit in ${busiest.name}.`;
+  if (empty) text += ` Nothing at all in ${empty.name}.`;
+  return text;
+}
+
+export type TimelineBar = { id: string; endOffsetDays: number | null };
+
+/** Position on the "Everything running" timeline, whose axis starts at
+ * today: a Process has no end date at all (the schema has none), so it
+ * always renders full width — open-ended. An Experiment's bar ends at its
+ * review date, clamped to non-negative — a review that's already overdue
+ * (but not yet given a verdict) still renders, as a zero-width marker at
+ * today rather than a negative offset off the left edge. */
+export function timelineBar(system: { id: string; type: SystemType; review: Date | null }, today: Date): TimelineBar {
+  if (system.type === "PROCESS" || system.review === null) return { id: system.id, endOffsetDays: null };
+  const days = Math.round((utcMidnight(system.review).getTime() - utcMidnight(today).getTime()) / DAY_MS);
+  return { id: system.id, endOffsetDays: Math.max(days, 0) };
+}
+
+export type RollupInput = {
+  id: string;
+  type: SystemType;
+  state: SystemState;
+  review: Date | null;
+  verdict: SystemVerdict | null;
+  stepsDone: number;
+  totalSteps: number;
+};
+
+export type RollupCategory = "REVIEW_DUE" | "REVIEW_UPCOMING" | "IN_PROGRESS" | "VERDICTED" | "INACTIVE";
+
+const ROLLUP_CATEGORY_ORDER: Record<RollupCategory, number> = {
+  REVIEW_DUE: 0,
+  REVIEW_UPCOMING: 1,
+  IN_PROGRESS: 2,
+  VERDICTED: 3,
+  INACTIVE: 4,
+};
+
+/** Which "what needs attention" bucket a System's rollup row falls into.
+ * Non-active states always sort last regardless of type — a Paused or
+ * Draft System isn't asking for anything right now. */
+export function rollupCategory(system: RollupInput, today: Date): RollupCategory {
+  if (system.state !== "ACTIVE") return "INACTIVE";
+  if (system.type === "EXPERIMENT") {
+    if (system.verdict !== null) return "VERDICTED";
+    return isVerdictDue(system.review, today) ? "REVIEW_DUE" : "REVIEW_UPCOMING";
+  }
+  return "IN_PROGRESS";
+}
+
+/** Sorts the rollup by what needs attention, not creation order: an
+ * Experiment whose review is overdue comes first, then ones with a review
+ * approaching soonest, then in-progress Processes (least complete first —
+ * furthest from done needs the most attention), then already-verdicted
+ * Experiments, then non-active states last. Ties within a category keep
+ * their input order (Array.prototype.sort is stable). */
+export function sortRollup<T extends RollupInput>(systems: T[], today: Date): T[] {
+  return [...systems].sort((a, b) => {
+    const orderA = ROLLUP_CATEGORY_ORDER[rollupCategory(a, today)];
+    const orderB = ROLLUP_CATEGORY_ORDER[rollupCategory(b, today)];
+    if (orderA !== orderB) return orderA - orderB;
+
+    if (orderA === ROLLUP_CATEGORY_ORDER.REVIEW_UPCOMING) {
+      return (a.review?.getTime() ?? 0) - (b.review?.getTime() ?? 0);
+    }
+    if (orderA === ROLLUP_CATEGORY_ORDER.IN_PROGRESS) {
+      const fractionA = a.totalSteps === 0 ? 0 : a.stepsDone / a.totalSteps;
+      const fractionB = b.totalSteps === 0 ? 0 : b.stepsDone / b.totalSteps;
+      return fractionA - fractionB;
+    }
+    return 0;
   });
 }

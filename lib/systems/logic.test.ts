@@ -12,6 +12,11 @@ import {
   resolveRunReview,
   isVerdictDue,
   hasCriteria,
+  describeLoad,
+  timelineBar,
+  rollupCategory,
+  sortRollup,
+  type RollupInput,
 } from "./logic";
 
 describe("validateCreateSystemInput", () => {
@@ -274,5 +279,133 @@ describe("hasCriteria", () => {
 
   it("is true for real criteria text", () => {
     expect(hasCriteria("Symptoms improve")).toBe(true);
+  });
+});
+
+describe("describeLoad", () => {
+  it("returns null when every Area is at zero", () => {
+    expect(describeLoad([{ name: "Sleep", count: 0 }, { name: "Diet", count: 0 }])).toBeNull();
+  });
+
+  it("highlights the busiest Area against the total", () => {
+    const result = describeLoad([
+      { name: "Training & body", count: 3 },
+      { name: "Diet", count: 2 },
+      { name: "Sleep", count: 4 },
+    ]);
+    expect(result).toBe("4 of 9 sit in Sleep.");
+  });
+
+  it("also calls out an Area sitting at zero", () => {
+    const result = describeLoad([
+      { name: "Training & body", count: 3 },
+      { name: "Diet", count: 6 },
+      { name: "Sleep", count: 0 },
+    ]);
+    expect(result).toBe("6 of 9 sit in Diet. Nothing at all in Sleep.");
+  });
+});
+
+describe("timelineBar", () => {
+  const today = new Date("2026-08-27");
+
+  it("is always open-ended (no end offset) for a Process", () => {
+    expect(timelineBar({ id: "a", type: "PROCESS", review: new Date("2026-09-01") }, today)).toEqual({
+      id: "a",
+      endOffsetDays: null,
+    });
+  });
+
+  it("is open-ended for an Experiment with no review date", () => {
+    expect(timelineBar({ id: "a", type: "EXPERIMENT", review: null }, today)).toEqual({ id: "a", endOffsetDays: null });
+  });
+
+  it("ends at the review date's offset from today for an Experiment", () => {
+    expect(timelineBar({ id: "a", type: "EXPERIMENT", review: new Date("2026-09-06") }, today)).toEqual({
+      id: "a",
+      endOffsetDays: 10,
+    });
+  });
+
+  it("clamps an overdue review to zero rather than a negative offset", () => {
+    expect(timelineBar({ id: "a", type: "EXPERIMENT", review: new Date("2026-08-20") }, today)).toEqual({
+      id: "a",
+      endOffsetDays: 0,
+    });
+  });
+});
+
+function rollupSystem(overrides: Partial<RollupInput>): RollupInput {
+  return {
+    id: "a",
+    type: "PROCESS",
+    state: "ACTIVE",
+    review: null,
+    verdict: null,
+    stepsDone: 0,
+    totalSteps: 0,
+    ...overrides,
+  };
+}
+
+describe("rollupCategory", () => {
+  const today = new Date("2026-08-27");
+
+  it("is INACTIVE for any non-active state, regardless of type", () => {
+    expect(rollupCategory(rollupSystem({ state: "PAUSED", type: "EXPERIMENT" }), today)).toBe("INACTIVE");
+  });
+
+  it("is REVIEW_DUE for an active Experiment past its review with no verdict", () => {
+    expect(rollupCategory(rollupSystem({ type: "EXPERIMENT", review: new Date("2026-08-20") }), today)).toBe(
+      "REVIEW_DUE"
+    );
+  });
+
+  it("is REVIEW_UPCOMING for an active Experiment before its review", () => {
+    expect(rollupCategory(rollupSystem({ type: "EXPERIMENT", review: new Date("2026-09-01") }), today)).toBe(
+      "REVIEW_UPCOMING"
+    );
+  });
+
+  it("is VERDICTED once a verdict is set, even past the review date", () => {
+    expect(
+      rollupCategory(rollupSystem({ type: "EXPERIMENT", review: new Date("2026-08-20"), verdict: "CONTINUE" }), today)
+    ).toBe("VERDICTED");
+  });
+
+  it("is IN_PROGRESS for an active Process", () => {
+    expect(rollupCategory(rollupSystem({ type: "PROCESS" }), today)).toBe("IN_PROGRESS");
+  });
+});
+
+describe("sortRollup", () => {
+  const today = new Date("2026-08-27");
+
+  it("puts REVIEW_DUE first, then soonest REVIEW_UPCOMING, then IN_PROGRESS, then VERDICTED, then INACTIVE", () => {
+    const systems: RollupInput[] = [
+      rollupSystem({ id: "inactive", state: "PAUSED" }),
+      rollupSystem({ id: "verdicted", type: "EXPERIMENT", verdict: "STOP" }),
+      rollupSystem({ id: "in-progress", type: "PROCESS", stepsDone: 1, totalSteps: 4 }),
+      rollupSystem({ id: "upcoming-far", type: "EXPERIMENT", review: new Date("2026-09-10") }),
+      rollupSystem({ id: "upcoming-near", type: "EXPERIMENT", review: new Date("2026-09-01") }),
+      rollupSystem({ id: "due", type: "EXPERIMENT", review: new Date("2026-08-20") }),
+    ];
+    const result = sortRollup(systems, today);
+    expect(result.map((s) => s.id)).toEqual([
+      "due",
+      "upcoming-near",
+      "upcoming-far",
+      "in-progress",
+      "verdicted",
+      "inactive",
+    ]);
+  });
+
+  it("orders in-progress Processes least-complete first", () => {
+    const systems: RollupInput[] = [
+      rollupSystem({ id: "mostly-done", type: "PROCESS", stepsDone: 4, totalSteps: 5 }),
+      rollupSystem({ id: "just-started", type: "PROCESS", stepsDone: 1, totalSteps: 5 }),
+    ];
+    expect(sortRollup(systems, today).map((s) => s.id)).toEqual(["just-started", "mostly-done"]);
   });
 });

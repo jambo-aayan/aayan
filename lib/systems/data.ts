@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
+import { sortRollup, timelineBar, describeLoad, type SystemType, type SystemState, type SystemVerdict } from "./logic";
 
 const SYSTEM_INCLUDE = {
   steps: {
@@ -140,4 +141,107 @@ export async function getUpcomingSystemSteps(from: Date, withinDays: number): Pr
       pillarId: s.system.pillarId,
     }))
     .sort((a, b) => a.date.getTime() - b.date.getTime());
+}
+
+export type AreaLoadRow = { id: string; name: string; count: number };
+
+export type RollupRow = {
+  id: string;
+  name: string;
+  type: SystemType;
+  state: SystemState;
+  areaId: string | null;
+  areaName: string | null;
+  pillarId: string;
+  review: Date | null;
+  verdict: SystemVerdict | null;
+  stepsDone: number;
+  totalSteps: number;
+};
+
+export type TimelineRow = { id: string; name: string; type: SystemType; endOffsetDays: number | null };
+
+export type WhatWorkedRow = {
+  id: string;
+  name: string;
+  verdict: SystemVerdict;
+  criteria: string | null;
+  runOutcome: string | null;
+  updatedAt: Date;
+};
+
+export type SystemsOverview = {
+  areaLoad: AreaLoadRow[];
+  loadSummary: string | null;
+  timeline: TimelineRow[];
+  rollup: RollupRow[];
+  whatWorked: WhatWorkedRow[];
+};
+
+const OVERVIEW_SELECT = {
+  id: true,
+  name: true,
+  type: true,
+  state: true,
+  areaId: true,
+  area: { select: { name: true } },
+  pillarId: true,
+  review: true,
+  verdict: true,
+  criteria: true,
+  runOutcome: true,
+  updatedAt: true,
+  steps: { select: { done: true } },
+};
+
+/** The Systems tab's cross-cutting data: load per Area (including Areas at
+ * zero), the "everything running" timeline, the attention-sorted rollup,
+ * and the "What worked" verdict list — all computed here so the pure
+ * ordering/formatting functions in logic.ts stay unaware of Prisma
+ * (DATA_MODEL.md §5). Template rows (`isTemplate`) and their runs
+ * (`templateId` set) are both real Systems and appear like any other;
+ * only actual run copies would double-count a template's own progress,
+ * and runs already have their own dedicated Runs section on the card. */
+export async function getSystemsOverview(today: Date): Promise<SystemsOverview> {
+  const [areas, systems] = await Promise.all([
+    prisma.area.findMany({ select: { id: true, name: true } }),
+    prisma.system.findMany({ where: { templateId: null }, select: OVERVIEW_SELECT, orderBy: { createdAt: "asc" } }),
+  ]);
+
+  const areaLoad: AreaLoadRow[] = areas.map((area) => ({
+    id: area.id,
+    name: area.name,
+    count: systems.filter((s) => s.areaId === area.id && s.state === "ACTIVE").length,
+  }));
+  const loadSummary = describeLoad(areaLoad);
+
+  const active = systems.filter((s) => s.state === "ACTIVE");
+  const timeline: TimelineRow[] = active.map((s) => ({
+    id: s.id,
+    name: s.name,
+    type: s.type,
+    endOffsetDays: timelineBar({ id: s.id, type: s.type, review: s.review }, today).endOffsetDays,
+  }));
+
+  const rollupRows: RollupRow[] = systems.map((s) => ({
+    id: s.id,
+    name: s.name,
+    type: s.type,
+    state: s.state,
+    areaId: s.areaId,
+    areaName: s.area?.name ?? null,
+    pillarId: s.pillarId,
+    review: s.review,
+    verdict: s.verdict,
+    stepsDone: s.steps.filter((step) => step.done).length,
+    totalSteps: s.steps.length,
+  }));
+  const rollup = sortRollup(rollupRows, today);
+
+  const whatWorked: WhatWorkedRow[] = systems
+    .filter((s): s is typeof s & { verdict: SystemVerdict } => s.verdict !== null)
+    .map((s) => ({ id: s.id, name: s.name, verdict: s.verdict, criteria: s.criteria, runOutcome: s.runOutcome, updatedAt: s.updatedAt }))
+    .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
+
+  return { areaLoad, loadSummary, timeline, rollup, whatWorked };
 }
