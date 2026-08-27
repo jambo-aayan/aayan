@@ -21,7 +21,7 @@ import {
   buildGoalVelocityDrillDown,
   buildSurplusRateDrillDown,
   buildSystemsOnTrackDrillDown,
-  isOnTrack,
+  onTrackPercent,
   type ExperimentReviewFixture,
   type KpiResult,
   type DrillDownData,
@@ -548,21 +548,15 @@ export async function getCorrelations(range: InsightsRange, asOf: Date = new Dat
   const stiffnessByDay = new Map(dailyLogs.map((l) => [dateKeyCorr(l.date), l.stiffness]));
   const sleepVsStiffness = pairedSeries(sleepByDay, new Set(stiffnessByDay.keys()), stiffnessByDay);
 
-  // "On track" is a live snapshot check (isOnTrack, lib/insights/kpis.ts),
-  // re-evaluated per day the same way computeSystemsOnTrackKpi's own
-  // sparkline does — not a historical record of what verdict/review looked
-  // like on that day (#134, ADR-0012). Zero active Experiments produces a
-  // flat 0% series (zero variance), which pearsonCorrelation and
+  // "On track" is a live snapshot check, re-evaluated per day via the same
+  // onTrackPercent aggregate computeSystemsOnTrackKpi's own sparkline uses
+  // (lib/insights/kpis.ts) — not a historical record of what verdict/review
+  // looked like on that day (#134, ADR-0012). Zero active Experiments
+  // produces a flat 0% series (zero variance), which pearsonCorrelation and
   // computeCorrelations already drop rather than showing a fabricated
   // "0% on track" correlation.
   const experimentFixtures: ExperimentReviewFixture[] = experiments;
-  const systemsOnTrackByDay = new Map(
-    days.map((day) => {
-      const onTrack = experimentFixtures.filter((e) => isOnTrack(e, day)).length;
-      const pct = experimentFixtures.length === 0 ? 0 : (onTrack / experimentFixtures.length) * 100;
-      return [dateKeyCorr(day), pct];
-    })
-  );
+  const systemsOnTrackByDay = new Map(days.map((day) => [dateKeyCorr(day), onTrackPercent(experimentFixtures, day)]));
   const systemsOnTrackVsSurplus = pairedSeries(systemsOnTrackByDay, hasTxByDay, surplusByDay);
 
   const pairs: CorrelationPair[] = [

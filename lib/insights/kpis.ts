@@ -200,6 +200,16 @@ export function isOnTrack(experiment: ExperimentReviewFixture, asOf: Date): bool
   return !isVerdictDue(experiment.review, asOf);
 }
 
+/** % of `experiments` on track as of a given date — the one place this
+ * snapshot aggregate is computed, reused by the KPI, its drill-down, and
+ * the Systems-on-track×surplus correlation (#134, ADR-0012) rather than
+ * each re-deriving the same isOnTrack loop. */
+export function onTrackPercent(experiments: ExperimentReviewFixture[], asOf: Date): number {
+  if (experiments.length === 0) return 0;
+  const onTrack = experiments.filter((e) => isOnTrack(e, asOf)).length;
+  return (onTrack / experiments.length) * 100;
+}
+
 /** Unlike the other KPIs (a rate accumulated over a range), "on track" is a
  * point-in-time status — so the sparkline/delta re-evaluate the same
  * snapshot check at different `asOf` dates rather than aggregating over
@@ -211,15 +221,9 @@ export function computeSystemsOnTrackKpi(
   previousStart: Date,
   previousEnd: Date
 ): KpiResult {
-  function onTrackPct(asOf: Date): number {
-    if (experiments.length === 0) return 0;
-    const onTrack = experiments.filter((e) => isOnTrack(e, asOf)).length;
-    return (onTrack / experiments.length) * 100;
-  }
-
-  const value = onTrackPct(currentEnd);
-  const previous = onTrackPct(previousEnd);
-  const sparkline = splitIntoBars(currentStart, currentEnd, SPARKLINE_BARS).map(([, end]) => onTrackPct(end));
+  const value = onTrackPercent(experiments, currentEnd);
+  const previous = onTrackPercent(experiments, previousEnd);
+  const sparkline = splitIntoBars(currentStart, currentEnd, SPARKLINE_BARS).map(([, end]) => onTrackPercent(experiments, end));
 
   const overdue = experiments.filter((e) => !isOnTrack(e, currentEnd));
   const diagnosis =
@@ -410,23 +414,18 @@ export function buildSystemsOnTrackDrillDown(
   previousEnd: Date,
   writtenRead: string
 ): DrillDownData {
-  function onTrackPct(asOf: Date): number {
-    if (experiments.length === 0) return 0;
-    const onTrack = experiments.filter((e) => isOnTrack(e, asOf)).length;
-    return (onTrack / experiments.length) * 100;
-  }
   return buildDrillDown({
     kindEyebrow: "KPI breakdown",
     title: KPI_LABEL.systemsOnTrack,
-    value: onTrackPct(currentEnd),
-    previous: onTrackPct(previousEnd),
+    value: onTrackPercent(experiments, currentEnd),
+    previous: onTrackPercent(experiments, previousEnd),
     unit: "%",
     start: currentStart,
     end: currentEnd,
     // Same snapshot-at-a-point framing as computeSystemsOnTrackKpi's
     // sparkline — a range's "value" here is just onTrack status as of that
     // range's end date, not an aggregate over the range.
-    rangeValue: (_s, e) => onTrackPct(e),
+    rangeValue: (_s, e) => onTrackPercent(experiments, e),
     entryLabel: (day) => day.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }),
     tone: pctTone,
     writtenRead,
