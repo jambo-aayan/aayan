@@ -1,3 +1,5 @@
+import { splitMean, type SplitMeanResult } from "../insights/split-mean";
+
 export type RatedStep = { rating: number | null; doneOn: Date | null };
 
 export type RatingPoint = { date: Date; rating: number };
@@ -116,6 +118,23 @@ export function streakGrid(occurrences: Date[], today: Date, days = 90): StreakD
     grid.push({ date, done: doneDates.has(date.getTime()) });
   }
   return grid;
+}
+
+/** Rating-vs-adherence scatter — appears once a System has 5+ ratings and
+ * a linked habit. Reuses lib/insights/split-mean.ts's n>=3-per-side gate
+ * directly rather than a new correlation algorithm; checkpoint ratings
+ * are timestamped the same shape ({date, value}[]) that CorrelationView
+ * already consumes for pain-vs-habit. */
+export function ratingVsAdherence(ratedSteps: RatedStep[], habitCheckInDates: Date[]): SplitMeanResult | null {
+  const points = ratedSteps.filter(
+    (s): s is RatedStep & { rating: number; doneOn: Date } => s.rating !== null && s.doneOn !== null
+  );
+  if (points.length < 5) return null;
+
+  return splitMean(
+    points.map((p) => ({ date: p.doneOn, value: p.rating })),
+    habitCheckInDates
+  );
 }
 
 export type OccurrenceStatusCounts = { onTime: number; late: number; skipped: number };

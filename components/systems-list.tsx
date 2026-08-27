@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import type { SystemType, SystemState } from "@/lib/systems/logic";
 import { expectedOccurrenceDates, classifyOccurrences } from "@/lib/systems/logic";
 import {
@@ -18,6 +19,10 @@ import {
   addRepeatingStep,
   logSystemStepOccurrence,
   deleteSystemStepOccurrence,
+  linkSystemHabit,
+  unlinkSystemHabit,
+  linkSystemGoal,
+  unlinkSystemGoal,
   updateChecklistStep,
   toggleSystemStep,
   backdateSystemStep,
@@ -35,6 +40,7 @@ import {
   distinctMetricNames,
   streakGrid,
   adherenceBreakdown,
+  ratingVsAdherence,
   type KanbanColumn,
   type MilestoneStep,
 } from "@/lib/systems/widgets";
@@ -62,6 +68,8 @@ export type SystemStepRow = {
   occurrences: { id: string; occurredOn: Date }[];
 };
 export type SystemDecisionRow = { id: string; when: Date; body: string };
+export type LinkedHabit = { id: string; name: string; status: string; checkInDates: Date[] };
+export type LinkedGoal = { id: string; name: string; status: string };
 export type AreaSystem = {
   id: string;
   name: string;
@@ -74,6 +82,8 @@ export type AreaSystem = {
   steps: SystemStepRow[];
   decisions: SystemDecisionRow[];
   children: { id: string; name: string; state: SystemState }[];
+  linkedHabits: LinkedHabit[];
+  linkedGoals: LinkedGoal[];
 };
 
 const STATE_NOTE: Record<SystemState, string | null> = {
@@ -94,10 +104,14 @@ export function SystemsList({
   areaId,
   pillarId,
   initialSystems,
+  habitOptions = [],
+  goalOptions = [],
 }: {
   areaId: string | null;
   pillarId: string;
   initialSystems: AreaSystem[];
+  habitOptions?: { id: string; name: string }[];
+  goalOptions?: { id: string; name: string }[];
 }) {
   const [systems, setSystems] = useState(initialSystems);
   const [showArchived, setShowArchived] = useState(false);
@@ -140,6 +154,8 @@ export function SystemsList({
         steps: [],
         decisions: [],
         children: [],
+        linkedHabits: [],
+        linkedGoals: [],
       },
     ]);
     setForm(EMPTY_FORM);
@@ -153,6 +169,8 @@ export function SystemsList({
         <SystemCard
           key={system.id}
           system={system}
+          habitOptions={habitOptions}
+          goalOptions={goalOptions}
           onChange={(next) => setSystems((prev) => prev.map((s) => (s.id === system.id ? next : s)))}
         />
       ))}
@@ -209,7 +227,17 @@ export function SystemsList({
   );
 }
 
-function SystemCard({ system, onChange }: { system: AreaSystem; onChange: (next: AreaSystem) => void }) {
+function SystemCard({
+  system,
+  onChange,
+  habitOptions,
+  goalOptions,
+}: {
+  system: AreaSystem;
+  onChange: (next: AreaSystem) => void;
+  habitOptions: { id: string; name: string }[];
+  goalOptions: { id: string; name: string }[];
+}) {
   const [stepText, setStepText] = useState("");
   const [stepType, setStepType] = useState<"CHECKLIST" | "CHECKPOINT" | "MILESTONE" | "MEASURE" | "REPEATING">(
     "CHECKLIST"
@@ -234,6 +262,7 @@ function SystemCard({ system, onChange }: { system: AreaSystem; onChange: (next:
   const [backdatingStepId, setBackdatingStepId] = useState<string | null>(null);
   const [backdateValue, setBackdateValue] = useState("");
   const [kanbanView, setKanbanView] = useState(false);
+  const [scatterHabitId, setScatterHabitId] = useState<string | null>(null);
   const [now] = useState(() => new Date());
   const { notifyError } = useToast();
 
@@ -254,6 +283,74 @@ function SystemCard({ system, onChange }: { system: AreaSystem; onChange: (next:
     if (!result.ok) {
       onChange(prev);
       notifyError(result.error, { onRetry: () => handleSetState(state) });
+    }
+  }
+
+  async function handleLinkHabit(habitId: string) {
+    if (!habitId || system.linkedHabits.some((h) => h.id === habitId)) return;
+    const option = habitOptions.find((h) => h.id === habitId);
+    if (!option) return;
+    // Optimistic placeholder first (instant feedback, matching this
+    // file's established idiom), then corrected to the habit's real
+    // status/checkInDates once the action returns — otherwise a
+    // freshly-linked habit would compute the scatter widget against an
+    // empty checkInDates stub until a full page reload.
+    onChange({
+      ...system,
+      linkedHabits: [...system.linkedHabits, { id: option.id, name: option.name, status: "ACTIVE", checkInDates: [] }],
+    });
+    const result = await withRetry(() => linkSystemHabit(system.id, habitId));
+    if (!result.ok) {
+      onChange({ ...system, linkedHabits: system.linkedHabits.filter((h) => h.id !== habitId) });
+      notifyError(result.error, { onRetry: () => handleLinkHabit(habitId) });
+      return;
+    }
+    onChange({
+      ...system,
+      linkedHabits: [
+        ...system.linkedHabits.filter((h) => h.id !== habitId),
+        { id: option.id, name: option.name, status: result.status, checkInDates: result.checkInDates },
+      ],
+    });
+  }
+
+  async function handleUnlinkHabit(habitId: string) {
+    const prev = system.linkedHabits;
+    onChange({ ...system, linkedHabits: prev.filter((h) => h.id !== habitId) });
+    const result = await withRetry(() => unlinkSystemHabit(system.id, habitId));
+    if (!result.ok) {
+      onChange({ ...system, linkedHabits: prev });
+      notifyError(result.error, { onRetry: () => handleUnlinkHabit(habitId) });
+    }
+  }
+
+  async function handleLinkGoal(goalId: string) {
+    if (!goalId || system.linkedGoals.some((g) => g.id === goalId)) return;
+    const option = goalOptions.find((g) => g.id === goalId);
+    if (!option) return;
+    onChange({ ...system, linkedGoals: [...system.linkedGoals, { id: option.id, name: option.name, status: "ACTIVE" }] });
+    const result = await withRetry(() => linkSystemGoal(system.id, goalId));
+    if (!result.ok) {
+      onChange({ ...system, linkedGoals: system.linkedGoals.filter((g) => g.id !== goalId) });
+      notifyError(result.error, { onRetry: () => handleLinkGoal(goalId) });
+      return;
+    }
+    onChange({
+      ...system,
+      linkedGoals: [
+        ...system.linkedGoals.filter((g) => g.id !== goalId),
+        { id: option.id, name: option.name, status: result.status },
+      ],
+    });
+  }
+
+  async function handleUnlinkGoal(goalId: string) {
+    const prev = system.linkedGoals;
+    onChange({ ...system, linkedGoals: prev.filter((g) => g.id !== goalId) });
+    const result = await withRetry(() => unlinkSystemGoal(system.id, goalId));
+    if (!result.ok) {
+      onChange({ ...system, linkedGoals: prev });
+      notifyError(result.error, { onRetry: () => handleUnlinkGoal(goalId) });
     }
   }
 
@@ -508,6 +605,8 @@ function SystemCard({ system, onChange }: { system: AreaSystem; onChange: (next:
     gauge: targetGauge(system.steps, name),
   }));
   const repeatingSteps = system.steps.filter((s) => s.type === "REPEATING" && s.cadenceDays !== null);
+  const scatterHabit = system.linkedHabits.find((h) => h.id === scatterHabitId) ?? system.linkedHabits[0] ?? null;
+  const scatter = scatterHabit ? ratingVsAdherence(system.steps, scatterHabit.checkInDates) : null;
 
   return (
     <div className={styles.systemCard}>
@@ -542,6 +641,80 @@ function SystemCard({ system, onChange }: { system: AreaSystem; onChange: (next:
       <div className={styles.progressBar}>
         <div className={styles.progressFill} style={{ width: `${progress(system.steps)}%` }} />
       </div>
+
+      {(system.linkedHabits.length > 0 || system.linkedGoals.length > 0 || habitOptions.length > 0 || goalOptions.length > 0) && (
+        <div className={styles.section}>
+          <div className={styles.sectionLabel}>Linked habits &amp; goals</div>
+          <div className={styles.chipRow}>
+            {system.linkedHabits.map((h) => (
+              <Link key={h.id} href="/habits" className={styles.chip}>
+                {h.name} ({h.status}) <button type="button" onClick={() => handleUnlinkHabit(h.id)}>×</button>
+              </Link>
+            ))}
+            {system.linkedGoals.map((g) => (
+              <Link key={g.id} href={`/goals/${g.id}`} className={styles.chip}>
+                {g.name} ({g.status}) <button type="button" onClick={() => handleUnlinkGoal(g.id)}>×</button>
+              </Link>
+            ))}
+          </div>
+          <div className={styles.addForm}>
+            {habitOptions.length > 0 && (
+              <select className={styles.input} value="" onChange={(e) => handleLinkHabit(e.target.value)}>
+                <option value="">Link a habit…</option>
+                {habitOptions.map((h) => (
+                  <option key={h.id} value={h.id}>
+                    {h.name}
+                  </option>
+                ))}
+              </select>
+            )}
+            {goalOptions.length > 0 && (
+              <select className={styles.input} value="" onChange={(e) => handleLinkGoal(e.target.value)}>
+                <option value="">Link a goal…</option>
+                {goalOptions.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.name}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+        </div>
+      )}
+      {scatterHabit && (
+        <div className={styles.section}>
+          <div className={styles.sectionLabel}>
+            Rating vs.{" "}
+            {system.linkedHabits.length > 1 ? (
+              <select
+                className={styles.input}
+                value={scatterHabit.id}
+                onChange={(e) => setScatterHabitId(e.target.value)}
+              >
+                {system.linkedHabits.map((h) => (
+                  <option key={h.id} value={h.id}>
+                    {h.name}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              scatterHabit.name
+            )}
+          </div>
+          {scatter && scatter.ready ? (
+            <p className={styles.body}>
+              Avg rating with: {scatter.trueAvg.toFixed(1)} ({scatter.trueDays}d) · without:{" "}
+              {scatter.falseAvg.toFixed(1)} ({scatter.falseDays}d)
+            </p>
+          ) : (
+            <p className={styles.body}>
+              Not enough data yet ({system.steps.filter((s) => s.rating !== null).length} rated Checkpoint
+              {system.steps.filter((s) => s.rating !== null).length === 1 ? "" : "s"} so far) — needs 5+ ratings and
+              at least 3 days on each side of &ldquo;{scatterHabit.name}&rdquo;.
+            </p>
+          )}
+        </div>
+      )}
 
       <div className={styles.section}>
         {editingReference ? (

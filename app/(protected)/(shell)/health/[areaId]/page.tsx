@@ -12,7 +12,7 @@ import { CorrelationView } from "@/components/correlation-view";
 import { DailyMetricHistory } from "@/components/daily-metric-history";
 import { SystemsList } from "@/components/systems-list";
 import { getArea } from "@/lib/health/data";
-import { getSystemsForArea } from "@/lib/systems/data";
+import { getSystemsForArea, getHabitOptionsForPillar } from "@/lib/systems/data";
 import { updateAreaCurrentState, updateAreaNorthStar } from "@/lib/health/actions";
 import { getHabitsForArea } from "@/lib/habits/data";
 import { getTasksForArea, getTaskLists, getPillarOptions, getAreaOptions, getTaskTags } from "@/lib/tasks/data";
@@ -41,7 +41,7 @@ export default async function AreaPage({
   const area = await getArea(areaId);
   if (!area) notFound();
 
-  const [habits, tasks, lists, pillars, areas, goals, tags, systems] = await Promise.all([
+  const [habits, tasks, lists, pillars, areas, goals, tags, systems, systemHabitOptions] = await Promise.all([
     getHabitsForArea(areaId),
     getTasksForArea(areaId),
     getTaskLists(),
@@ -50,6 +50,7 @@ export default async function AreaPage({
     getGoalOptions(area.pillarId),
     getTaskTags(),
     getSystemsForArea(areaId),
+    getHabitOptionsForPillar(area.pillarId),
   ]);
   const isPainMobilityArea = areaId === PAIN_MOBILITY_AREA_ID;
   const isSleepArea = areaId === SLEEP_AREA_ID;
@@ -103,7 +104,13 @@ export default async function AreaPage({
           />
         </Card>
         <Card title="Systems">
-          <SystemsList areaId={area.id} pillarId={area.pillarId} initialSystems={systems} />
+          <SystemsList
+            areaId={area.id}
+            pillarId={area.pillarId}
+            initialSystems={systems}
+            habitOptions={systemHabitOptions}
+            goalOptions={goals}
+          />
         </Card>
         {isPainMobilityArea && (
           <>

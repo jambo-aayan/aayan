@@ -10,6 +10,7 @@ import {
   distinctMetricNames,
   streakGrid,
   adherenceBreakdown,
+  ratingVsAdherence,
   type RatedStep,
   type MilestoneStep,
   type MeasureStep,
@@ -168,5 +169,27 @@ describe("adherenceBreakdown", () => {
   it("returns counts once 3+ occurrences are logged", () => {
     const result = adherenceBreakdown(["ON_TIME", "ON_TIME", "LATE", "SKIPPED"], 3);
     expect(result).toEqual({ onTime: 2, late: 1, skipped: 1 });
+  });
+});
+
+describe("ratingVsAdherence", () => {
+  it("returns null below 5 ratings", () => {
+    const steps = [step(3, "2026-08-01"), step(4, "2026-08-02"), step(5, "2026-08-03"), step(3, "2026-08-04")];
+    expect(ratingVsAdherence(steps, [])).toBeNull();
+  });
+
+  it("returns split-mean's not-ready result when the habit side lacks enough data", () => {
+    const steps = [3, 4, 5, 3, 4].map((r, i) => step(r, `2026-08-0${i + 1}`));
+    const result = ratingVsAdherence(steps, [new Date("2026-08-01")]);
+    expect(result).not.toBeNull();
+    expect(result!.ready).toBe(false);
+  });
+
+  it("returns a ready comparison once both sides have 3+ days", () => {
+    const steps = [3, 4, 5, 3, 4, 5].map((r, i) => step(r, `2026-08-0${i + 1}`));
+    const habitDates = [new Date("2026-08-01"), new Date("2026-08-02"), new Date("2026-08-03")];
+    const result = ratingVsAdherence(steps, habitDates);
+    expect(result).not.toBeNull();
+    expect(result!.ready).toBe(true);
   });
 });

@@ -372,6 +372,74 @@ export async function deleteSystemStepOccurrence(occurrenceId: string): Promise<
   return { ok: true };
 }
 
+export type LinkSystemHabitResult =
+  | { ok: true; status: string; checkInDates: Date[] }
+  | { ok: false; error: string };
+
+/** Returns the habit's real current status/check-in dates rather than just
+ * `{ok: true}` — the caller's optimistic chip needs real data immediately
+ * (not a placeholder that never gets corrected until a full page reload),
+ * since checkInDates feed the rating-vs-adherence scatter widget. */
+export async function linkSystemHabit(systemId: string, habitId: string): Promise<LinkSystemHabitResult> {
+  try {
+    const [system, habit] = await Promise.all([
+      prisma.system.findUniqueOrThrow({ where: { id: systemId } }),
+      prisma.habit.findUniqueOrThrow({ where: { id: habitId }, include: { checkIns: { select: { date: true } } } }),
+    ]);
+    await prisma.systemHabit.upsert({
+      where: { systemId_habitId: { systemId, habitId } },
+      create: { systemId, habitId },
+      update: {},
+    });
+    revalidateSystemPaths(system.areaId);
+    return { ok: true, status: habit.status, checkInDates: habit.checkIns.map((c) => c.date) };
+  } catch {
+    return { ok: false, error: SAVE_ERROR };
+  }
+}
+
+export async function unlinkSystemHabit(systemId: string, habitId: string): Promise<ActionResult> {
+  try {
+    const system = await prisma.system.findUniqueOrThrow({ where: { id: systemId } });
+    await prisma.systemHabit.deleteMany({ where: { systemId, habitId } });
+    revalidateSystemPaths(system.areaId);
+  } catch {
+    return { ok: false, error: SAVE_ERROR };
+  }
+  return { ok: true };
+}
+
+export type LinkSystemGoalResult = { ok: true; status: string } | { ok: false; error: string };
+
+export async function linkSystemGoal(systemId: string, goalId: string): Promise<LinkSystemGoalResult> {
+  try {
+    const [system, goal] = await Promise.all([
+      prisma.system.findUniqueOrThrow({ where: { id: systemId } }),
+      prisma.lifeGoal.findUniqueOrThrow({ where: { id: goalId } }),
+    ]);
+    await prisma.systemGoal.upsert({
+      where: { systemId_goalId: { systemId, goalId } },
+      create: { systemId, goalId },
+      update: {},
+    });
+    revalidateSystemPaths(system.areaId);
+    return { ok: true, status: goal.status };
+  } catch {
+    return { ok: false, error: SAVE_ERROR };
+  }
+}
+
+export async function unlinkSystemGoal(systemId: string, goalId: string): Promise<ActionResult> {
+  try {
+    const system = await prisma.system.findUniqueOrThrow({ where: { id: systemId } });
+    await prisma.systemGoal.deleteMany({ where: { systemId, goalId } });
+    revalidateSystemPaths(system.areaId);
+  } catch {
+    return { ok: false, error: SAVE_ERROR };
+  }
+  return { ok: true };
+}
+
 export async function updateChecklistStep(stepId: string, text: string): Promise<ActionResult> {
   const trimmed = text.trim();
   if (!trimmed) return { ok: false, error: "Give the step some text first." };

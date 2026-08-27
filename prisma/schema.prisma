@@ -170,6 +170,7 @@ model Habit {
   updatedAt DateTime    @updatedAt
   checkIns  CheckIn[]
   goals     HabitGoal[]
+  systems   SystemHabit[]
 
   @@index([areaId])
   @@index([pillarId])
@@ -236,8 +237,9 @@ model LifeGoal {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  tasks  Task[]
-  habits HabitGoal[]
+  tasks   Task[]
+  habits  HabitGoal[]
+  systems SystemGoal[]
 
   @@index([pillarId])
   @@index([areaId])
@@ -403,6 +405,8 @@ model System {
 
   steps     SystemStep[]
   decisions SystemDecision[]
+  habits    SystemHabit[]
+  goals     SystemGoal[]
 
   @@index([pillarId])
   @@index([areaId])
@@ -469,6 +473,30 @@ model SystemStepOccurrence {
   loggedAt   DateTime   @default(now())
 
   @@index([stepId])
+}
+
+/// Many-to-many System<->Habit, mirroring HabitGoal's join-table shape.
+/// A System declares the Habits it serves; there is no reverse
+/// Habit-side linkage beyond this table (DATA_MODEL.md §5).
+model SystemHabit {
+  systemId String
+  system   System @relation(fields: [systemId], references: [id], onDelete: Cascade)
+  habitId  String
+  habit    Habit  @relation(fields: [habitId], references: [id], onDelete: Cascade)
+
+  @@id([systemId, habitId])
+  @@index([habitId])
+}
+
+/// Many-to-many System<->LifeGoal, mirroring HabitGoal's join-table shape.
+model SystemGoal {
+  systemId String
+  system   System   @relation(fields: [systemId], references: [id], onDelete: Cascade)
+  goalId   String
+  goal     LifeGoal @relation(fields: [goalId], references: [id], onDelete: Cascade)
+
+  @@id([systemId, goalId])
+  @@index([goalId])
 }
 
 /// Dated decision-log entries, separate from System.body — "why did I
