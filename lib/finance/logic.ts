@@ -20,13 +20,14 @@ export function sortGoalsByPriority<T extends GoalPriorityRow>(goals: T[]): T[] 
   return [...goals].sort((a, b) => a.priority - b.priority);
 }
 
-export type ReceivableFlaggableTransaction = { receivableId: string | null };
+export type ReclassifiableTransaction = { receivableId: string | null; goalContributionId: string | null };
 
-/** A transaction can only be linked to one reclassification at a time
- * (#114, ADR-0010) — a transaction already flagged as a receivable can't
- * be flagged again without first being unflagged/settled. */
-export function canFlagAsReceivable(transaction: ReceivableFlaggableTransaction): boolean {
-  return transaction.receivableId === null;
+/** A transaction can only carry one reclassification at a time — a
+ * receivable OR a goal contribution, never both (#114/#120, ADR-0010).
+ * A transaction already linked to either can't be linked again without
+ * first being unflagged. */
+export function canReclassifyTransaction(transaction: ReclassifiableTransaction): boolean {
+  return transaction.receivableId === null && transaction.goalContributionId === null;
 }
 
 /** Below this, a statement-parsed transaction is held for review rather

@@ -95,10 +95,11 @@ export async function importMappedData(mapped: MappedImport): Promise<ImportSumm
   }
 
   for (const goal of mapped.goals) {
+    const { saved, ...goalFields } = goal;
     await prisma.goal.upsert({
       where: { id: goal.id },
-      update: { name: goal.name, target: goal.target, saved: goal.saved, monthlyContribution: goal.monthlyContribution },
-      create: { ...goal },
+      update: { name: goal.name, target: goal.target, monthlyContribution: goal.monthlyContribution },
+      create: { ...goalFields, contributions: { create: { date: new Date(), amount: saved } } },
     });
   }
 

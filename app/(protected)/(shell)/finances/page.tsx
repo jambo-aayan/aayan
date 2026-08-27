@@ -73,6 +73,9 @@ export default async function FinancesPage({ searchParams }: { searchParams: Pro
   const trendPoints = cashFlowTrend(transactions);
   const assetBreakdown = netWorthBreakdown(accounts);
   const repaymentCandidates = transactions.filter((t) => t.direction === "IN" && t.receivableId === null);
+  const contributionCandidates = transactions.filter(
+    (t) => t.direction === "OUT" && t.receivableId === null && t.goalContributionId === null
+  );
 
   return (
     <>
@@ -132,13 +135,13 @@ export default async function FinancesPage({ searchParams }: { searchParams: Pro
           />
         </Card>
         <Card title="Goals">
-          <GoalsManager initialGoals={goals} surplus={monthlySurplus} />
+          <GoalsManager initialGoals={goals} surplus={monthlySurplus} contributionCandidates={contributionCandidates} />
         </Card>
         <Card title="This month by category">
           <CategoryBreakdownView breakdown={categorySpending} />
         </Card>
         <Card title="Transactions">
-          <TransactionsManager initialTransactions={transactions} />
+          <TransactionsManager initialTransactions={transactions} goals={goals} />
         </Card>
         <Card title="Receivables">
           <ReceivablesList initialReceivables={receivables} repaymentCandidates={repaymentCandidates} />

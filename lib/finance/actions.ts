@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { put } from "@vercel/blob";
 import { prisma } from "@/lib/prisma";
 import { BASELINE_ID } from "./baseline-id";
-import { canFlagAsReceivable, isHeldForReview, netTransactionAmount, validateStatementUpload } from "./logic";
+import { canReclassifyTransaction, isHeldForReview, netTransactionAmount, validateStatementUpload } from "./logic";
 import { FINANCE_NORTH_STAR_ID } from "./north-star-id";
 import { parseStatement, parseValuation } from "./statement-parser";
 
@@ -241,6 +241,11 @@ export async function updateBaseline(
 export type GoalInput = {
   name: string;
   target: number;
+  /** The goal's starting saved amount — seeds an initial GoalContribution
+   * on create/restore, never stored on the Goal row itself (#120,
+   * ADR-0010). Editing an existing goal's saved total happens via
+   * logGoalContribution, a separate dated log entry, not by overwriting
+   * this field in place — same shape as AccountInput.value/Snapshot. */
   saved: number;
   monthlyContribution: number;
   vehicle: "EMERGENCY_FUND" | "LISA" | "PENSION" | "STOCKS_ISA" | "CASH_ISA" | "GENERIC";
@@ -252,8 +257,11 @@ export type GoalResult =
   | { ok: false; error: string };
 
 export async function createGoal(input: GoalInput): Promise<GoalResult> {
+  const { saved, ...goalFields } = input;
   try {
-    const goal = await prisma.goal.create({ data: input });
+    const goal = await prisma.goal.create({
+      data: { ...goalFields, contributions: { create: { date: new Date(), amount: saved } } },
+    });
     revalidatePath("/finances");
     return { ok: true, goal: { ...input, id: goal.id } };
   } catch {
@@ -262,8 +270,9 @@ export async function createGoal(input: GoalInput): Promise<GoalResult> {
 }
 
 export async function updateGoal(id: string, input: GoalInput): Promise<ActionResult> {
+  const { name, target, monthlyContribution, vehicle, priority } = input;
   try {
-    await prisma.goal.update({ where: { id }, data: input });
+    await prisma.goal.update({ where: { id }, data: { name, target, monthlyContribution, vehicle, priority } });
   } catch {
     return { ok: false, error: SAVE_ERROR };
   }
@@ -281,15 +290,89 @@ export async function deleteGoal(id: string): Promise<ActionResult> {
   return { ok: true };
 }
 
-/** Recreates a just-deleted goal with its original id, for the delete-undo toast. */
+/** Recreates a just-deleted goal with its original id, for the
+ * delete-undo toast — seeds one fresh GoalContribution at the saved total
+ * it held at delete time (its earlier contribution log is not recovered,
+ * matching every other delete-undo action in this app). */
 export async function restoreGoal(goal: GoalInput & { id: string }): Promise<ActionResult> {
+  const { saved, id, ...goalFields } = goal;
   try {
-    await prisma.goal.create({ data: goal });
+    await prisma.goal.create({
+      data: { id, ...goalFields, contributions: { create: { date: new Date(), amount: saved } } },
+    });
   } catch {
     return { ok: false, error: "Couldn't undo — the goal may already be back." };
   }
   revalidatePath("/finances");
   return { ok: true };
+}
+
+export type GoalContributionResult =
+  | { ok: true; contributionId: string }
+  | { ok: false; error: string };
+
+/** Logs a new dated GoalContribution — a Goal's saved total comes from
+ * its own history, so contributing adds a row rather than overwriting one
+ * (#120, ADR-0010), same shape as addSnapshot. Optionally links an
+ * existing transaction as the funding record (claimed atomically, same
+ * mechanism as settleReceivable's optional repayment link) — standalone
+ * contributions (no linked transaction) are equally valid. */
+export async function logGoalContribution(
+  goalId: string,
+  date: Date,
+  amount: number,
+  note: string | null,
+  transactionId: string | null
+): Promise<GoalContributionResult> {
+  try {
+    if (transactionId !== null) {
+      const transaction = await prisma.transaction.findUnique({ where: { id: transactionId } });
+      if (!transaction) return { ok: false, error: SAVE_ERROR };
+      if (!canReclassifyTransaction(transaction)) return { ok: false, error: ALREADY_LINKED_ERROR };
+    }
+
+    const contribution = await prisma.goalContribution.create({ data: { goalId, date, amount, note } });
+    if (transactionId !== null && !(await claimTransaction(transactionId, { goalContributionId: contribution.id }))) {
+      await prisma.goalContribution.delete({ where: { id: contribution.id } });
+      return { ok: false, error: ALREADY_LINKED_ERROR };
+    }
+
+    revalidatePath("/finances");
+    return { ok: true, contributionId: contribution.id };
+  } catch {
+    return { ok: false, error: SAVE_ERROR };
+  }
+}
+
+/** "This went toward Goal X" — reclassifies an outgoing transaction as a
+ * goal contribution rather than real spend, mirroring flagAsReceivable
+ * exactly (#120, ADR-0010). Refuses a transaction already linked to a
+ * reclassification (a receivable or another goal contribution). */
+export async function flagAsGoalContribution(
+  transactionId: string,
+  goalId: string,
+  amount: number,
+  note: string | null
+): Promise<GoalContributionResult> {
+  try {
+    const transaction = await prisma.transaction.findUnique({ where: { id: transactionId } });
+    if (!transaction) return { ok: false, error: SAVE_ERROR };
+    if (!canReclassifyTransaction(transaction)) return { ok: false, error: ALREADY_LINKED_ERROR };
+
+    const contribution = await prisma.goalContribution.create({
+      data: { goalId, date: transaction.date, amount, note },
+    });
+    if (!(await claimTransaction(transactionId, { goalContributionId: contribution.id }))) {
+      await prisma.goalContribution.delete({ where: { id: contribution.id } });
+      return { ok: false, error: ALREADY_LINKED_ERROR };
+    }
+
+    revalidatePath("/finances");
+    revalidatePath("/finances/uncategorised");
+    return { ok: true, contributionId: contribution.id };
+  } catch {
+    return { ok: false, error: SAVE_ERROR };
+  }
 }
 
 export async function updateFinanceNorthStar(
@@ -385,17 +468,23 @@ export type ReceivableResult =
   | { ok: true; receivableId: string }
   | { ok: false; error: string };
 
-const ALREADY_LINKED_ERROR = "Already linked to a receivable.";
+const ALREADY_LINKED_ERROR = "Already linked to a reclassification.";
 
 /** Atomically claims a transaction for a reclassification link — the
- * WHERE clause (not just the pure canFlagAsReceivable check, which only
- * catches the common case) is what actually prevents two concurrent
+ * WHERE clause (not just the pure canReclassifyTransaction check, which
+ * only catches the common case) is what actually prevents two concurrent
  * flags/settles on the same transaction from both succeeding: only one
- * UPDATE can match receivableId: null, so the loser's count is 0. */
-async function claimTransactionForReceivable(transactionId: string, receivableId: string): Promise<boolean> {
+ * UPDATE can match both receivableId AND goalContributionId still null,
+ * so the loser's count is 0. Shared by the receivable and goal-
+ * contribution flows (#114/#120, ADR-0010) since a transaction can only
+ * ever carry one or the other. */
+async function claimTransaction(
+  transactionId: string,
+  data: { receivableId: string } | { goalContributionId: string }
+): Promise<boolean> {
   const claimed = await prisma.transaction.updateMany({
-    where: { id: transactionId, receivableId: null },
-    data: { receivableId },
+    where: { id: transactionId, receivableId: null, goalContributionId: null },
+    data,
   });
   return claimed.count === 1;
 }
@@ -413,11 +502,11 @@ export async function flagAsReceivable(
   try {
     const transaction = await prisma.transaction.findUnique({ where: { id: transactionId } });
     if (!transaction) return { ok: false, error: SAVE_ERROR };
-    if (!canFlagAsReceivable({ receivableId: transaction.receivableId })) {
+    if (!canReclassifyTransaction(transaction)) {
       return { ok: false, error: ALREADY_LINKED_ERROR };
     }
     const receivable = await prisma.receivable.create({ data: { amount, note } });
-    if (!(await claimTransactionForReceivable(transactionId, receivable.id))) {
+    if (!(await claimTransaction(transactionId, { receivableId: receivable.id }))) {
       await prisma.receivable.delete({ where: { id: receivable.id } });
       return { ok: false, error: ALREADY_LINKED_ERROR };
     }
@@ -443,10 +532,10 @@ export async function settleReceivable(
     if (repaymentTransactionId !== null) {
       const repayment = await prisma.transaction.findUnique({ where: { id: repaymentTransactionId } });
       if (!repayment) return { ok: false, error: SAVE_ERROR };
-      if (!canFlagAsReceivable({ receivableId: repayment.receivableId })) {
+      if (!canReclassifyTransaction(repayment)) {
         return { ok: false, error: ALREADY_LINKED_ERROR };
       }
-      if (!(await claimTransactionForReceivable(repaymentTransactionId, receivableId))) {
+      if (!(await claimTransaction(repaymentTransactionId, { receivableId }))) {
         return { ok: false, error: ALREADY_LINKED_ERROR };
       }
     }

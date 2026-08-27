@@ -648,17 +648,42 @@ enum GoalVehicle {
 /// vehicle is a label only (ADR-0010) — no LISA cap/bonus or ISA
 /// allowance is modeled. priority is an explicit, user-editable rank,
 /// not implied by vehicle — the user's real priority order can change
-/// independently of which vehicle a Goal uses.
+/// independently of which vehicle a Goal uses. `saved` is NOT a column
+/// here (#120, ADR-0010) — it's the computed sum of this Goal's
+/// GoalContribution rows (lib/finance/data.ts's getGoals()), same
+/// "value lives in dated child rows" shape as Account/Snapshot.
+/// monthlyContribution is the stated-plan figure, independent of and
+/// allowed to diverge from the actual contribution log.
 model Goal {
-  id                  String      @id @default(cuid())
+  id                  String             @id @default(cuid())
   name                String
-  target              Decimal     @db.Decimal(12, 2)
-  saved               Decimal     @db.Decimal(12, 2)
-  monthlyContribution Decimal     @db.Decimal(12, 2)
-  vehicle             GoalVehicle @default(GENERIC)
-  priority            Int         @default(0)
-  createdAt           DateTime    @default(now())
-  updatedAt           DateTime    @updatedAt
+  target              Decimal            @db.Decimal(12, 2)
+  monthlyContribution Decimal            @db.Decimal(12, 2)
+  vehicle             GoalVehicle        @default(GENERIC)
+  priority            Int                @default(0)
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  contributions       GoalContribution[]
+}
+
+/// A dated, per-goal contribution log entry — the source of truth for
+/// Goal.saved (computed as this table's sum), replacing a manually
+/// overwritten column (#120, ADR-0010). Optionally linked back to the
+/// Transaction that funded it via Transaction.goalContributionId
+/// (mirroring Receivable's own link exactly) — a contribution can also
+/// stand alone with no linked transaction (e.g. cash saved outside any
+/// tracked account).
+model GoalContribution {
+  id           String        @id @default(cuid())
+  goalId       String
+  goal         Goal          @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  date         DateTime      @db.Date
+  amount       Decimal       @db.Decimal(12, 2)
+  note         String?
+  createdAt    DateTime      @default(now())
+  transactions Transaction[]
+
+  @@index([goalId])
 }
 
 /// Singleton: the single headline Finances target + deadline, tracked
@@ -683,31 +708,40 @@ enum TransactionDirection {
 /// is set by the "this became a receivable" reclassification action
 /// (#114, ADR-0010) — not unique, since the same Receivable can be
 /// referenced by both the funding OUT transaction and an optional
-/// repayment IN transaction. A transaction with receivableId set is
-/// excluded from spend totals (lib/finance/category-breakdown.ts) since
-/// it's a loan, not real spend/income — cash flow (lib/finance/cash-flow-
-/// trend.ts) stays receivable-unaware since real cash still moved.
-/// confidence is set only by statement-upload parsing (#115, ADR-0010) —
-/// null for manually entered transactions, which are never held for
-/// review (see lib/finance/logic.ts's isHeldForReview).
+/// repayment IN transaction. goalContributionId is the mirrored "this
+/// went toward Goal X" reclassification (#120, ADR-0010), same shape.
+/// A transaction can carry at most ONE of the two (never both) — enforced
+/// by lib/finance/logic.ts's canReclassifyTransaction, and atomically at
+/// write time by only ever claiming a transaction where both are still
+/// null (lib/finance/actions.ts's claimTransaction). A transaction with
+/// either set is excluded from spend totals (lib/finance/category-
+/// breakdown.ts) since it's a loan or a goal contribution, not real
+/// spend/income — cash flow (lib/finance/cash-flow-trend.ts) stays
+/// reclassification-unaware since real cash still moved. confidence is
+/// set only by statement-upload parsing (#115, ADR-0010) — null for
+/// manually entered transactions, which are never held for review (see
+/// lib/finance/logic.ts's isHeldForReview).
 model Transaction {
-  id           String               @id @default(cuid())
-  date         DateTime             @db.Date
-  amount       Decimal              @db.Decimal(12, 2)
-  direction    TransactionDirection
-  category     String
-  source       String?
-  accountId    String?
-  account      Account?             @relation(fields: [accountId], references: [id])
-  receivableId String?
-  confidence   Float?
-  receivable   Receivable?          @relation(fields: [receivableId], references: [id])
-  createdAt    DateTime             @default(now())
-  updatedAt    DateTime             @updatedAt
+  id                 String               @id @default(cuid())
+  date               DateTime             @db.Date
+  amount             Decimal              @db.Decimal(12, 2)
+  direction          TransactionDirection
+  category           String
+  source             String?
+  accountId          String?
+  account            Account?             @relation(fields: [accountId], references: [id])
+  receivableId       String?
+  receivable         Receivable?          @relation(fields: [receivableId], references: [id])
+  goalContributionId String?
+  goalContribution   GoalContribution?    @relation(fields: [goalContributionId], references: [id])
+  confidence         Float?
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
 
   @@index([date])
   @@index([accountId])
   @@index([receivableId])
+  @@index([goalContributionId])
 }
 
 /// A live Enable Banking authorization — the result of one `POST /sessions`

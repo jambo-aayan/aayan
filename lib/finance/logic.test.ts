@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  canFlagAsReceivable,
+  canReclassifyTransaction,
   isHeldForReview,
   netTransactionAmount,
   resolveAccountValueAt,
@@ -77,13 +77,17 @@ describe("sortGoalsByPriority", () => {
   });
 });
 
-describe("canFlagAsReceivable", () => {
-  it("allows flagging a transaction with no existing reclassification", () => {
-    expect(canFlagAsReceivable({ receivableId: null })).toBe(true);
+describe("canReclassifyTransaction", () => {
+  it("allows reclassifying a transaction with no existing link", () => {
+    expect(canReclassifyTransaction({ receivableId: null, goalContributionId: null })).toBe(true);
   });
 
   it("refuses a transaction already linked to a receivable", () => {
-    expect(canFlagAsReceivable({ receivableId: "rec1" })).toBe(false);
+    expect(canReclassifyTransaction({ receivableId: "rec1", goalContributionId: null })).toBe(false);
+  });
+
+  it("refuses a transaction already linked to a goal contribution", () => {
+    expect(canReclassifyTransaction({ receivableId: null, goalContributionId: "gc1" })).toBe(false);
   });
 });
 

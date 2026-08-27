@@ -8,6 +8,7 @@ import { DEFAULT_CATEGORIES } from "@/lib/finance/categories";
 import { PrimaryButton } from "@/components/primary-button";
 import { EmptyState } from "@/components/empty-state";
 import { FlagReceivableForm } from "@/components/flag-receivable-form";
+import { FlagGoalContributionForm, type GoalOption } from "@/components/flag-goal-contribution-form";
 import styles from "./uncategorised-queue.module.css";
 
 type HeldTransaction = TransactionInput & { id: string; accountName: string | null };
@@ -18,9 +19,15 @@ function toDateInputValue(date: Date): string {
 
 /** The low-confidence transactions statement parsing held back (#115),
  * made actionable: correct their fields (which clears confidence and
- * drops them from this list) or flag them as a receivable, reusing #114's
- * action unchanged (#117, ADR-0010). */
-export function UncategorisedQueue({ initialTransactions }: { initialTransactions: HeldTransaction[] }) {
+ * drops them from this list) or flag them as a receivable/goal
+ * contribution, reusing #114/#120's actions unchanged (#117, ADR-0010). */
+export function UncategorisedQueue({
+  initialTransactions,
+  goals,
+}: {
+  initialTransactions: HeldTransaction[];
+  goals: GoalOption[];
+}) {
   const [transactions, setTransactions] = useState(initialTransactions);
 
   function handleResolved(id: string) {
@@ -31,7 +38,7 @@ export function UncategorisedQueue({ initialTransactions }: { initialTransaction
     <div>
       <ul className={styles.list}>
         {transactions.map((t) => (
-          <QueueRow key={t.id} transaction={t} onResolved={() => handleResolved(t.id)} />
+          <QueueRow key={t.id} transaction={t} goals={goals} onResolved={() => handleResolved(t.id)} />
         ))}
       </ul>
       {transactions.length === 0 && (
@@ -41,11 +48,19 @@ export function UncategorisedQueue({ initialTransactions }: { initialTransaction
   );
 }
 
-function QueueRow({ transaction, onResolved }: { transaction: HeldTransaction; onResolved: () => void }) {
+function QueueRow({
+  transaction,
+  goals,
+  onResolved,
+}: {
+  transaction: HeldTransaction;
+  goals: GoalOption[];
+  onResolved: () => void;
+}) {
   const [form, setForm] = useState<TransactionInput>(transaction);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [flagging, setFlagging] = useState(false);
+  const [flagging, setFlagging] = useState<"receivable" | "goal" | null>(null);
 
   async function handleSave() {
     setSaving(true);
@@ -98,18 +113,34 @@ function QueueRow({ transaction, onResolved }: { transaction: HeldTransaction; o
           {saving ? "Saving…" : "Confirm"}
         </PrimaryButton>
         {!flagging && transaction.direction === "OUT" && (
-          <button type="button" className={styles.link} onClick={() => setFlagging(true)}>
-            Flag as receivable
-          </button>
+          <>
+            <button type="button" className={styles.link} onClick={() => setFlagging("receivable")}>
+              Flag as receivable
+            </button>
+            {goals.length > 0 && (
+              <button type="button" className={styles.link} onClick={() => setFlagging("goal")}>
+                Flag as goal contribution
+              </button>
+            )}
+          </>
         )}
       </div>
       {error && <p className={styles.error}>{error}</p>}
 
-      {flagging && (
+      {flagging === "receivable" && (
         <FlagReceivableForm
           transactionId={transaction.id}
           initialAmount={transaction.amount}
-          onCancel={() => setFlagging(false)}
+          onCancel={() => setFlagging(null)}
+          onConfirmed={onResolved}
+        />
+      )}
+      {flagging === "goal" && (
+        <FlagGoalContributionForm
+          transactionId={transaction.id}
+          initialAmount={transaction.amount}
+          goals={goals}
+          onCancel={() => setFlagging(null)}
           onConfirmed={onResolved}
         />
       )}

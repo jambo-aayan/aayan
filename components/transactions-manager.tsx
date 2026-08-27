@@ -15,9 +15,15 @@ import { DEFAULT_CATEGORIES } from "@/lib/finance/categories";
 import { PrimaryButton } from "@/components/primary-button";
 import { EmptyState } from "@/components/empty-state";
 import { FlagReceivableForm } from "@/components/flag-receivable-form";
+import { FlagGoalContributionForm, type GoalOption } from "@/components/flag-goal-contribution-form";
 import styles from "./transactions-manager.module.css";
 
-type Transaction = TransactionInput & { id: string; receivableId: string | null; confidence: number | null };
+type Transaction = TransactionInput & {
+  id: string;
+  receivableId: string | null;
+  goalContributionId: string | null;
+  confidence: number | null;
+};
 
 const EMPTY_FORM: TransactionInput = {
   date: new Date(),
@@ -39,14 +45,22 @@ function toDateInputValue(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
 
-export function TransactionsManager({ initialTransactions }: { initialTransactions: Transaction[] }) {
+export function TransactionsManager({
+  initialTransactions,
+  goals,
+}: {
+  initialTransactions: Transaction[];
+  goals: GoalOption[];
+}) {
   const { items: transactions, error, undo, add, update, remove, undoDelete } = useUndoableCrudList<
     Transaction,
     TransactionInput
   >(initialTransactions, {
     create: async (input) => {
       const result = await createTransaction(input);
-      return result.ok ? { ok: true, item: { ...result.item, receivableId: null, confidence: null } } : result;
+      return result.ok
+        ? { ok: true, item: { ...result.item, receivableId: null, goalContributionId: null, confidence: null } }
+        : result;
     },
     update: updateTransaction,
     remove: deleteTransaction,
@@ -57,14 +71,21 @@ export function TransactionsManager({ initialTransactions }: { initialTransactio
   const [addError, setAddError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [flaggingRowId, setFlaggingRowId] = useState<string | null>(null);
-  // Overlays flagAsReceivable's result onto the list without a redundant
-  // updateTransaction write — flagAsReceivable already persisted
-  // receivableId server-side, so the hook's update() (which calls
-  // updateTransaction) would be both wasted and semantically wrong here.
+  const [flaggingMode, setFlaggingMode] = useState<"receivable" | "goal">("receivable");
+  // Overlays flagAsReceivable's/flagAsGoalContribution's result onto the
+  // list without a redundant updateTransaction write — both actions
+  // already persist their id server-side, so the hook's update() (which
+  // calls updateTransaction) would be both wasted and semantically wrong
+  // here.
   const [receivableOverrides, setReceivableOverrides] = useState<Record<string, string>>({});
+  const [goalContributionOverrides, setGoalContributionOverrides] = useState<Record<string, string>>({});
 
   const sorted = [...transactions]
-    .map((t) => (receivableOverrides[t.id] ? { ...t, receivableId: receivableOverrides[t.id] } : t))
+    .map((t) => ({
+      ...t,
+      receivableId: receivableOverrides[t.id] ?? t.receivableId,
+      goalContributionId: goalContributionOverrides[t.id] ?? t.goalContributionId,
+    }))
     .sort((a, b) => b.date.getTime() - a.date.getTime());
 
   async function handleAdd() {
@@ -93,6 +114,7 @@ export function TransactionsManager({ initialTransactions }: { initialTransactio
                   ...input,
                   id: t.id,
                   receivableId: t.receivableId,
+                  goalContributionId: t.goalContributionId,
                   confidence: t.confidence,
                 });
                 if (result.ok) setEditingId(null);
@@ -101,15 +123,28 @@ export function TransactionsManager({ initialTransactions }: { initialTransactio
             />
           ) : flaggingRowId === t.id ? (
             <li key={t.id} className={styles.addForm}>
-              <FlagReceivableForm
-                transactionId={t.id}
-                initialAmount={t.amount}
-                onCancel={() => setFlaggingRowId(null)}
-                onConfirmed={(receivableId) => {
-                  setReceivableOverrides((prev) => ({ ...prev, [t.id]: receivableId }));
-                  setFlaggingRowId(null);
-                }}
-              />
+              {flaggingMode === "receivable" ? (
+                <FlagReceivableForm
+                  transactionId={t.id}
+                  initialAmount={t.amount}
+                  onCancel={() => setFlaggingRowId(null)}
+                  onConfirmed={(receivableId) => {
+                    setReceivableOverrides((prev) => ({ ...prev, [t.id]: receivableId }));
+                    setFlaggingRowId(null);
+                  }}
+                />
+              ) : (
+                <FlagGoalContributionForm
+                  transactionId={t.id}
+                  initialAmount={t.amount}
+                  goals={goals}
+                  onCancel={() => setFlaggingRowId(null)}
+                  onConfirmed={(contributionId) => {
+                    setGoalContributionOverrides((prev) => ({ ...prev, [t.id]: contributionId }));
+                    setFlaggingRowId(null);
+                  }}
+                />
+              )}
             </li>
           ) : (
             <li key={t.id} className={styles.row}>
@@ -118,6 +153,7 @@ export function TransactionsManager({ initialTransactions }: { initialTransactio
                   {t.category}
                   {t.source && <span className={styles.source}> · {t.source}</span>}
                   {t.receivableId && <span className={styles.badge}>Receivable</span>}
+                  {t.goalContributionId && <span className={styles.badge}>Goal contribution</span>}
                   {isHeldForReview(t.confidence) && <span className={styles.badge}>Held for review</span>}
                 </div>
                 <div className={styles.date}>{formatDate(t.date)}</div>
@@ -127,10 +163,31 @@ export function TransactionsManager({ initialTransactions }: { initialTransactio
                   {t.direction === "IN" ? "+" : "−"}
                   {formatGBP(t.amount)}
                 </span>
-                {t.direction === "OUT" && !t.receivableId && (
-                  <button type="button" className={styles.link} onClick={() => setFlaggingRowId(t.id)}>
-                    Flag as receivable
-                  </button>
+                {t.direction === "OUT" && !t.receivableId && !t.goalContributionId && (
+                  <>
+                    <button
+                      type="button"
+                      className={styles.link}
+                      onClick={() => {
+                        setFlaggingMode("receivable");
+                        setFlaggingRowId(t.id);
+                      }}
+                    >
+                      Flag as receivable
+                    </button>
+                    {goals.length > 0 && (
+                      <button
+                        type="button"
+                        className={styles.link}
+                        onClick={() => {
+                          setFlaggingMode("goal");
+                          setFlaggingRowId(t.id);
+                        }}
+                      >
+                        Flag as goal contribution
+                      </button>
+                    )}
+                  </>
                 )}
                 <button type="button" className={styles.link} onClick={() => setEditingId(t.id)}>
                   Edit

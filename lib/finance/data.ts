@@ -40,15 +40,31 @@ export async function getBaseline() {
   };
 }
 
+/** A Goal's saved figure is the computed sum of its GoalContribution
+ * rows, not a stored column (#120, ADR-0010) — resolved here in one
+ * batched query rather than N+1 per goal. */
 export async function getGoals() {
-  const goals = await prisma.goal.findMany({ orderBy: { createdAt: "asc" } });
-  const mapped = goals.map((goal) => ({
+  const goals = await prisma.goal.findMany({
+    orderBy: { createdAt: "asc" },
+    include: { contributions: { select: { amount: true } } },
+  });
+  const mapped = goals.map(({ contributions, ...goal }) => ({
     ...goal,
     target: goal.target.toNumber(),
-    saved: goal.saved.toNumber(),
+    saved: contributions.reduce((sum, c) => sum + c.amount.toNumber(), 0),
     monthlyContribution: goal.monthlyContribution.toNumber(),
   }));
   return sortGoalsByPriority(mapped);
+}
+
+/** One Goal's full dated contribution log, most recent first (#120,
+ * ADR-0010) — the detail view behind its computed `saved` total. */
+export async function getGoalContributions(goalId: string) {
+  const contributions = await prisma.goalContribution.findMany({
+    where: { goalId },
+    orderBy: { date: "desc" },
+  });
+  return contributions.map((c) => ({ ...c, amount: c.amount.toNumber() }));
 }
 
 export async function getFinanceNorthStar() {
@@ -76,13 +92,13 @@ export async function getReceivables() {
  * all accounts — the Uncategorised queue's source list (#117, ADR-0010).
  * Filtered at the DB level with the same threshold isHeldForReview uses,
  * so a manually entered transaction (confidence: null) never appears.
- * Also excludes anything already flagged as a receivable — reclassifying
- * it that way (reusing #114's flow, per #117's AC) already resolves it,
- * even though it doesn't clear confidence the way resolveHeldTransaction
- * does. */
+ * Also excludes anything already flagged as a receivable or a goal
+ * contribution — reclassifying it either way (reusing #114/#120's flows,
+ * per #117's AC) already resolves it, even though neither clears
+ * confidence the way resolveHeldTransaction does. */
 export async function getUncategorisedTransactions() {
   const transactions = await prisma.transaction.findMany({
-    where: { confidence: { not: null, lt: CONFIDENCE_THRESHOLD }, receivableId: null },
+    where: { confidence: { not: null, lt: CONFIDENCE_THRESHOLD }, receivableId: null, goalContributionId: null },
     orderBy: { date: "desc" },
     include: { account: { select: { name: true } } },
   });

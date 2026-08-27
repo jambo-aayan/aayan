@@ -1,14 +1,25 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Flag } from "lucide-react";
-import { createGoal, deleteGoal, restoreGoal, updateGoal, type GoalInput } from "@/lib/finance/actions";
+import {
+  createGoal,
+  deleteGoal,
+  logGoalContribution,
+  restoreGoal,
+  updateGoal,
+  type GoalInput,
+} from "@/lib/finance/actions";
 import { useUndoableCrudList, type ActionResult } from "@/lib/hooks/use-undoable-crud-list";
 import { goalProgressPercent, projectedCompletionDate, totalMonthlyContributions, isOvercommitted } from "@/lib/finance/goal-math";
 import { sortGoalsByPriority } from "@/lib/finance/logic";
+import { withRetry } from "@/lib/with-retry";
 import { PrimaryButton } from "@/components/primary-button";
 import { EmptyState } from "@/components/empty-state";
 import styles from "./goals-manager.module.css";
+
+type ContributionCandidate = { id: string; date: Date; amount: number; category: string };
 
 type Goal = GoalInput & { id: string };
 
@@ -31,7 +42,15 @@ function formatDate(date: Date): string {
   return new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric" }).format(date);
 }
 
-export function GoalsManager({ initialGoals, surplus }: { initialGoals: Goal[]; surplus: number }) {
+export function GoalsManager({
+  initialGoals,
+  surplus,
+  contributionCandidates,
+}: {
+  initialGoals: Goal[];
+  surplus: number;
+  contributionCandidates: ContributionCandidate[];
+}) {
   const { items: goals, error, undo, add, update, remove, undoDelete } = useUndoableCrudList<Goal, GoalInput>(
     initialGoals,
     {
@@ -154,6 +173,7 @@ export function GoalsManager({ initialGoals, surplus }: { initialGoals: Goal[]; 
                 >
                   ↓
                 </button>
+                <LogContributionControl goalId={goal.id} candidates={contributionCandidates} />
                 <button type="button" className={styles.link} onClick={() => setEditingId(goal.id)}>
                   Edit
                 </button>
@@ -188,7 +208,19 @@ export function GoalsManager({ initialGoals, surplus }: { initialGoals: Goal[]; 
   );
 }
 
-function GoalFields({ form, onChange }: { form: GoalInput; onChange: (update: GoalInput) => void }) {
+function GoalFields({
+  form,
+  onChange,
+  showSaved = true,
+}: {
+  form: GoalInput;
+  onChange: (update: GoalInput) => void;
+  /** "Starting saved" only applies at creation — an existing goal's saved
+   * total comes from its contribution log (via "Log contribution"
+   * below), so editing the goal's own fields never shows it (matching
+   * AccountFields' showValue). */
+  showSaved?: boolean;
+}) {
   return (
     <>
       <input
@@ -219,15 +251,17 @@ function GoalFields({ form, onChange }: { form: GoalInput; onChange: (update: Go
         value={form.target}
         onChange={(e) => onChange({ ...form, target: Number(e.target.value) })}
       />
-      <input
-        className={styles.input}
-        type="number"
-        step="0.01"
-        placeholder="Saved"
-        aria-label="Amount saved so far"
-        value={form.saved}
-        onChange={(e) => onChange({ ...form, saved: Number(e.target.value) })}
-      />
+      {showSaved && (
+        <input
+          className={styles.input}
+          type="number"
+          step="0.01"
+          placeholder="Starting saved"
+          aria-label="Starting saved amount"
+          value={form.saved}
+          onChange={(e) => onChange({ ...form, saved: Number(e.target.value) })}
+        />
+      )}
       <input
         className={styles.input}
         type="number"
@@ -264,7 +298,7 @@ function GoalEditRow({
 
   return (
     <li className={styles.addForm}>
-      <GoalFields form={form} onChange={setForm} />
+      <GoalFields form={form} onChange={setForm} showSaved={false} />
       <PrimaryButton onClick={handleSave} disabled={saving}>
         {saving ? "Saving…" : "Save"}
       </PrimaryButton>
@@ -273,5 +307,97 @@ function GoalEditRow({
       </button>
       {error && <p className={styles.error}>{error}</p>}
     </li>
+  );
+}
+
+/** A Goal's saved total comes from its own dated contribution log, not a
+ * field on the goal itself — this logs a new one rather than editing the
+ * goal's own row (#120, ADR-0010), same shape as AddSnapshotControl.
+ * Optionally links an existing transaction as the funding record. */
+function LogContributionControl({
+  goalId,
+  candidates,
+}: {
+  goalId: string;
+  candidates: { id: string; date: Date; amount: number; category: string }[];
+}) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [amount, setAmount] = useState("");
+  const [note, setNote] = useState("");
+  const [transactionId, setTransactionId] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleSave() {
+    const parsedAmount = Number(amount);
+    if (!Number.isFinite(parsedAmount)) {
+      setError("Enter a number.");
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    const result = await withRetry(() =>
+      logGoalContribution(goalId, new Date(), parsedAmount, note || null, transactionId || null)
+    );
+    setSaving(false);
+    if (!result.ok) {
+      setError(result.error);
+      return;
+    }
+    setOpen(false);
+    setAmount("");
+    setNote("");
+    setTransactionId("");
+    router.refresh();
+  }
+
+  if (!open) {
+    return (
+      <button type="button" className={styles.link} onClick={() => setOpen(true)}>
+        Log contribution
+      </button>
+    );
+  }
+
+  return (
+    <span className={styles.snapshotForm}>
+      <input
+        className={styles.input}
+        type="number"
+        step="0.01"
+        placeholder="Amount"
+        aria-label="Contribution amount"
+        value={amount}
+        onChange={(e) => setAmount(e.target.value)}
+      />
+      <input
+        className={styles.input}
+        placeholder="Note (optional)"
+        aria-label="Contribution note"
+        value={note}
+        onChange={(e) => setNote(e.target.value)}
+      />
+      <select
+        className={styles.input}
+        aria-label="Link a transaction (optional)"
+        value={transactionId}
+        onChange={(e) => setTransactionId(e.target.value)}
+      >
+        <option value="">No linked transaction</option>
+        {candidates.map((t) => (
+          <option key={t.id} value={t.id}>
+            {t.category} · {formatGBP(t.amount)}
+          </option>
+        ))}
+      </select>
+      <button type="button" className={styles.link} onClick={handleSave} disabled={saving}>
+        {saving ? "Saving…" : "Save"}
+      </button>
+      <button type="button" className={styles.link} onClick={() => setOpen(false)}>
+        Cancel
+      </button>
+      {error && <p className={styles.error}>{error}</p>}
+    </span>
   );
 }
