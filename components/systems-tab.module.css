@@ -142,6 +142,11 @@
   font-family: inherit;
 }
 
+.rollupSearch {
+  width: 100%;
+  margin-bottom: 8px;
+}
+
 .add {
   border: 1px solid var(--coral);
   background: var(--coral);

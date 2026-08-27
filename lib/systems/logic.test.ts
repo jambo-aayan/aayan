@@ -16,6 +16,7 @@ import {
   timelineBar,
   rollupCategory,
   sortRollup,
+  filterRollupByName,
   type RollupInput,
 } from "./logic";
 
@@ -407,5 +408,27 @@ describe("sortRollup", () => {
       rollupSystem({ id: "just-started", type: "PROCESS", stepsDone: 1, totalSteps: 5 }),
     ];
     expect(sortRollup(systems, today).map((s) => s.id)).toEqual(["just-started", "mostly-done"]);
+  });
+});
+
+describe("filterRollupByName", () => {
+  const rows = [{ name: "Elimination diet" }, { name: "Payday routine" }, { name: "Training block" }];
+
+  it("returns every row when the query is empty or blank", () => {
+    expect(filterRollupByName(rows, "")).toEqual(rows);
+    expect(filterRollupByName(rows, "   ")).toEqual(rows);
+  });
+
+  it("filters to rows whose name contains the query, case-insensitively", () => {
+    expect(filterRollupByName(rows, "diet")).toEqual([{ name: "Elimination diet" }]);
+    expect(filterRollupByName(rows, "PAYDAY")).toEqual([{ name: "Payday routine" }]);
+  });
+
+  it("matches a substring anywhere in the name", () => {
+    expect(filterRollupByName(rows, "rou")).toEqual([{ name: "Payday routine" }]);
+  });
+
+  it("returns an empty array when nothing matches", () => {
+    expect(filterRollupByName(rows, "nonexistent")).toEqual([]);
   });
 });

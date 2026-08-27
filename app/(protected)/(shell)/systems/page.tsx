@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { PageHeader } from "@/components/page-header";
 import pageStyles from "@/components/page-header.module.css";
 import { PageTitle } from "@/components/page-title";
@@ -21,16 +22,18 @@ export default async function SystemsPage() {
           lede="Every Process and Experiment you're running, in one place."
         />
         <Card>
-          <SystemsTab
-            areaLoad={overview.areaLoad}
-            loadSummary={overview.loadSummary}
-            timeline={overview.timeline}
-            rollup={overview.rollup}
-            whatWorked={overview.whatWorked}
-            pillars={pillars}
-            areas={areas}
-            today={today}
-          />
+          <Suspense fallback={null}>
+            <SystemsTab
+              areaLoad={overview.areaLoad}
+              loadSummary={overview.loadSummary}
+              timeline={overview.timeline}
+              rollup={overview.rollup}
+              whatWorked={overview.whatWorked}
+              pillars={pillars}
+              areas={areas}
+              today={today}
+            />
+          </Suspense>
         </Card>
         <TodaySectionPills />
       </div>

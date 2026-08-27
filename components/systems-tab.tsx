@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import type { SystemType, SystemState, SystemVerdict } from "@/lib/systems/logic";
+import { filterRollupByName } from "@/lib/systems/logic";
 import type { AreaLoadRow, TimelineRow, RollupRow, WhatWorkedRow } from "@/lib/systems/data";
 import { createSystem } from "@/lib/systems/actions";
 import { withRetry } from "@/lib/with-retry";
@@ -93,7 +95,29 @@ export function SystemsTab({
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { notifyError } = useToast();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const [rollupQuery, setRollupQuery] = useState(searchParams.get("q") ?? "");
 
+  // Debounced so the URL (and any RSC refetch it triggers) settles a beat
+  // after typing stops, rather than on every keystroke — the filtering
+  // itself is instant client-side (below), this is only for shareability.
+  useEffect(() => {
+    const current = searchParams.get("q") ?? "";
+    if (rollupQuery === current) return;
+    const timer = setTimeout(() => {
+      const next = new URLSearchParams(searchParams.toString());
+      if (rollupQuery) next.set("q", rollupQuery);
+      else next.delete("q");
+      const query = next.toString();
+      router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+    }, 300);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only re-sync on rollupQuery changing, not on every searchParams/router identity change
+  }, [rollupQuery]);
+
+  const filteredRollup = filterRollupByName(rollup, rollupQuery);
   const areasForPillar = areas.filter((a) => a.pillarId === form.pillarId);
   const maxLoad = Math.max(1, ...areaLoad.map((a) => a.count));
 
@@ -163,8 +187,21 @@ export function SystemsTab({
 
       <div className={styles.section}>
         <div className={styles.sectionLabel}>Rollup</div>
+        {rollup.length > 0 && (
+          <input
+            type="search"
+            className={`${styles.input} ${styles.rollupSearch}`}
+            placeholder="Search by name…"
+            value={rollupQuery}
+            onChange={(e) => setRollupQuery(e.target.value)}
+            aria-label="Search the rollup by name"
+          />
+        )}
         {rollup.length === 0 && <p className={styles.empty}>No Systems yet.</p>}
-        {rollup.map((row) => (
+        {rollup.length > 0 && filteredRollup.length === 0 && (
+          <p className={styles.empty}>No Systems match &ldquo;{rollupQuery}&rdquo;.</p>
+        )}
+        {filteredRollup.map((row) => (
           <Link key={row.id} href={systemHref(row)} className={styles.rollupRow}>
             <div className={styles.rollupMain}>
               <span className={styles.rollupName}>{row.name}</span>

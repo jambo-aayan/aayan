@@ -267,3 +267,13 @@ export function sortRollup<T extends RollupInput>(systems: T[], today: Date): T[
     return 0;
   });
 }
+
+/** Narrows the rollup to name matches — case-insensitive substring, same
+ * as any other "find the thing" search box in the app. A blank query
+ * (including whitespace-only) returns every row unfiltered rather than
+ * an empty list. */
+export function filterRollupByName<T extends { name: string }>(rows: T[], query: string): T[] {
+  const trimmed = query.trim().toLowerCase();
+  if (!trimmed) return rows;
+  return rows.filter((r) => r.name.toLowerCase().includes(trimmed));
+}
