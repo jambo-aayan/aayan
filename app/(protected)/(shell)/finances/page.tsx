@@ -20,6 +20,7 @@ import { ActivityTable } from "@/components/finance-dashboard/activity-table";
 import { SystemsList } from "@/components/systems-list";
 import { GoalProgressRings, SurplusSplitCard } from "@/components/financial-plan-section";
 import { FinanceSetupChecklist } from "@/components/finance-setup-checklist";
+import { BudgetVsActual } from "@/components/budget-vs-actual";
 import dashboardStyles from "@/components/finance-dashboard/dashboard.module.css";
 import {
   getAccounts,
@@ -30,11 +31,12 @@ import {
   getReceivables,
   getUncategorisedTransactions,
   getFinanceSetupStatus,
+  getBudgets,
 } from "@/lib/finance/data";
 import { getLinkedBanks } from "@/lib/enable-banking/data";
 import { netWorth } from "@/lib/finance/net-worth";
 import { surplus } from "@/lib/finance/baseline-math";
-import { categoryBreakdown } from "@/lib/finance/category-breakdown";
+import { budgetVsActual, categoryBreakdown } from "@/lib/finance/category-breakdown";
 import { goalProgressPercent } from "@/lib/finance/goal-math";
 import { cashFlowTrend } from "@/lib/finance/cash-flow-trend";
 import { netWorthBreakdown } from "@/lib/finance/net-worth-breakdown";
@@ -57,6 +59,7 @@ export default async function FinancesPage({ searchParams }: { searchParams: Pro
     systemHabitOptions,
     systemGoalOptions,
     setupStatus,
+    budgets,
   ] = await Promise.all([
     getAccounts(),
     getBaseline(),
@@ -70,10 +73,16 @@ export default async function FinancesPage({ searchParams }: { searchParams: Pro
     getHabitOptionsForPillar(FINANCE_PILLAR_ID),
     getGoalOptionsForPillar(FINANCE_PILLAR_ID),
     getFinanceSetupStatus(),
+    getBudgets(),
   ]);
   const { accessible, total } = netWorth(accounts);
   const monthlySurplus = surplus(baseline.monthlyIncome, baseline.fixedOutgoings);
-  const categorySpending = categoryBreakdown(transactions, new Date());
+  const today = new Date();
+  const currentMonth = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1));
+  const daysInMonth = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + 1, 0)).getUTCDate();
+  const daysElapsed = today.getUTCDate();
+  const categorySpending = categoryBreakdown(transactions, currentMonth);
+  const budgetStatuses = budgetVsActual(transactions, currentMonth, budgets, daysElapsed, daysInMonth);
   const northStarPercent = financeNorthStar.target !== null ? goalProgressPercent(accessible, financeNorthStar.target) : null;
   const trendPoints = cashFlowTrend(transactions);
   const assetBreakdown = netWorthBreakdown(accounts);
@@ -154,6 +163,9 @@ export default async function FinancesPage({ searchParams }: { searchParams: Pro
         </Card>
         <Card title="This month by category">
           <CategoryBreakdownView breakdown={categorySpending} />
+        </Card>
+        <Card title="Budget vs. actual">
+          <BudgetVsActual initialStatuses={budgetStatuses} />
         </Card>
         <Card title="Transactions">
           <TransactionsManager initialTransactions={transactions} goals={goals} />

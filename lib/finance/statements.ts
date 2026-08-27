@@ -8,6 +8,7 @@ export type StatementTransaction = {
   category: string;
   source: string | null;
   receivableId: string | null;
+  goalContributionId: string | null;
 };
 
 function isSameUtcMonth(date: Date, month: Date): boolean {
@@ -15,7 +16,7 @@ function isSameUtcMonth(date: Date, month: Date): boolean {
 }
 
 function isRealSpend(t: StatementTransaction): boolean {
-  return t.direction === "OUT" && t.receivableId === null;
+  return t.direction === "OUT" && t.receivableId === null && t.goalContributionId === null;
 }
 
 function monthSpendTotal(transactions: StatementTransaction[], month: Date): number {

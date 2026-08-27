@@ -238,6 +238,33 @@ export async function updateBaseline(
   return { ok: true };
 }
 
+/** Sets (or replaces) the standing monthly spending limit for a category
+ * — one row per category, upserted by its unique category value rather
+ * than an id the caller would need to already know (#123, ADR-0010). */
+export async function setBudget(category: string, limit: number): Promise<ActionResult> {
+  try {
+    await prisma.budget.upsert({
+      where: { category },
+      create: { category, limit },
+      update: { limit },
+    });
+  } catch {
+    return { ok: false, error: SAVE_ERROR };
+  }
+  revalidatePath("/finances");
+  return { ok: true };
+}
+
+export async function deleteBudget(category: string): Promise<ActionResult> {
+  try {
+    await prisma.budget.delete({ where: { category } });
+  } catch {
+    return { ok: false, error: "Couldn't delete — try again." };
+  }
+  revalidatePath("/finances");
+  return { ok: true };
+}
+
 export type GoalInput = {
   name: string;
   target: number;

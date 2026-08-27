@@ -109,6 +109,14 @@ export async function getFinanceSetupStatus(): Promise<{ complete: boolean; step
   return { complete: steps.baseline && steps.accounts && steps.goals, steps };
 }
 
+/** Every standing category budget (#123, ADR-0010) — `budgetVsActual`
+ * (lib/finance/category-breakdown.ts) turns this into spend-vs-limit
+ * figures for a given month; this is just the raw limits. */
+export async function getBudgets() {
+  const budgets = await prisma.budget.findMany({ orderBy: { category: "asc" } });
+  return budgets.map((b) => ({ ...b, limit: b.limit.toNumber() }));
+}
+
 export async function getReceivables() {
   const receivables = await prisma.receivable.findMany({ orderBy: { openedAt: "desc" } });
   return receivables.map((r) => ({ ...r, amount: r.amount.toNumber() }));

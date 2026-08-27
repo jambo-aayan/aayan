@@ -21,6 +21,7 @@ function tx(overrides: Partial<Parameters<typeof topMerchants>[0][number]> = {})
     category: "Food",
     source: "Tesco",
     receivableId: null,
+    goalContributionId: null,
     ...overrides,
   };
 }
@@ -44,6 +45,15 @@ describe("monthOverMonthDiff", () => {
   it("excludes receivable-flagged transactions from both months", () => {
     const transactions = [
       tx({ id: "a", date: d("2026-08-05"), amount: 100, receivableId: "r1" }),
+      tx({ id: "b", date: d("2026-08-06"), amount: 50 }),
+    ];
+    const result = monthOverMonthDiff(transactions, d("2026-08-01"), d("2026-07-01"));
+    expect(result.currentTotal).toBe(50);
+  });
+
+  it("excludes goal-contribution-flagged transactions from both months", () => {
+    const transactions = [
+      tx({ id: "a", date: d("2026-08-05"), amount: 100, goalContributionId: "gc1" }),
       tx({ id: "b", date: d("2026-08-06"), amount: 50 }),
     ];
     const result = monthOverMonthDiff(transactions, d("2026-08-01"), d("2026-07-01"));

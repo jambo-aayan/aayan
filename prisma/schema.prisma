@@ -634,6 +634,20 @@ model Baseline {
   updatedAt      DateTime @updatedAt
 }
 
+/// A standing monthly spending limit for one Transaction category (#123,
+/// ADR-0010) — category, not Account/cls, since Transactions are already
+/// categorised and that's the natural fit for "how much do I spend on
+/// Food a month." Not month-scoped itself (no rollover, per the AC) —
+/// one row per category, read fresh against each month's actual spend
+/// (lib/finance/category-breakdown.ts's budgetVsActual).
+model Budget {
+  id        String   @id @default(cuid())
+  category  String   @unique
+  limit     Decimal  @db.Decimal(12, 2)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 enum GoalVehicle {
   EMERGENCY_FUND
   LISA
