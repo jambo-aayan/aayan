@@ -1,4 +1,4 @@
-# v2 Phase 6: Insights — reconnecting PER_WEEK/Finance-reclassification bugs, and bringing Systems in
+# v2 Phase 6: Insights — reconnecting PER_WEEK/Finance-reclassification bugs, bringing Systems in, and System deletion + evaluation
 
 Phase 6 is the "full rewiring and polish pass" ADR-0006/ADR-0007 both deferred until Insights was
 actually being built, rather than doing it as a side quest in Phase 2/3. `lib/insights/` itself
@@ -7,6 +7,13 @@ ever kept *compiling* through each schema change since, never rewired onto the n
 phase introduced. Decided ahead of `/to-spec`, working from the repo itself — CONTEXT.md's
 Insight glossary entry and the ADR-0006/0007 deferred-work notes — since no external design
 handoff doc exists for this phase.
+
+Discussing the new Systems KPI (below) reopened two gaps in Systems itself, at the user's
+explicit request: Systems can't be deleted at all today (only archived), and there's no way to
+score how a System is actually going over time, independent of an Experiment's eventual verdict
+or a Process's eventual conclusion. Both land in this same ADR, alongside the Insights work, the
+same way ADR-0010 folded a reopened Goal-model decision in alongside that phase's own Finances
+work.
 
 ## Two real correctness bugs, not just deferred polish
 
@@ -84,12 +91,79 @@ as its own small card next to Correlations, reusing `splitMean` directly — the
 `lib/systems/widgets.ts`'s `ratingVsAdherence` already calls for an analogous boolean-vs-
 continuous shape (per ADR-0008).
 
+## System deletion: full-fidelity undo, mirroring deleteHabit not deleteAccount
+
+`deleteSystem` is new — until now a System (Process or Experiment, template, run, or standalone)
+could only be archived (`setSystemState` → `ARCHIVED`), never actually removed. Every child row —
+`SystemStep`, `SystemStepOccurrence`, `SystemDecision`, `SystemHabit`, `SystemGoal`, and the new
+`SystemEvaluation` below — already cascades on delete at the DB level, so a bare `prisma.system.
+delete()` would silently discard months of step/decision/evaluation history with no way back.
+
+This is the same shape `deleteHabit` already solved for `CheckIn` history, not the shallower
+"seed one fresh row" pattern `deleteAccount`/`deleteGoal`/`deleteTransaction` use for their own
+undo toasts: capture every child row inside the same transaction as the delete, return them to
+the client, and have `restoreSystem` recreate the System plus its full step/decision/occurrence/
+evaluation/link history verbatim on undo. A System's steps *are* the System — an undone delete
+that came back empty would be worse than no undo at all, same reasoning `deleteHabit`'s own doc
+comment gives for `CheckIn`s.
+
+`templateId`/`parentId` both already resolve `ON DELETE SET NULL` at the DB level (decided back
+in Phase 4) — deleting a template un-links its runs rather than cascading into them (they become
+standalone Systems, not orphaned rows), and deleting a parent promotes its children rather than
+deleting them too. `deleteSystem` doesn't override either behavior; it inherits it, same as every
+other System write already does. A `SystemStep`'s `photoUrl` (Vercel Blob) is left orphaned on
+delete, not cleaned up — matching this codebase's established tolerance for orphaned Blobs as "a
+cost, not a correctness problem" (see `deleteCheckpointPhoto`'s own reasoning) rather than adding
+delete-vs-undo-window blob lifecycle complexity for a personal app with no real storage pressure.
+
+## System evaluation: a dated three-question survey, not one blended score
+
+Neither Process's "mark concluded" nor Experiment's Continue/Escalate/Stop verdict answers "how
+is this actually going, right now" — both are end-of-run judgments, not an ongoing signal, and
+Experiment's Checkpoint-step rating only exists on Experiments with a Checkpoint step at all, not
+universally. New `SystemEvaluation`: a dated log entry, loggable on any System (standalone,
+template, or run; Process or Experiment; any state) at any time the user chooses — no forced
+cadence, no Nudge tie-in for the act of logging itself, matching the "passive, user-initiated"
+shape already established for Finance's Budget-vs-actual and surplus-split cards.
+
+Three 1-5 questions per entry (same 1-5 scale Checkpoint ratings already use), not one number:
+
+- **Effectiveness** — "Is this actually working?"
+- **Consistency** — "How consistently have I stuck to it?"
+- **Sustainability** — "Does this feel sustainable to keep doing?"
+
+Plus an optional free-text note, same shape as `SystemDecision`. An entry's overall score is the
+plain average of the three, always shown alongside the per-dimension breakdown, never in place of
+it — the same "a score nobody can explain gets ignored" principle behind Momentum's own three
+visible weighted inputs. Chosen over a single question because the whole point is catching
+*divergence* between dimensions (effectiveness climbing while sustainability quietly craters is
+exactly the situation a blended average would hide).
+
+Two small additions ride along, both read-only derivations of the same entries — no new schema:
+
+- **Staleness flag**: an ACTIVE System with no evaluation in 30 days gets a soft "it's been a
+  while" flag on its card — the same idiom the Statements tab already uses for accounts with no
+  recent statement upload, not a new visual language.
+- **Needs-attention ranking**: a small view on the Systems tab's existing rollup section (where
+  "Load"/"Everything running" already live) surfacing the System with the lowest recent score or
+  the sharpest downward trend in one dimension. Deliberately distinct from the Neglect radar,
+  which measures *absence* of check-ins — this measures *presence with declining quality*, a
+  different failure mode a recency-only signal can't see.
+
 ## Out of scope
 
 - Rewiring `weekly-digest.ts`'s own prose/phrasing beyond what it inherits for free from the
   `momentum.ts`/`kpis.ts` fixes above — no new digest sections.
-- A Systems-specific correlation pair (e.g. rating vs. some other series) — the KPI above is
-  Phase 6's whole Systems footprint; a correlation pair is a separate, later decision if wanted.
+- A Systems-specific correlation pair (e.g. evaluation score vs. some other series) — a genuinely
+  separate, later decision if wanted, not folded into this pass just because Evaluation happens
+  to produce another numeric series.
 - Attention Balance counting Systems activity toward a Pillar's actual time-share — considered
   and explicitly declined in favor of the single KPI card, to avoid stretching one Insights
   surface's definition of "attention" across two unrelated measurement models in the same pass.
+- Any Nudge tie-in for evaluation staleness (e.g. a real `NudgeType`) — the staleness flag above
+  is a passive card badge, not a notification; wiring it into the Nudges eligibility engine is a
+  separate decision with its own delivery-rule questions (quiet hours, dedup, severity) this ADR
+  isn't making.
+- Wiring Evaluation into cross-run comparisons (`lib/systems/widgets.ts`'s `runComparisonBars`/
+  `ratingOverlay`) — those stay scoped to Checkpoint `runRating` as they are today; a future
+  ticket can decide whether Evaluation trends belong in that same overlay.

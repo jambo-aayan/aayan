@@ -86,6 +86,23 @@ Two parts: the user's day job (e.g. sample-apps work) and Jumbo Labs (his startu
 ## Goals
 Superseded by the Task/Habit/Goal split above — a Goal is now an outcome (`Active`/`Paused`/`Completed`/`Archived`), not a one-off unit of work with a `dueDate` or a `myday` flag. Day-to-day one-off work now lives on Task instead; Task carries `myDay` (see "My Day" above), Goal does not. The old "All Actions" cross-cutting list is superseded by "All Tasks" (which itself is being redesigned into a Lists-first Tasks page per the Claude Design handoff — see `docs/adr/` once that decision lands).
 
+## Systems
+A named **Process** (an ongoing routine) or **Experiment** (a time-boxed test with a review date
+and a Continue/Escalate/Stop verdict) — distinct from a Habit (a single recurring behaviour) and
+a Goal (an outcome): a System is the structured *procedure* around one or more Habits/Goals. A
+**template** defines the steps; a **run** is one execution of a template, copying its steps at
+creation time. Scoped to one Pillar (optionally narrower, one Area).
+
+**Deletion**: a System can be archived (hidden, kept) or fully deleted (undo-able within the
+session, full step/decision/occurrence/evaluation history restored on undo — deleting a template
+un-links its runs rather than deleting them too, same for a nested parent and its children).
+
+**Evaluation**: a dated, user-logged check-in on how a System is actually going — independent of
+a Process's eventual "mark concluded" or an Experiment's eventual verdict, since neither answers
+"how's it going right now." Three 1-5 ratings per entry (Effectiveness, Consistency,
+Sustainability) plus an optional note; the overall score is their plain average, always shown
+alongside the three, never instead of them. No forced cadence — logged whenever the user chooses.
+
 ## Insights & Nudges
 Pillar-independent surfaces from the Claude Design handoff (v2). See [ADR-0011](./docs/adr/0011-v2-phase6-insights.md) for the Phase 6 rewiring/additions pass.
 
