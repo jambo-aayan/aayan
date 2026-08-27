@@ -10,6 +10,8 @@ import {
   isValidRating,
   isValidMeasureNumber,
   validatePhotoUpload,
+  resolveRunReview,
+  isVerdictDue,
   type SystemType,
   type SystemState,
 } from "./logic";
@@ -61,6 +63,137 @@ export async function createSystem(input: CreateSystemInput): Promise<CreateSyst
     });
     revalidateSystemPaths(input.areaId);
     return { ok: true, id: system.id };
+  } catch {
+    return { ok: false, error: SAVE_ERROR };
+  }
+}
+
+export async function setSystemTemplate(
+  systemId: string,
+  isTemplate: boolean,
+  runNoun: string | null
+): Promise<ActionResult> {
+  try {
+    const system = await prisma.system.update({
+      where: { id: systemId },
+      data: { isTemplate, runNoun: isTemplate ? runNoun?.trim() || null : null },
+    });
+    revalidateSystemPaths(system.areaId);
+  } catch {
+    return { ok: false, error: SAVE_ERROR };
+  }
+  return { ok: true };
+}
+
+export type StartSystemRunResult = { ok: true; id: string } | { ok: false; error: string };
+
+/** A run is a System row with templateId set, not a separate entity — its
+ * steps are copied (not referenced) from the template at creation time,
+ * so editing the template later never rewrites history for runs already
+ * in progress or concluded. review is always stamped as a concrete
+ * DateTime, resolved from the template's relative-offset or absolute
+ * flavor, so verdict-trigger logic downstream only ever reads one field. */
+export async function startSystemRun(templateId: string): Promise<StartSystemRunResult> {
+  try {
+    const template = await prisma.system.findUniqueOrThrow({ where: { id: templateId }, include: { steps: true } });
+    if (!template.isTemplate) return { ok: false, error: "This System isn't a template." };
+
+    const runStart = new Date();
+    const review = resolveRunReview(
+      { review: template.review, reviewOffsetDays: template.reviewOffsetDays },
+      runStart
+    );
+
+    const run = await prisma.system.create({
+      data: {
+        name: template.name,
+        pillarId: template.pillarId,
+        areaId: template.areaId,
+        type: template.type,
+        body: template.body,
+        review,
+        criteria: template.criteria,
+        sequential: template.sequential,
+        templateId: template.id,
+        createdAt: runStart,
+        steps: {
+          create: template.steps.map((s) => ({
+            type: s.type,
+            text: s.text,
+            sortOrder: s.sortOrder,
+            targetDate: s.targetDate,
+            date: s.date,
+            unit: s.unit,
+            target: s.target,
+            metricName: s.metricName,
+            cadenceDays: s.cadenceDays,
+            endCondition: s.endCondition,
+            endValue: s.endValue,
+          })),
+        },
+      },
+    });
+    revalidateSystemPaths(run.areaId);
+    return { ok: true, id: run.id };
+  } catch {
+    return { ok: false, error: SAVE_ERROR };
+  }
+}
+
+export type ConcludeRunResult = { ok: true } | { ok: false; error: string };
+
+/** A Process run's conclusion: a plain "mark concluded" plus an optional
+ * outcome note — not forced into an Experiment's continue/escalate/stop
+ * framing. */
+export async function concludeProcessRun(runId: string, outcome: string | null): Promise<ConcludeRunResult> {
+  try {
+    const run = await prisma.system.findUniqueOrThrow({ where: { id: runId }, include: { steps: true } });
+    if (run.type !== "PROCESS") return { ok: false, error: "Only Process runs conclude this way." };
+
+    await prisma.system.update({
+      where: { id: runId },
+      data: {
+        runEnd: new Date(),
+        runOutcome: outcome?.trim() || null,
+        runStepsDone: run.steps.filter((s) => s.done).length,
+      },
+    });
+    revalidateSystemPaths(run.areaId);
+    return { ok: true };
+  } catch {
+    return { ok: false, error: SAVE_ERROR };
+  }
+}
+
+export type SetVerdictInput = { verdict: "CONTINUE" | "ESCALATE" | "STOP"; outcome: string | null };
+export type SetVerdictResult = { ok: true } | { ok: false; error: string };
+
+/** An Experiment run's verdict — Continue/Escalate/Stop plus an optional
+ * outcome note, tied to the review date having been reached (render-time
+ * check, not a manually added step). */
+export async function setRunVerdict(runId: string, input: SetVerdictInput): Promise<SetVerdictResult> {
+  try {
+    const run = await prisma.system.findUniqueOrThrow({ where: { id: runId }, include: { steps: true } });
+    if (run.type !== "EXPERIMENT") return { ok: false, error: "Only Experiment runs get a verdict." };
+    if (!isVerdictDue(run.review, new Date())) {
+      return { ok: false, error: "This run hasn't reached its review date yet." };
+    }
+
+    const ratings = run.steps.filter((s) => s.rating !== null).map((s) => s.rating!);
+    const runRating = ratings.length > 0 ? ratings.reduce((sum, r) => sum + r, 0) / ratings.length : null;
+
+    await prisma.system.update({
+      where: { id: runId },
+      data: {
+        verdict: input.verdict,
+        runEnd: new Date(),
+        runOutcome: input.outcome?.trim() || null,
+        runStepsDone: run.steps.filter((s) => s.done).length,
+        runRating,
+      },
+    });
+    revalidateSystemPaths(run.areaId);
+    return { ok: true };
   } catch {
     return { ok: false, error: SAVE_ERROR };
   }

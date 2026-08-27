@@ -325,6 +325,16 @@ enum SystemType {
   EXPERIMENT
 }
 
+/// An Experiment run's verdict at its review date — Continue/Escalate/Stop
+/// (DATA_MODEL.md §5). Process runs use runOutcome (a plain note) instead;
+/// a Process's "mark concluded" isn't forced into this continue/escalate/
+/// stop framing.
+enum SystemVerdict {
+  CONTINUE
+  ESCALATE
+  STOP
+}
+
 /// Paused reads as "deliberately dormant, not failing" per DATA_MODEL.md —
 /// excluded from nudges/streak pressure by every reader that iterates
 /// Systems. Archived Systems are hidden behind a "Show archived" toggle,
@@ -395,6 +405,22 @@ model System {
   templateId String?
   template   System?  @relation("SystemRuns", fields: [templateId], references: [id])
   runs       System[] @relation("SystemRuns")
+
+  /// Run-only summary fields, populated when a run concludes — stored
+  /// rather than re-derived from step detail each time (DATA_MODEL.md §5).
+  /// A run's *start* is just its own `createdAt`; no separate column for
+  /// that would only duplicate it.
+  runEnd       DateTime?
+  runStepsDone Int?
+  /// Process: the optional outcome note on "mark concluded". Experiment:
+  /// the optional written outcome alongside `verdict`.
+  runOutcome String?
+  /// Experiment only — the average of the run's own Checkpoint ratings,
+  /// snapshotted at conclusion for the cross-run rating overlay.
+  runRating Float?
+  /// Experiment only, set together with runEnd/runOutcome via the
+  /// Set-verdict action once `today >= review`.
+  verdict SystemVerdict?
 
   parentId String?
   parent   System?  @relation("SystemNesting", fields: [parentId], references: [id])

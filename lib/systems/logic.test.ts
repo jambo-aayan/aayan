@@ -9,6 +9,9 @@ import {
   classifyOccurrences,
   validatePhotoUpload,
   MAX_PHOTO_BYTES,
+  resolveRunReview,
+  isVerdictDue,
+  hasCriteria,
 } from "./logic";
 
 describe("validateCreateSystemInput", () => {
@@ -221,5 +224,55 @@ describe("validatePhotoUpload", () => {
 
   it("accepts a file exactly at the size cap", () => {
     expect(validatePhotoUpload("image/png", MAX_PHOTO_BYTES)).toEqual({ ok: true });
+  });
+});
+
+describe("resolveRunReview", () => {
+  it("resolves a relative offset from the run's start", () => {
+    const result = resolveRunReview({ review: null, reviewOffsetDays: 14 }, new Date("2026-08-01"));
+    expect(result).toEqual(new Date("2026-08-15"));
+  });
+
+  it("copies an absolute review date straight through", () => {
+    const result = resolveRunReview({ review: new Date("2026-09-01"), reviewOffsetDays: null }, new Date("2026-08-01"));
+    expect(result).toEqual(new Date("2026-09-01"));
+  });
+
+  it("prefers the relative offset when both are somehow set", () => {
+    const result = resolveRunReview(
+      { review: new Date("2026-09-01"), reviewOffsetDays: 7 },
+      new Date("2026-08-01")
+    );
+    expect(result).toEqual(new Date("2026-08-08"));
+  });
+
+  it("returns null for a Process template (neither field set)", () => {
+    expect(resolveRunReview({ review: null, reviewOffsetDays: null }, new Date("2026-08-01"))).toBeNull();
+  });
+});
+
+describe("isVerdictDue", () => {
+  it("is false when there's no review date", () => {
+    expect(isVerdictDue(null, new Date("2026-08-20"))).toBe(false);
+  });
+
+  it("is false before the review date", () => {
+    expect(isVerdictDue(new Date("2026-08-20"), new Date("2026-08-19"))).toBe(false);
+  });
+
+  it("is true on or after the review date", () => {
+    expect(isVerdictDue(new Date("2026-08-20"), new Date("2026-08-20"))).toBe(true);
+    expect(isVerdictDue(new Date("2026-08-20"), new Date("2026-08-25"))).toBe(true);
+  });
+});
+
+describe("hasCriteria", () => {
+  it("is false for null or blank criteria", () => {
+    expect(hasCriteria(null)).toBe(false);
+    expect(hasCriteria("   ")).toBe(false);
+  });
+
+  it("is true for real criteria text", () => {
+    expect(hasCriteria("Symptoms improve")).toBe(true);
   });
 });

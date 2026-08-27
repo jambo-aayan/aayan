@@ -8,6 +8,10 @@ const SYSTEM_INCLUDE = {
   },
   children: { select: { id: true, name: true, state: true } },
   parent: { select: { id: true, name: true } },
+  runs: {
+    orderBy: { createdAt: "desc" as const },
+    include: { steps: { select: { rating: true, done: true } } },
+  },
   decisions: { orderBy: { when: "desc" as const } },
   habits: {
     include: {

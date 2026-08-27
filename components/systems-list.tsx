@@ -3,12 +3,16 @@
 import { useState } from "react";
 import Link from "next/link";
 import type { SystemType, SystemState } from "@/lib/systems/logic";
-import { expectedOccurrenceDates, classifyOccurrences, validatePhotoUpload } from "@/lib/systems/logic";
+import { expectedOccurrenceDates, classifyOccurrences, validatePhotoUpload, isVerdictDue, hasCriteria } from "@/lib/systems/logic";
 import {
   createSystem,
   setSystemState,
   setSystemSequential,
   setSystemParent,
+  setSystemTemplate,
+  startSystemRun,
+  concludeProcessRun,
+  setRunVerdict,
   updateSystemReference,
   duplicateSystem,
   addChecklistStep,
@@ -76,6 +80,18 @@ export type SystemStepRow = {
 export type SystemDecisionRow = { id: string; when: Date; body: string };
 export type LinkedHabit = { id: string; name: string; status: string; checkInDates: Date[] };
 export type LinkedGoal = { id: string; name: string; status: string };
+export type RunRow = {
+  id: string;
+  createdAt: Date;
+  runEnd: Date | null;
+  runOutcome: string | null;
+  runRating: number | null;
+  runStepsDone: number | null;
+  verdict: "CONTINUE" | "ESCALATE" | "STOP" | null;
+  review: Date | null;
+  criteria: string | null;
+  steps: { rating: number | null; done: boolean }[];
+};
 export type AreaSystem = {
   id: string;
   name: string;
@@ -84,7 +100,16 @@ export type AreaSystem = {
   body: string | null;
   reference: string | null;
   review: Date | null;
+  criteria: string | null;
   sequential: boolean;
+  isTemplate: boolean;
+  runNoun: string | null;
+  templateId: string | null;
+  runEnd: Date | null;
+  runOutcome: string | null;
+  runRating: number | null;
+  runStepsDone: number | null;
+  verdict: "CONTINUE" | "ESCALATE" | "STOP" | null;
   steps: SystemStepRow[];
   decisions: SystemDecisionRow[];
   children: { id: string; name: string; state: SystemState }[];
@@ -92,6 +117,7 @@ export type AreaSystem = {
   parent: { id: string; name: string } | null;
   linkedHabits: LinkedHabit[];
   linkedGoals: LinkedGoal[];
+  runs: RunRow[];
 };
 
 const STATE_NOTE: Record<SystemState, string | null> = {
@@ -158,7 +184,16 @@ export function SystemsList({
         body: form.body.trim() || null,
         reference: null,
         review: form.type === "EXPERIMENT" && form.review ? new Date(form.review) : null,
+        criteria: form.type === "EXPERIMENT" ? form.criteria.trim() || null : null,
         sequential: false,
+        isTemplate: false,
+        runNoun: null,
+        templateId: null,
+        runEnd: null,
+        runOutcome: null,
+        runRating: null,
+        runStepsDone: null,
+        verdict: null,
         steps: [],
         decisions: [],
         children: [],
@@ -166,6 +201,7 @@ export function SystemsList({
         parent: null,
         linkedHabits: [],
         linkedGoals: [],
+        runs: [],
       },
     ]);
     setForm(EMPTY_FORM);
@@ -273,6 +309,9 @@ function SystemCard({
   const [captureComment, setCaptureComment] = useState("");
   const [captureValue, setCaptureValue] = useState("");
   const [uploadingStepId, setUploadingStepId] = useState<string | null>(null);
+  const [runNounDraft, setRunNounDraft] = useState(system.runNoun ?? "");
+  const [startingRun, setStartingRun] = useState(false);
+  const [outcomeDrafts, setOutcomeDrafts] = useState<Record<string, string>>({});
   const [backdatingStepId, setBackdatingStepId] = useState<string | null>(null);
   const [backdateValue, setBackdateValue] = useState("");
   const [kanbanView, setKanbanView] = useState(false);
@@ -299,6 +338,83 @@ function SystemCard({
       onChange({ ...system, sequential: !next });
       notifyError(result.error, { onRetry: handleToggleSequential });
     }
+  }
+
+  async function handleToggleTemplate() {
+    const next = !system.isTemplate;
+    const prev = { isTemplate: system.isTemplate, runNoun: system.runNoun };
+    onChange({ ...system, isTemplate: next, runNoun: next ? runNounDraft.trim() || null : null });
+    const result = await withRetry(() => setSystemTemplate(system.id, next, next ? runNounDraft : null));
+    if (!result.ok) {
+      onChange({ ...system, ...prev });
+      notifyError(result.error, { onRetry: handleToggleTemplate });
+    }
+  }
+
+  async function handleSaveRunNoun() {
+    const trimmed = runNounDraft.trim() || null;
+    if (trimmed === system.runNoun) return;
+    const prevNoun = system.runNoun;
+    onChange({ ...system, runNoun: trimmed });
+    const result = await withRetry(() => setSystemTemplate(system.id, true, trimmed));
+    if (!result.ok) {
+      onChange({ ...system, runNoun: prevNoun });
+      notifyError(result.error, { onRetry: handleSaveRunNoun });
+    }
+  }
+
+  async function handleStartRun() {
+    setStartingRun(true);
+    const result = await withRetry(() => startSystemRun(system.id));
+    setStartingRun(false);
+    if (!result.ok) {
+      notifyError(result.error, { onRetry: handleStartRun });
+      return;
+    }
+    onChange({
+      ...system,
+      runs: [
+        {
+          id: result.id,
+          createdAt: new Date(),
+          runEnd: null,
+          runOutcome: null,
+          runRating: null,
+          runStepsDone: null,
+          verdict: null,
+          review: system.review,
+          criteria: system.criteria,
+          steps: [],
+        },
+        ...system.runs,
+      ],
+    });
+  }
+
+  async function handleConcludeRun(runId: string, outcome: string) {
+    const result = await withRetry(() => concludeProcessRun(runId, outcome || null));
+    if (!result.ok) {
+      notifyError(result.error, { onRetry: () => handleConcludeRun(runId, outcome) });
+      return;
+    }
+    onChange({
+      ...system,
+      runs: system.runs.map((r) =>
+        r.id === runId ? { ...r, runEnd: new Date(), runOutcome: outcome.trim() || null } : r
+      ),
+    });
+  }
+
+  async function handleSetVerdict(runId: string, verdict: "CONTINUE" | "ESCALATE" | "STOP", outcome: string) {
+    const result = await withRetry(() => setRunVerdict(runId, { verdict, outcome: outcome || null }));
+    if (!result.ok) {
+      notifyError(result.error, { onRetry: () => handleSetVerdict(runId, verdict, outcome) });
+      return;
+    }
+    onChange({
+      ...system,
+      runs: system.runs.map((r) => (r.id === runId ? { ...r, verdict, runEnd: new Date(), runOutcome: outcome.trim() || null } : r)),
+    });
   }
 
   async function handleSetState(state: SystemState) {
@@ -704,6 +820,23 @@ function SystemCard({
         <button type="button" className={styles.link} onClick={handleToggleSequential}>
           {system.sequential ? "Sequential ✓" : "Make sequential"}
         </button>
+        <button type="button" className={styles.link} onClick={handleToggleTemplate}>
+          {system.isTemplate ? "Template ✓" : "Make a template"}
+        </button>
+        {system.isTemplate && (
+          <>
+            <input
+              className={styles.input}
+              placeholder="Run noun (e.g. block)"
+              value={runNounDraft}
+              onChange={(e) => setRunNounDraft(e.target.value)}
+              onBlur={handleSaveRunNoun}
+            />
+            <button type="button" className={styles.link} onClick={handleStartRun} disabled={startingRun}>
+              {startingRun ? "Starting…" : `Start a new ${system.runNoun || "run"}`}
+            </button>
+          </>
+        )}
         {system.children.length === 0 && parentOptions.length > 0 && (
           <select
             className={styles.statePill}
@@ -826,6 +959,87 @@ function SystemCard({
               <img src={beforeAfter.now.url} alt="Latest" className={styles.photoThumbLarge} />
             </div>
           </div>
+        </div>
+      )}
+      {system.isTemplate && system.runs.length > 0 && (
+        <div className={styles.section}>
+          <div className={styles.sectionLabel}>{system.runNoun ? `${system.runNoun}s` : "Runs"}</div>
+          <ul className={styles.stepList}>
+            {system.runs.map((run) => {
+              const stepsDone = run.runStepsDone ?? run.steps.filter((s) => s.done).length;
+              const verdictDue = system.type === "EXPERIMENT" && !run.verdict && isVerdictDue(run.review, now);
+              const outcomeDraft = outcomeDrafts[run.id] ?? "";
+              return (
+                <li key={run.id} className={styles.stepRow}>
+                  <div>
+                    <span>{run.createdAt.toISOString().slice(0, 10)}</span>
+                    <span className={styles.meta}>
+                      {" "}
+                      · {stepsDone}/{run.steps.length} steps
+                      {run.verdict && ` · ${run.verdict}`}
+                      {run.runEnd && !run.verdict && " · concluded"}
+                      {!run.runEnd && run.review && ` · review ${run.review.toISOString().slice(0, 10)}`}
+                    </span>
+                    {run.runOutcome && <div className={styles.meta}>{run.runOutcome}</div>}
+                    {!run.runEnd && system.type === "PROCESS" && (
+                      <div className={styles.addForm}>
+                        <input
+                          className={styles.input}
+                          placeholder="Outcome note (optional)"
+                          value={outcomeDraft}
+                          onChange={(e) => setOutcomeDrafts((prev) => ({ ...prev, [run.id]: e.target.value }))}
+                        />
+                        <button
+                          type="button"
+                          className={styles.link}
+                          onClick={() => handleConcludeRun(run.id, outcomeDraft)}
+                        >
+                          Mark concluded
+                        </button>
+                      </div>
+                    )}
+                    {verdictDue && (
+                      <div className={styles.addForm}>
+                        {!hasCriteria(run.criteria) && (
+                          <p className={styles.error}>
+                            No success criteria was set. Whatever you decide here is a judgement after the fact,
+                            not a test of something written in advance.
+                          </p>
+                        )}
+                        <input
+                          className={styles.input}
+                          placeholder="Outcome note (optional)"
+                          value={outcomeDraft}
+                          onChange={(e) => setOutcomeDrafts((prev) => ({ ...prev, [run.id]: e.target.value }))}
+                        />
+                        <button
+                          type="button"
+                          className={styles.link}
+                          onClick={() => handleSetVerdict(run.id, "CONTINUE", outcomeDraft)}
+                        >
+                          Continue
+                        </button>
+                        <button
+                          type="button"
+                          className={styles.link}
+                          onClick={() => handleSetVerdict(run.id, "ESCALATE", outcomeDraft)}
+                        >
+                          Escalate
+                        </button>
+                        <button
+                          type="button"
+                          className={styles.link}
+                          onClick={() => handleSetVerdict(run.id, "STOP", outcomeDraft)}
+                        >
+                          Stop
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
         </div>
       )}
 

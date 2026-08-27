@@ -49,6 +49,36 @@ export function isValidRating(rating: number): boolean {
   return Number.isInteger(rating) && rating >= 1 && rating <= 5;
 }
 
+export type ReviewTemplate = { review: Date | null; reviewOffsetDays: number | null };
+
+/** Resolves a run's concrete review date from its template — relative
+ * (`reviewOffsetDays` days after the run's start) or absolute (`review`
+ * copied straight through). A run always ends up with one concrete date
+ * (or null, for a Process template / an Experiment template somehow
+ * lacking both), so downstream verdict-trigger logic never has to know
+ * which flavor the template used. */
+export function resolveRunReview(template: ReviewTemplate, runStart: Date): Date | null {
+  if (template.reviewOffsetDays !== null) {
+    return new Date(runStart.getTime() + template.reviewOffsetDays * DAY_MS);
+  }
+  return template.review;
+}
+
+/** An Experiment run surfaces "Set verdict" once its review date has
+ * arrived — a render-time comparison, no cron, same pattern as the
+ * existing Nudge computation. */
+export function isVerdictDue(review: Date | null, today: Date): boolean {
+  return review !== null && utcMidnight(today).getTime() >= utcMidnight(review).getTime();
+}
+
+/** An Experiment created without criteria (the creation form should
+ * prevent this, but defensively) shows an explicit "no criteria was set"
+ * notice at verdict time rather than presenting the verdict as if it
+ * passed a real test. */
+export function hasCriteria(criteria: string | null): boolean {
+  return criteria !== null && criteria.trim().length > 0;
+}
+
 export const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
 const ALLOWED_PHOTO_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif", "image/heic"]);
 
