@@ -25,6 +25,9 @@ export async function getAccounts() {
     // manually entered value or a Transactional account (whose value
     // comes from summed transactions, not a parsed balance figure).
     valueConfidence: snapshots[0]?.confidence ?? null,
+    // The Statements "Uploads" section's staleness signal (#118,
+    // ADR-0010) — null when an account has never had a Snapshot at all.
+    lastSnapshotDate: snapshots[0]?.date ?? null,
   }));
 }
 

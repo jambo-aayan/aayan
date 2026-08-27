@@ -1,4 +1,4 @@
-import { Landmark, ClipboardCheck } from "lucide-react";
+import { Landmark, ClipboardCheck, FileBarChart } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import pageStyles from "@/components/page-header.module.css";
 import { PageTitle } from "@/components/page-title";
@@ -108,6 +108,13 @@ export default async function FinancesPage({ searchParams }: { searchParams: Pro
               ? "Nothing held for review"
               : `${uncategorisedTransactions.length} held for review`
           }
+        />
+        <DashboardCard
+          href="/finances/statements"
+          icon={FileBarChart}
+          accent="finance"
+          title="Statements"
+          status="Overview, detail, compare & more"
         />
 
         <Card title="North Star">
