@@ -50,6 +50,9 @@ import {
   ratingVsAdherence,
   photoStrip,
   thenAndNow,
+  runComparisonBars,
+  runFrequency,
+  ratingOverlay,
   type KanbanColumn,
   type MilestoneStep,
 } from "@/lib/systems/widgets";
@@ -781,6 +784,18 @@ function SystemCard({
   const photos = photoStrip(system.steps);
   const beforeAfter = thenAndNow(system.steps);
   const scatter = scatterHabit ? ratingVsAdherence(system.steps, scatterHabit.checkInDates) : null;
+  const runSummaries = system.runs.map((r) => ({
+    id: r.id,
+    createdAt: r.createdAt,
+    runEnd: r.runEnd,
+    runStepsDone: r.runStepsDone,
+    outcome: r.runOutcome,
+    runRating: r.runRating,
+    totalSteps: r.steps.length,
+  }));
+  const comparisonBars = runComparisonBars(runSummaries);
+  const frequency = runFrequency(runSummaries);
+  const overlay = ratingOverlay(runSummaries);
 
   return (
     <div className={styles.systemCard} id={`system-${system.id}`}>
@@ -1040,6 +1055,61 @@ function SystemCard({
               );
             })}
           </ul>
+          {comparisonBars && (
+            <div className={styles.section}>
+              <div className={styles.sectionLabel}>Comparing {system.runNoun ? `${system.runNoun}s` : "runs"}</div>
+              <ul className={styles.stepList}>
+                {comparisonBars.map((b) => (
+                  <li key={b.id} className={styles.stepRow}>
+                    <span>{b.createdAt.toISOString().slice(0, 10)}</span>
+                    <span className={styles.meta}>
+                      {" "}
+                      · {b.durationDays}d · {b.stepsDone}/{b.totalSteps} steps
+                      {b.outcome && ` · ${b.outcome}`}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {frequency && (
+            <div className={styles.section}>
+              <div className={styles.sectionLabel}>Frequency</div>
+              <ul className={styles.stepList}>
+                {frequency.map((f) => {
+                  const fromDate = system.runs.find((r) => r.id === f.fromId)?.createdAt;
+                  const toDate = system.runs.find((r) => r.id === f.toId)?.createdAt;
+                  return (
+                    <li key={`${f.fromId}-${f.toId}`} className={styles.stepRow}>
+                      <span>
+                        {fromDate?.toISOString().slice(0, 10)} → {toDate?.toISOString().slice(0, 10)}
+                      </span>
+                      <span className={styles.meta}>
+                        {" "}
+                        · {f.gapDays} day{f.gapDays === 1 ? "" : "s"} apart
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
+          {overlay && (
+            <div className={styles.section}>
+              <div className={styles.sectionLabel}>Rating by {system.runNoun ? `${system.runNoun}` : "run"}</div>
+              <ul className={styles.stepList}>
+                {overlay.map((p) => {
+                  const runDate = system.runs.find((r) => r.id === p.runId)?.createdAt;
+                  return (
+                    <li key={p.runId} className={styles.stepRow}>
+                      <span>{runDate ? runDate.toISOString().slice(0, 10) : p.runId}</span>
+                      <span className={styles.meta}> · {p.rating}</span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
         </div>
       )}
 

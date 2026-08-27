@@ -29,6 +29,70 @@ export function photoStrip(steps: PhotoStep[]): PhotoEntry[] | null {
 
 export type ThenAndNow = { then: PhotoEntry; now: PhotoEntry };
 
+export type RunSummary = {
+  id: string;
+  createdAt: Date;
+  runEnd: Date | null;
+  runStepsDone: number | null;
+  outcome: string | null;
+  runRating: number | null;
+  totalSteps: number;
+};
+
+export type RunComparisonBar = {
+  id: string;
+  createdAt: Date;
+  durationDays: number | null;
+  stepsDone: number;
+  totalSteps: number;
+  outcome: string | null;
+};
+
+/** Comparison bars (duration, steps, outcome) — appears once a template
+ * has 2+ concluded runs. Only concluded runs (runEnd set) are comparable;
+ * an in-progress run has no duration yet. */
+export function runComparisonBars(runs: RunSummary[]): RunComparisonBar[] | null {
+  const concluded = runs.filter((r): r is RunSummary & { runEnd: Date } => r.runEnd !== null);
+  if (concluded.length < 2) return null;
+
+  return concluded.map((r) => ({
+    id: r.id,
+    createdAt: r.createdAt,
+    durationDays: Math.round((r.runEnd.getTime() - r.createdAt.getTime()) / (24 * 60 * 60 * 1000)),
+    stepsDone: r.runStepsDone ?? 0,
+    totalSteps: r.totalSteps,
+    outcome: r.outcome,
+  }));
+}
+
+export type RunSpacing = { fromId: string; toId: string; gapDays: number };
+
+/** Frequency-over-time — the spacing between run starts — appears once a
+ * template has 3+ runs (in progress or concluded; frequency is about
+ * *starting* again, not finishing). */
+export function runFrequency(runs: RunSummary[]): RunSpacing[] | null {
+  if (runs.length < 3) return null;
+
+  const sorted = [...runs].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+  const spacings: RunSpacing[] = [];
+  for (let i = 1; i < sorted.length; i++) {
+    const gapDays = Math.round((sorted[i].createdAt.getTime() - sorted[i - 1].createdAt.getTime()) / (24 * 60 * 60 * 1000));
+    spacings.push({ fromId: sorted[i - 1].id, toId: sorted[i].id, gapDays });
+  }
+  return spacings;
+}
+
+export type RunRatingPoint = { runId: string; dayOffset: number; rating: number };
+
+/** Overlay of each run's own rating, aligned to its own day 0 (its start
+ * date) — appears once 2+ runs have a rating. Reads only the runRating
+ * summary field, same as runComparisonBars/runFrequency — one point per
+ * run, not a per-step curve. */
+export function ratingOverlay(runs: RunSummary[]): RunRatingPoint[] | null {
+  const rated = runs.filter((r): r is RunSummary & { runRating: number } => r.runRating !== null);
+  return rated.length >= 2 ? rated.map((r) => ({ runId: r.id, dayOffset: 0, rating: r.runRating })) : null;
+}
+
 /** Then-and-now pair (earliest vs latest) — appears once a System has 2+
  * photos. */
 export function thenAndNow(steps: PhotoStep[]): ThenAndNow | null {

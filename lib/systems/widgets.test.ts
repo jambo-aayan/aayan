@@ -13,8 +13,12 @@ import {
   ratingVsAdherence,
   photoStrip,
   thenAndNow,
+  runComparisonBars,
+  runFrequency,
+  ratingOverlay,
   type RatedStep,
   type PhotoStep,
+  type RunSummary,
   type MilestoneStep,
   type MeasureStep,
 } from "./widgets";
@@ -227,5 +231,86 @@ describe("thenAndNow", () => {
       then: { url: "a.jpg", date: new Date("2026-08-01") },
       now: { url: "c.jpg", date: new Date("2026-08-03") },
     });
+  });
+});
+
+function run(
+  id: string,
+  createdAt: string,
+  runEnd: string | null,
+  stepsDone: number | null,
+  totalSteps: number,
+  outcome: string | null = null,
+  runRating: number | null = null
+): RunSummary {
+  return {
+    id,
+    createdAt: new Date(createdAt),
+    runEnd: runEnd ? new Date(runEnd) : null,
+    runStepsDone: stepsDone,
+    outcome,
+    runRating,
+    totalSteps,
+  };
+}
+
+describe("runComparisonBars", () => {
+  it("returns null below 2 concluded runs", () => {
+    const runs = [run("a", "2026-08-01", "2026-08-10", 5, 5), run("b", "2026-08-11", null, 2, 5)];
+    expect(runComparisonBars(runs)).toBeNull();
+  });
+
+  it("returns bars for concluded runs only, with computed duration", () => {
+    const runs = [
+      run("a", "2026-08-01", "2026-08-11", 5, 5, "Worked well"),
+      run("b", "2026-08-12", "2026-08-19", 4, 5),
+      run("c", "2026-08-20", null, 1, 5),
+    ];
+    const result = runComparisonBars(runs);
+    expect(result).toHaveLength(2);
+    expect(result![0]).toEqual({ id: "a", createdAt: new Date("2026-08-01"), durationDays: 10, stepsDone: 5, totalSteps: 5, outcome: "Worked well" });
+    expect(result![1].durationDays).toBe(7);
+  });
+});
+
+describe("runFrequency", () => {
+  it("returns null below 3 runs", () => {
+    const runs = [run("a", "2026-08-01", null, 0, 5), run("b", "2026-08-10", null, 0, 5)];
+    expect(runFrequency(runs)).toBeNull();
+  });
+
+  it("returns spacing between consecutive run starts once 3+ exist", () => {
+    const runs = [run("a", "2026-08-01", null, 0, 5), run("c", "2026-08-20", null, 0, 5), run("b", "2026-08-10", null, 0, 5)];
+    const result = runFrequency(runs);
+    expect(result).toEqual([
+      { fromId: "a", toId: "b", gapDays: 9 },
+      { fromId: "b", toId: "c", gapDays: 10 },
+    ]);
+  });
+});
+
+describe("ratingOverlay", () => {
+  it("returns null below 2 runs with a rating", () => {
+    const runs = [run("a", "2026-08-01", null, 0, 5, null, 4)];
+    expect(ratingOverlay(runs)).toBeNull();
+  });
+
+  it("returns one point per rated run, all aligned to day 0", () => {
+    const runs = [run("a", "2026-08-01", "2026-08-11", 5, 5, null, 4), run("b", "2026-09-01", null, 3, 5, null, 5)];
+    const result = ratingOverlay(runs);
+    expect(result).toEqual([
+      { runId: "a", dayOffset: 0, rating: 4 },
+      { runId: "b", dayOffset: 0, rating: 5 },
+    ]);
+  });
+
+  it("excludes runs with no rating from the overlay", () => {
+    const runs = [
+      run("a", "2026-08-01", null, 0, 5, null, 4),
+      run("b", "2026-08-01", null, 0, 5, null, null),
+      run("c", "2026-08-01", null, 0, 5, null, 3),
+    ];
+    const result = ratingOverlay(runs);
+    expect(result!.map((t) => t.runId)).toEqual(["a", "c"]);
   });
 });
