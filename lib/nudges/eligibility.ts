@@ -16,7 +16,12 @@ export type HabitEligibilityFixture = {
   name: string;
   scheduledToday: boolean;
   checkedInToday: boolean;
-  streakDays: number;
+  /** Whether skipping today would put a meaningful streak at risk —
+   * precomputed by the caller via lib/habits/schedule.ts's
+   * isStreakAtRisk, which knows how to judge this per schedule type (a
+   * PER_WEEK habit's "at risk" isn't a daily-consecutive streak — see
+   * that function's own doc comment, #126/ADR-0011). */
+  atRisk: boolean;
 };
 
 export type TaskEligibilityFixture = {
@@ -70,8 +75,6 @@ export type EligibilityResult = {
    * it as one coalesced batch, so nothing held is lost, only delayed. */
   held: boolean;
 };
-
-const STREAK_AT_RISK_THRESHOLD = 7;
 
 function dateKey(date: Date): string {
   return date.toISOString().slice(0, 10);
@@ -138,14 +141,14 @@ function generateCandidates(ctx: NudgeContext): NudgeCandidate[] {
     if (ctx.deliveryRules.streakWarnings) {
       for (const habit of ctx.habits) {
         if (!habit.scheduledToday || habit.checkedInToday) continue;
-        if (habit.streakDays <= STREAK_AT_RISK_THRESHOLD) continue;
+        if (!habit.atRisk) continue;
         candidates.push({
           dedupKey: `habit:${habit.id}:${today}`,
           type: "STREAK_AT_RISK",
           severity: NUDGE_SEVERITY.STREAK_AT_RISK,
           targetType: "HABIT",
           targetId: habit.id,
-          title: `${habit.name}'s ${habit.streakDays}-day streak is at risk`,
+          title: `${habit.name}'s streak is at risk`,
           body: "Unlogged and getting late — check in to keep the streak alive.",
         });
       }

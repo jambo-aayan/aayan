@@ -42,7 +42,7 @@ describe("evaluateEligibility — quiet-hour hold", () => {
     const ctx = baseCtx({
       now: d("2026-08-21T23:00:00.000Z"),
       runKind: "EVENING",
-      habits: [{ id: "h1", name: "Stretch", scheduledToday: true, checkedInToday: false, streakDays: 1 }],
+      habits: [{ id: "h1", name: "Stretch", scheduledToday: true, checkedInToday: false, atRisk: false }],
     });
     const result = evaluateEligibility(ctx);
     expect(result.held).toBe(true);
@@ -59,7 +59,7 @@ describe("evaluateEligibility — same-habit dedup by severity", () => {
   it("streak-at-risk supersedes habit-due for the same habit on the same day", () => {
     const ctx = baseCtx({
       runKind: "EVENING",
-      habits: [{ id: "h1", name: "Journal", scheduledToday: true, checkedInToday: false, streakDays: 12 }],
+      habits: [{ id: "h1", name: "Journal", scheduledToday: true, checkedInToday: false, atRisk: true }],
     });
     const result = evaluateEligibility(ctx);
     const forHabit = result.deliver.filter((c) => c.dedupKey === "habit:h1:2026-08-21");
@@ -70,7 +70,7 @@ describe("evaluateEligibility — same-habit dedup by severity", () => {
   it("falls back to habit-due when the streak isn't long enough to be at risk", () => {
     const ctx = baseCtx({
       runKind: "EVENING",
-      habits: [{ id: "h1", name: "Journal", scheduledToday: true, checkedInToday: false, streakDays: 3 }],
+      habits: [{ id: "h1", name: "Journal", scheduledToday: true, checkedInToday: false, atRisk: false }],
     });
     const result = evaluateEligibility(ctx);
     const forHabit = result.deliver.filter((c) => c.dedupKey === "habit:h1:2026-08-21");
@@ -81,7 +81,7 @@ describe("evaluateEligibility — same-habit dedup by severity", () => {
   it("does not warn about a streak at risk once the habit is checked in", () => {
     const ctx = baseCtx({
       runKind: "EVENING",
-      habits: [{ id: "h1", name: "Journal", scheduledToday: true, checkedInToday: true, streakDays: 20 }],
+      habits: [{ id: "h1", name: "Journal", scheduledToday: true, checkedInToday: true, atRisk: true }],
     });
     expect(evaluateEligibility(ctx).deliver).toEqual([]);
   });
@@ -92,9 +92,9 @@ describe("evaluateEligibility — morning brief coalescing", () => {
     const ctx = baseCtx({
       runKind: "MORNING",
       habits: [
-        { id: "h1", name: "Stretch", scheduledToday: true, checkedInToday: false, streakDays: 1 },
-        { id: "h2", name: "Read", scheduledToday: true, checkedInToday: false, streakDays: 2 },
-        { id: "h3", name: "Journal", scheduledToday: true, checkedInToday: false, streakDays: 3 },
+        { id: "h1", name: "Stretch", scheduledToday: true, checkedInToday: false, atRisk: false },
+        { id: "h2", name: "Read", scheduledToday: true, checkedInToday: false, atRisk: false },
+        { id: "h3", name: "Journal", scheduledToday: true, checkedInToday: false, atRisk: false },
       ],
       topTasks: [{ id: "t1", title: "Call the vet" }, { id: "t2", title: "Pay rent" }],
     });
@@ -122,7 +122,7 @@ describe("evaluateEligibility — delivery rule toggles", () => {
     const ctx = baseCtx({
       runKind: "EVENING",
       deliveryRules: { ...ALL_ON, eveningCheckIn: false, streakWarnings: false },
-      habits: [{ id: "h1", name: "Journal", scheduledToday: true, checkedInToday: false, streakDays: 12 }],
+      habits: [{ id: "h1", name: "Journal", scheduledToday: true, checkedInToday: false, atRisk: true }],
     });
     expect(evaluateEligibility(ctx).deliver).toEqual([]);
   });
@@ -205,7 +205,7 @@ describe("evaluateEligibility — idempotent reruns", () => {
   it("delivers an upgrade when the new candidate outranks the stored severity", () => {
     const ctx = baseCtx({
       runKind: "EVENING",
-      habits: [{ id: "h1", name: "Journal", scheduledToday: true, checkedInToday: false, streakDays: 12 }],
+      habits: [{ id: "h1", name: "Journal", scheduledToday: true, checkedInToday: false, atRisk: true }],
       existingNudgesToday: [{ dedupKey: "habit:h1:2026-08-21", severity: 1 }], // an earlier HABIT_DUE
     });
     const result = evaluateEligibility(ctx);

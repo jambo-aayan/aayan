@@ -163,3 +163,62 @@ export function doneCount(schedule: HabitSchedule, days: Date[], loggedDays: Dat
   }
   return days.filter((day) => isLogged(day) && habitOccursOn(schedule, day, doneEarlierThisWeek(day, loggedDays))).length;
 }
+
+export type WeeklyShortfall = { daysRemaining: number; shortfall: number };
+
+/** For a PER_WEEK habit only: how many days remain in `today`'s Mon-Sun
+ * week (inclusive of today), and how many more occurrences are still
+ * needed to hit that week's target. Used by Nudges' "due today"/"at
+ * risk" checks below, which need a genuinely different framing for a
+ * count-based habit than a daily-consecutive streak (#126, ADR-0011). */
+export function weeklyShortfall(schedule: HabitSchedule, today: Date, loggedDays: Date[]): WeeklyShortfall {
+  const weekStart = mondayOf(today);
+  const todayMid = utcMidnight(today);
+  const daysThisWeekSoFar: Date[] = [];
+  for (let t = weekStart.getTime(); t <= todayMid.getTime(); t += DAY_MS) daysThisWeekSoFar.push(new Date(t));
+
+  const doneThisWeek = doneCount(schedule, daysThisWeekSoFar, loggedDays);
+  const target = schedule.scheduleTargetCount ?? 0;
+  const shortfall = Math.max(0, target - doneThisWeek);
+
+  const weekEndMs = weekStart.getTime() + 6 * DAY_MS;
+  const daysRemaining = Math.round((weekEndMs - todayMid.getTime()) / DAY_MS) + 1;
+
+  return { daysRemaining, shortfall };
+}
+
+/** Whether a habit is due today — for PER_WEEK, "the weekly target hasn't
+ * been met yet" (habitOccursOn alone always answers true for PER_WEEK,
+ * since the real gate is the count, not a per-day due/not-due split);
+ * every other type delegates to habitOccursOn as before (#126,
+ * ADR-0011). */
+export function isDueToday(schedule: HabitSchedule, today: Date, loggedDays: Date[]): boolean {
+  if (schedule.scheduleType === "PER_WEEK") {
+    return weeklyShortfall(schedule, today, loggedDays).shortfall > 0;
+  }
+  return habitOccursOn(schedule, today, doneEarlierThisWeek(today, loggedDays));
+}
+
+/** Days past this threshold, a daily-consecutive streak is "worth
+ * protecting" for Nudges' STREAK_AT_RISK severity. */
+export const STREAK_AT_RISK_DAYS_THRESHOLD = 7;
+
+/** Whether skipping today would put a meaningful streak at risk. For most
+ * schedule types this is just "the daily streak is long enough to be
+ * worth protecting" (a caller-supplied fact, since daily-streak counting
+ * lives in lib/habits/streak.ts, a different concern from this schedule
+ * engine). For PER_WEEK, a daily-consecutive count doesn't apply at all
+ * — "at risk" instead means every remaining day this week is needed to
+ * still hit the target, i.e. zero slack left (#126, ADR-0011). */
+export function isStreakAtRisk(
+  schedule: HabitSchedule,
+  today: Date,
+  loggedDays: Date[],
+  dailyStreakDays: number
+): boolean {
+  if (schedule.scheduleType === "PER_WEEK") {
+    const { daysRemaining, shortfall } = weeklyShortfall(schedule, today, loggedDays);
+    return shortfall > 0 && daysRemaining <= shortfall;
+  }
+  return dailyStreakDays > STREAK_AT_RISK_DAYS_THRESHOLD;
+}

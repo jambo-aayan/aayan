@@ -1,7 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
-import { dailyStreak, mondayOf } from "@/lib/habits/streak";
-import { habitOccursOn } from "@/lib/habits/schedule";
+import { dailyStreak } from "@/lib/habits/streak";
+import { isDueToday, isStreakAtRisk, type HabitSchedule } from "@/lib/habits/schedule";
 import { BASELINE_ID } from "@/lib/finance/baseline-id";
 import { APP_SETTINGS_ID } from "@/lib/settings/constants";
 import { resolveColorHex, type ColorKey } from "@/lib/colors";
@@ -46,21 +46,24 @@ async function getHabitFixtures(today: Date): Promise<HabitEligibilityFixture[]>
       scheduleWeekdays: true,
       scheduleIntervalN: true,
       scheduleAnchorDate: true,
+      scheduleTargetCount: true,
       checkIns: { select: { date: true, level: true } },
     },
   });
 
   return habits.map((h) => {
     const checkInDates = h.checkIns.map((c) => c.date);
-    const weekStart = mondayOf(today).getTime();
-    const doneThisWeek = checkInDates.some((d) => mondayOf(d).getTime() === weekStart);
-    const scheduledToday = habitOccursOn(
-      { scheduleType: h.scheduleType, scheduleWeekdays: h.scheduleWeekdays, scheduleIntervalN: h.scheduleIntervalN, scheduleAnchorDate: h.scheduleAnchorDate },
-      today,
-      doneThisWeek
-    );
+    const schedule: HabitSchedule = {
+      scheduleType: h.scheduleType,
+      scheduleWeekdays: h.scheduleWeekdays,
+      scheduleIntervalN: h.scheduleIntervalN,
+      scheduleAnchorDate: h.scheduleAnchorDate,
+      scheduleTargetCount: h.scheduleTargetCount,
+    };
+    const scheduledToday = isDueToday(schedule, today, checkInDates);
     const checkedInToday = h.checkIns.some((c) => utcMidnight(c.date).getTime() === today.getTime());
-    return { id: h.id, name: h.name, scheduledToday, checkedInToday, streakDays: dailyStreak(checkInDates) };
+    const atRisk = isStreakAtRisk(schedule, today, checkInDates, dailyStreak(checkInDates));
+    return { id: h.id, name: h.name, scheduledToday, checkedInToday, atRisk };
   });
 }
 
@@ -181,7 +184,7 @@ async function reEvaluateSnoozes(
     ...overdueTasks.map((t): EligibleTargetFixture => ({ type: "TASK_OVERDUE", targetType: "TASK", targetId: t.id })),
     ...habits
       .filter((h) => h.scheduledToday && !h.checkedInToday)
-      .map((h): EligibleTargetFixture => ({ type: h.streakDays > 7 ? "STREAK_AT_RISK" : "HABIT_DUE", targetType: "HABIT", targetId: h.id })),
+      .map((h): EligibleTargetFixture => ({ type: h.atRisk ? "STREAK_AT_RISK" : "HABIT_DUE", targetType: "HABIT", targetId: h.id })),
     ...dueSystemReviews.map((r): EligibleTargetFixture => ({ type: "SYSTEM_REVIEW_DUE", targetType: "SYSTEM", targetId: r.id })),
   ];
 

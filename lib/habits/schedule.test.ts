@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { habitOccursOn, formatScheduleLabel, expectedCount, doneCount, type HabitSchedule } from "./schedule";
+import {
+  habitOccursOn,
+  formatScheduleLabel,
+  expectedCount,
+  doneCount,
+  weeklyShortfall,
+  isDueToday,
+  isStreakAtRisk,
+  type HabitSchedule,
+} from "./schedule";
 
 function d(iso: string): Date {
   return new Date(`${iso}T00:00:00.000Z`);
@@ -206,5 +215,73 @@ describe("doneCount", () => {
     // already satisfied by Monday) and doesn't count.
     const logged = [d("2026-08-17"), d("2026-08-19")];
     expect(doneCount(s, window, logged)).toBe(1);
+  });
+});
+
+// 2026-08-17 is a Monday, so its Mon-Sun week runs 2026-08-17..2026-08-23.
+describe("weeklyShortfall", () => {
+  it("computes days remaining (inclusive of today) and occurrences still needed", () => {
+    const s = schedule({ scheduleType: "PER_WEEK", scheduleTargetCount: 4 });
+    // Wednesday, 2 already logged this week (Mon, Tue).
+    const result = weeklyShortfall(s, d("2026-08-19"), [d("2026-08-17"), d("2026-08-18")]);
+    expect(result).toEqual({ daysRemaining: 5, shortfall: 2 });
+  });
+
+  it("reports zero shortfall once the weekly target is met, never negative", () => {
+    const s = schedule({ scheduleType: "PER_WEEK", scheduleTargetCount: 2 });
+    const result = weeklyShortfall(s, d("2026-08-19"), [d("2026-08-17"), d("2026-08-18"), d("2026-08-19")]);
+    expect(result.shortfall).toBe(0);
+  });
+
+  it("reports 1 day remaining on the last day of the week", () => {
+    const s = schedule({ scheduleType: "PER_WEEK", scheduleTargetCount: 4 });
+    const result = weeklyShortfall(s, d("2026-08-23"), []);
+    expect(result.daysRemaining).toBe(1);
+  });
+});
+
+describe("isDueToday", () => {
+  it("PER_WEEK: due while the weekly target hasn't been met yet", () => {
+    const s = schedule({ scheduleType: "PER_WEEK", scheduleTargetCount: 2 });
+    expect(isDueToday(s, d("2026-08-19"), [d("2026-08-17")])).toBe(true);
+  });
+
+  it("PER_WEEK: not due once the weekly target has already been met", () => {
+    const s = schedule({ scheduleType: "PER_WEEK", scheduleTargetCount: 2 });
+    expect(isDueToday(s, d("2026-08-19"), [d("2026-08-17"), d("2026-08-18")])).toBe(false);
+  });
+
+  it("delegates to habitOccursOn for every other schedule type", () => {
+    const daily = schedule({ scheduleType: "DAILY" });
+    expect(isDueToday(daily, d("2026-08-19"), [])).toBe(true);
+
+    const weekly = schedule({ scheduleType: "WEEKLY" });
+    // Already checked in earlier this week -> not due again today.
+    expect(isDueToday(weekly, d("2026-08-19"), [d("2026-08-17")])).toBe(false);
+  });
+});
+
+describe("isStreakAtRisk", () => {
+  it("PER_WEEK: at risk when every remaining day this week is needed to hit target", () => {
+    const s = schedule({ scheduleType: "PER_WEEK", scheduleTargetCount: 4 });
+    // Sunday (last day), 3 logged so far, 1 still needed, 1 day left -> at risk.
+    expect(isStreakAtRisk(s, d("2026-08-23"), [d("2026-08-17"), d("2026-08-18"), d("2026-08-19")], 0)).toBe(true);
+  });
+
+  it("PER_WEEK: not at risk while there's still slack in the week", () => {
+    const s = schedule({ scheduleType: "PER_WEEK", scheduleTargetCount: 4 });
+    // Tuesday, nothing logged yet, 6 days left, 4 needed -> plenty of slack.
+    expect(isStreakAtRisk(s, d("2026-08-18"), [], 0)).toBe(false);
+  });
+
+  it("PER_WEEK: not at risk once the weekly target is already met", () => {
+    const s = schedule({ scheduleType: "PER_WEEK", scheduleTargetCount: 1 });
+    expect(isStreakAtRisk(s, d("2026-08-23"), [d("2026-08-17")], 0)).toBe(false);
+  });
+
+  it("non-PER_WEEK: at risk once the caller-supplied daily streak passes the threshold", () => {
+    const s = schedule({ scheduleType: "DAILY" });
+    expect(isStreakAtRisk(s, d("2026-08-19"), [], 8)).toBe(true);
+    expect(isStreakAtRisk(s, d("2026-08-19"), [], 7)).toBe(false);
   });
 });
