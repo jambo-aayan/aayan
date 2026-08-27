@@ -3,6 +3,8 @@ import {
   ratingTrend,
   ratingHistogram,
   milestoneList,
+  isGanttEligible,
+  kanbanColumn,
   numericTrend,
   targetGauge,
   distinctMetricNames,
@@ -61,6 +63,34 @@ describe("milestoneList", () => {
   it("returns dated milestones, excluding undated ones", () => {
     const result = milestoneList([milestone("Undated", null), milestone("Launch", "2026-09-01")]);
     expect(result).toEqual([milestone("Launch", "2026-09-01")]);
+  });
+});
+
+describe("isGanttEligible", () => {
+  it("is false below 3 dated milestones", () => {
+    expect(isGanttEligible([milestone("A", "2026-09-01"), milestone("B", "2026-09-02")])).toBe(false);
+  });
+
+  it("is true at 3+ dated milestones", () => {
+    expect(
+      isGanttEligible([milestone("A", "2026-09-01"), milestone("B", "2026-09-02"), milestone("C", "2026-09-03")])
+    ).toBe(true);
+  });
+});
+
+describe("kanbanColumn", () => {
+  const today = new Date("2026-09-05");
+
+  it("is DONE when the milestone is done, regardless of date", () => {
+    expect(kanbanColumn(milestone("Done", "2026-09-10", true), today)).toBe("DONE");
+  });
+
+  it("is IN_PROGRESS once the date has arrived and it's not done", () => {
+    expect(kanbanColumn(milestone("Due", "2026-09-01"), today)).toBe("IN_PROGRESS");
+  });
+
+  it("is NOT_STARTED while the date is still in the future", () => {
+    expect(kanbanColumn(milestone("Later", "2026-09-10"), today)).toBe("NOT_STARTED");
   });
 });
 

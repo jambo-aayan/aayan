@@ -145,6 +145,21 @@
   padding: 0;
 }
 
+/* A real numbered chain: native ordered-list counters plus a connecting
+   rail down the left edge, so "sequential" reads as a chain, not just a
+   number prefixed onto an otherwise-unordered list. */
+.stepChain {
+  list-style: decimal;
+  margin: 0;
+  padding-left: 20px;
+  border-left: 2px solid var(--border);
+  margin-left: 6px;
+}
+
+.stepChain > li {
+  padding-left: 6px;
+}
+
 .stepRow {
   display: flex;
   align-items: center;
@@ -161,4 +176,60 @@
 .meta {
   font-size: 11.5px;
   color: var(--muted);
+}
+
+.gantt {
+  margin-bottom: 8px;
+}
+
+.ganttAxis {
+  position: relative;
+  height: 20px;
+  background: var(--border-soft);
+  border-radius: 4px;
+  margin-bottom: 8px;
+}
+
+.ganttNowLine {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 2px;
+  background: var(--coral);
+}
+
+.ganttPoint {
+  position: absolute;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--muted);
+  transform: translate(-50%, -50%);
+}
+
+.ganttPointDone {
+  background: var(--positive);
+}
+
+.kanban {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.kanbanColumn {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px;
+}
+
+.kanbanCard {
+  font-size: 12.5px;
+  padding: 6px 0;
+  border-top: 1px solid var(--border-soft);
+}
+
+.kanbanCard:first-of-type {
+  border-top: none;
 }

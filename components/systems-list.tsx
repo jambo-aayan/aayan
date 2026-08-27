@@ -5,6 +5,7 @@ import type { SystemType, SystemState } from "@/lib/systems/logic";
 import {
   createSystem,
   setSystemState,
+  setSystemSequential,
   updateSystemReference,
   duplicateSystem,
   addChecklistStep,
@@ -19,7 +20,18 @@ import {
   deleteSystemStep,
   addSystemDecision,
 } from "@/lib/systems/actions";
-import { ratingTrend, ratingHistogram, milestoneList, numericTrend, targetGauge, distinctMetricNames } from "@/lib/systems/widgets";
+import {
+  ratingTrend,
+  ratingHistogram,
+  milestoneList,
+  isGanttEligible,
+  kanbanColumn,
+  numericTrend,
+  targetGauge,
+  distinctMetricNames,
+  type KanbanColumn,
+  type MilestoneStep,
+} from "@/lib/systems/widgets";
 import { withRetry } from "@/lib/with-retry";
 import { useToast } from "@/components/toast/toast-provider";
 import styles from "./systems-list.module.css";
@@ -46,6 +58,7 @@ export type AreaSystem = {
   state: SystemState;
   body: string | null;
   reference: string | null;
+  sequential: boolean;
   steps: SystemStepRow[];
   decisions: SystemDecisionRow[];
   children: { id: string; name: string; state: SystemState }[];
@@ -110,6 +123,7 @@ export function SystemsList({
         state: "ACTIVE",
         body: form.body.trim() || null,
         reference: null,
+        sequential: false,
         steps: [],
         decisions: [],
         children: [],
@@ -200,7 +214,19 @@ function SystemCard({ system, onChange }: { system: AreaSystem; onChange: (next:
   const [captureValue, setCaptureValue] = useState("");
   const [backdatingStepId, setBackdatingStepId] = useState<string | null>(null);
   const [backdateValue, setBackdateValue] = useState("");
+  const [kanbanView, setKanbanView] = useState(false);
+  const [now] = useState(() => new Date());
   const { notifyError } = useToast();
+
+  async function handleToggleSequential() {
+    const next = !system.sequential;
+    onChange({ ...system, sequential: next });
+    const result = await withRetry(() => setSystemSequential(system.id, next));
+    if (!result.ok) {
+      onChange({ ...system, sequential: !next });
+      notifyError(result.error, { onRetry: handleToggleSequential });
+    }
+  }
 
   async function handleSetState(state: SystemState) {
     const prev = system;
@@ -436,6 +462,9 @@ function SystemCard({ system, onChange }: { system: AreaSystem; onChange: (next:
         <button type="button" className={styles.link} onClick={handleDuplicate}>
           Duplicate
         </button>
+        <button type="button" className={styles.link} onClick={handleToggleSequential}>
+          {system.sequential ? "Sequential ✓" : "Make sequential"}
+        </button>
       </div>
       <div className={styles.name}>{system.name}</div>
       {system.body && <p className={styles.body}>{system.body}</p>}
@@ -511,15 +540,30 @@ function SystemCard({ system, onChange }: { system: AreaSystem; onChange: (next:
       )}
       {milestones && (
         <div className={styles.section}>
-          <div className={styles.sectionLabel}>Milestones</div>
-          <ul className={styles.stepList}>
-            {milestones.map((m) => (
-              <li key={m.text + m.date!.getTime()} className={styles.stepRow}>
-                <span>{m.text}</span>
-                <span>{m.date!.toISOString().slice(0, 10)}</span>
-              </li>
-            ))}
-          </ul>
+          <div className={styles.sectionLabel}>
+            {isGanttEligible(milestones) ? "Timeline" : "Milestones"}
+            {isGanttEligible(milestones) && (
+              <button type="button" className={styles.link} onClick={() => setKanbanView((v) => !v)}>
+                {kanbanView ? " · List view" : " · Board view"}
+              </button>
+            )}
+          </div>
+          {isGanttEligible(milestones) && kanbanView ? (
+            <KanbanBoard milestones={milestones} today={now} />
+          ) : isGanttEligible(milestones) ? (
+            <GanttTimeline milestones={milestones} now={now} />
+          ) : (
+            <ul className={styles.stepList}>
+              {[...milestones]
+                .sort((a, b) => a.date!.getTime() - b.date!.getTime())
+                .map((m) => (
+                  <li key={m.text + m.date!.getTime()} className={styles.stepRow}>
+                    <span>{m.text}</span>
+                    <span>{m.date!.toISOString().slice(0, 10)}</span>
+                  </li>
+                ))}
+            </ul>
+          )}
         </div>
       )}
       {metricSeries.map(
@@ -550,7 +594,8 @@ function SystemCard({ system, onChange }: { system: AreaSystem; onChange: (next:
       )}
 
       <div className={styles.section}>
-        <ul className={styles.stepList}>
+        {system.sequential && system.steps.length > 0 && <div className={styles.sectionLabel}>Steps — in order</div>}
+        <ol className={system.sequential ? styles.stepChain : styles.stepList}>
           {system.steps.map((step) =>
             editingStepId === step.id ? (
               <li key={step.id} className={styles.stepRow}>
@@ -681,7 +726,7 @@ function SystemCard({ system, onChange }: { system: AreaSystem; onChange: (next:
               </li>
             )
           )}
-        </ul>
+        </ol>
         <div className={styles.addForm}>
           <input
             className={styles.input}
@@ -735,6 +780,69 @@ function SystemCard({ system, onChange }: { system: AreaSystem; onChange: (next:
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+/** A real horizontal timeline: each milestone positioned proportionally
+ * along a date axis (earliest milestone to latest, padded a week either
+ * side), with a now-line marking today's position — not just a sorted
+ * list with a glyph on past items. */
+function GanttTimeline({ milestones, now }: { milestones: MilestoneStep[]; now: Date }) {
+  const sorted = [...milestones].sort((a, b) => a.date!.getTime() - b.date!.getTime());
+  const padMs = 7 * 24 * 60 * 60 * 1000;
+  const start = sorted[0].date!.getTime() - padMs;
+  const end = sorted[sorted.length - 1].date!.getTime() + padMs;
+  const span = Math.max(end - start, 1);
+  const pct = (t: number) => `${Math.min(100, Math.max(0, ((t - start) / span) * 100))}%`;
+
+  return (
+    <div className={styles.gantt}>
+      <div className={styles.ganttAxis}>
+        <div className={styles.ganttNowLine} style={{ left: pct(now.getTime()) }} title="Today" />
+        {sorted.map((m) => (
+          <div
+            key={m.text + m.date!.getTime()}
+            className={`${styles.ganttPoint} ${m.done ? styles.ganttPointDone : ""}`}
+            style={{ left: pct(m.date!.getTime()) }}
+            title={`${m.text} — ${m.date!.toISOString().slice(0, 10)}`}
+          />
+        ))}
+      </div>
+      <ul className={styles.stepList}>
+        {sorted.map((m) => (
+          <li key={m.text + m.date!.getTime()} className={styles.stepRow}>
+            <span>{m.text}</span>
+            <span>{m.date!.toISOString().slice(0, 10)}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+const KANBAN_COLUMNS: { key: KanbanColumn; label: string }[] = [
+  { key: "NOT_STARTED", label: "Not started" },
+  { key: "IN_PROGRESS", label: "In progress" },
+  { key: "DONE", label: "Done" },
+];
+
+function KanbanBoard({ milestones, today }: { milestones: MilestoneStep[]; today: Date }) {
+  return (
+    <div className={styles.kanban}>
+      {KANBAN_COLUMNS.map((col) => (
+        <div key={col.key} className={styles.kanbanColumn}>
+          <div className={styles.sectionLabel}>{col.label}</div>
+          {milestones
+            .filter((m) => kanbanColumn(m, today) === col.key)
+            .map((m) => (
+              <div key={m.text + m.date!.getTime()} className={styles.kanbanCard}>
+                {m.text}
+                <span className={styles.meta}> {m.date!.toISOString().slice(0, 10)}</span>
+              </div>
+            ))}
+        </div>
+      ))}
     </div>
   );
 }

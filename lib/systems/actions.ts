@@ -15,9 +15,12 @@ import {
 export type ActionResult = { ok: true } | { ok: false; error: string };
 const SAVE_ERROR = "Couldn't save — try again.";
 
-function revalidateSystemPaths(areaId: string | null, pillarId: string) {
+/** No per-Pillar dynamic route exists yet (`/pillars` is a flat index),
+ * so revalidating one isn't possible — only the index. */
+function revalidateSystemPaths(areaId: string | null) {
   if (areaId) revalidatePath(`/health/${areaId}`);
-  revalidatePath(`/pillars/${pillarId}`);
+  revalidatePath("/pillars");
+  revalidatePath("/my-day");
   revalidatePath("/systems");
 }
 
@@ -54,17 +57,27 @@ export async function createSystem(input: CreateSystemInput): Promise<CreateSyst
         criteria: input.type === "EXPERIMENT" ? input.criteria : null,
       },
     });
-    revalidateSystemPaths(input.areaId, input.pillarId);
+    revalidateSystemPaths(input.areaId);
     return { ok: true, id: system.id };
   } catch {
     return { ok: false, error: SAVE_ERROR };
   }
 }
 
+export async function setSystemSequential(systemId: string, sequential: boolean): Promise<ActionResult> {
+  try {
+    const system = await prisma.system.update({ where: { id: systemId }, data: { sequential } });
+    revalidateSystemPaths(system.areaId);
+  } catch {
+    return { ok: false, error: SAVE_ERROR };
+  }
+  return { ok: true };
+}
+
 export async function setSystemState(systemId: string, state: SystemState): Promise<ActionResult> {
   try {
     const system = await prisma.system.update({ where: { id: systemId }, data: { state } });
-    revalidateSystemPaths(system.areaId, system.pillarId);
+    revalidateSystemPaths(system.areaId);
   } catch {
     return { ok: false, error: SAVE_ERROR };
   }
@@ -77,7 +90,7 @@ export async function updateSystemReference(systemId: string, reference: string)
       where: { id: systemId },
       data: { reference: reference.trim() || null },
     });
-    revalidateSystemPaths(system.areaId, system.pillarId);
+    revalidateSystemPaths(system.areaId);
   } catch {
     return { ok: false, error: SAVE_ERROR };
   }
@@ -115,7 +128,7 @@ export async function duplicateSystem(systemId: string): Promise<DuplicateSystem
         },
       },
     });
-    revalidateSystemPaths(copy.areaId, copy.pillarId);
+    revalidateSystemPaths(copy.areaId);
     return { ok: true, id: copy.id };
   } catch {
     return { ok: false, error: SAVE_ERROR };
@@ -131,7 +144,7 @@ export async function setSystemParent(systemId: string, parentId: string | null)
       }
     }
     const system = await prisma.system.update({ where: { id: systemId }, data: { parentId } });
-    revalidateSystemPaths(system.areaId, system.pillarId);
+    revalidateSystemPaths(system.areaId);
   } catch {
     return { ok: false, error: SAVE_ERROR };
   }
@@ -152,7 +165,7 @@ export async function addChecklistStep(systemId: string, text: string): Promise<
     const step = await prisma.systemStep.create({
       data: { systemId, type: "CHECKLIST", text: trimmed, sortOrder: count },
     });
-    revalidateSystemPaths(system.areaId, system.pillarId);
+    revalidateSystemPaths(system.areaId);
     return { ok: true, id: step.id };
   } catch {
     return { ok: false, error: SAVE_ERROR };
@@ -177,7 +190,7 @@ export async function addCheckpointStep(
     const step = await prisma.systemStep.create({
       data: { systemId, type: "CHECKPOINT", text: trimmed, targetDate, sortOrder: count },
     });
-    revalidateSystemPaths(system.areaId, system.pillarId);
+    revalidateSystemPaths(system.areaId);
     return { ok: true, id: step.id };
   } catch {
     return { ok: false, error: SAVE_ERROR };
@@ -200,7 +213,7 @@ export async function captureCheckpoint(
       data: { rating: input.rating, comment: input.comment?.trim() || null },
       include: { system: true },
     });
-    revalidateSystemPaths(step.system.areaId, step.system.pillarId);
+    revalidateSystemPaths(step.system.areaId);
   } catch {
     return { ok: false, error: SAVE_ERROR };
   }
@@ -221,7 +234,7 @@ export async function addMilestoneStep(systemId: string, text: string, date: Dat
     const step = await prisma.systemStep.create({
       data: { systemId, type: "MILESTONE", text: trimmed, date, sortOrder: count },
     });
-    revalidateSystemPaths(system.areaId, system.pillarId);
+    revalidateSystemPaths(system.areaId);
     return { ok: true, id: step.id };
   } catch {
     return { ok: false, error: SAVE_ERROR };
@@ -254,7 +267,7 @@ export async function addMeasureStep(systemId: string, input: AddMeasureStepInpu
     const step = await prisma.systemStep.create({
       data: { systemId, type: "MEASURE", text, metricName, unit: input.unit, target: input.target, sortOrder: count },
     });
-    revalidateSystemPaths(system.areaId, system.pillarId);
+    revalidateSystemPaths(system.areaId);
     return { ok: true, id: step.id };
   } catch {
     return { ok: false, error: SAVE_ERROR };
@@ -273,7 +286,7 @@ export async function captureMeasureValue(stepId: string, value: number): Promis
       data: { value },
       include: { system: true },
     });
-    revalidateSystemPaths(step.system.areaId, step.system.pillarId);
+    revalidateSystemPaths(step.system.areaId);
   } catch {
     return { ok: false, error: SAVE_ERROR };
   }
@@ -290,7 +303,7 @@ export async function updateChecklistStep(stepId: string, text: string): Promise
       data: { text: trimmed },
       include: { system: true },
     });
-    revalidateSystemPaths(step.system.areaId, step.system.pillarId);
+    revalidateSystemPaths(step.system.areaId);
   } catch {
     return { ok: false, error: SAVE_ERROR };
   }
@@ -300,7 +313,7 @@ export async function updateChecklistStep(stepId: string, text: string): Promise
 export async function deleteSystemStep(stepId: string): Promise<ActionResult> {
   try {
     const step = await prisma.systemStep.delete({ where: { id: stepId }, include: { system: true } });
-    revalidateSystemPaths(step.system.areaId, step.system.pillarId);
+    revalidateSystemPaths(step.system.areaId);
   } catch {
     return { ok: false, error: SAVE_ERROR };
   }
@@ -317,7 +330,7 @@ export async function toggleSystemStep(stepId: string): Promise<ActionResult> {
       where: { id: stepId },
       data: { done, doneOn: done ? new Date() : null },
     });
-    revalidateSystemPaths(step.system.areaId, step.system.pillarId);
+    revalidateSystemPaths(step.system.areaId);
   } catch {
     return { ok: false, error: SAVE_ERROR };
   }
@@ -333,7 +346,7 @@ export async function addSystemDecision(systemId: string, body: string): Promise
   try {
     const system = await prisma.system.findUniqueOrThrow({ where: { id: systemId } });
     const decision = await prisma.systemDecision.create({ data: { systemId, body: trimmed } });
-    revalidateSystemPaths(system.areaId, system.pillarId);
+    revalidateSystemPaths(system.areaId);
     return { ok: true, id: decision.id, when: decision.when };
   } catch {
     return { ok: false, error: SAVE_ERROR };
@@ -350,7 +363,7 @@ export async function backdateSystemStep(stepId: string, doneOn: Date): Promise<
       data: { doneOn: resolved.date },
       include: { system: true },
     });
-    revalidateSystemPaths(step.system.areaId, step.system.pillarId);
+    revalidateSystemPaths(step.system.areaId);
   } catch {
     return { ok: false, error: SAVE_ERROR };
   }

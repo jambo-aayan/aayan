@@ -32,11 +32,29 @@ export function ratingHistogram(steps: RatedStep[]): RatingHistogram | null {
 export type MilestoneStep = { text: string; date: Date | null; done: boolean };
 
 /** Milestone list — appears once a System has any dated milestones (1+),
- * per DATA_MODEL.md §5. Not gated further here; the Gantt/kanban upgrade
- * at 3+ is a separate widget (see #100). */
+ * per DATA_MODEL.md §5. Upgrades to a Gantt timeline (isGanttEligible) at
+ * 3+, replacing this list rather than sitting alongside it. */
 export function milestoneList(steps: MilestoneStep[]): MilestoneStep[] | null {
   const dated = steps.filter((s) => s.date !== null);
   return dated.length > 0 ? dated : null;
+}
+
+/** The milestone list upgrades to a Gantt-style timeline with a now-line
+ * once 3+ dated milestones exist — replacing the plain list, not adding
+ * alongside it. A kanban board toggles from the same underlying data. */
+export function isGanttEligible(milestones: MilestoneStep[]): boolean {
+  return milestones.length >= 3;
+}
+
+export type KanbanColumn = "NOT_STARTED" | "IN_PROGRESS" | "DONE";
+
+/** Kanban classification for a dated milestone: done wins outright;
+ * otherwise "in progress" once its date has arrived, "not started" while
+ * it's still in the future. */
+export function kanbanColumn(milestone: MilestoneStep, today: Date): KanbanColumn {
+  if (milestone.done) return "DONE";
+  if (milestone.date !== null && milestone.date.getTime() <= today.getTime()) return "IN_PROGRESS";
+  return "NOT_STARTED";
 }
 
 export type MeasureStep = { metricName: string | null; value: number | null; target: number | null; doneOn: Date | null };
