@@ -6,6 +6,7 @@ import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import type { SystemType, SystemState, SystemVerdict } from "@/lib/systems/logic";
 import { filterRollupByName, systemDeepLinkHref } from "@/lib/systems/logic";
 import type { AreaLoadRow, TimelineRow, RollupRow, WhatWorkedRow } from "@/lib/systems/data";
+import type { NeedsAttentionEntry } from "@/lib/systems/evaluation";
 import { createSystem } from "@/lib/systems/actions";
 import { withRetry } from "@/lib/with-retry";
 import { useToast } from "@/components/toast/toast-provider";
@@ -48,6 +49,7 @@ export function SystemsTab({
   timeline,
   rollup,
   whatWorked,
+  needsAttention,
   pillars,
   areas,
   today,
@@ -57,6 +59,7 @@ export function SystemsTab({
   timeline: TimelineRow[];
   rollup: RollupRow[];
   whatWorked: WhatWorkedRow[];
+  needsAttention: NeedsAttentionEntry | null;
   pillars: { id: string; name: string }[];
   areas: { id: string; name: string; pillarId: string }[];
   today: Date;
@@ -133,6 +136,24 @@ export function SystemsTab({
           </div>
         ))}
       </div>
+
+      {needsAttention && (
+        <div className={styles.section}>
+          <div className={styles.sectionLabel}>Needs attention</div>
+          <Link
+            href={systemDeepLinkHref(rollup.find((r) => r.id === needsAttention.systemId) ?? { id: needsAttention.systemId, areaId: null, pillarId: "" })}
+            className={styles.rollupRow}
+          >
+            <div className={styles.rollupMain}>
+              <span className={styles.rollupName}>{needsAttention.systemName}</span>
+              <span className={styles.rollupMeta}>
+                {needsAttention.reason === "declining-trend" ? "Trending down in a dimension" : "Lowest recent evaluation score"}
+              </span>
+            </div>
+            <span className={styles.status}>{needsAttention.score.toFixed(1)} overall</span>
+          </Link>
+        </div>
+      )}
 
       <div className={styles.section}>
         <div className={styles.sectionLabel}>Everything running</div>

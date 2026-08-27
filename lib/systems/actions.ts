@@ -778,3 +778,66 @@ export async function logSystemEvaluation(systemId: string, input: LogSystemEval
     return { ok: false, error: SAVE_ERROR };
   }
 }
+
+/** Everything captured before a delete, verbatim rows straight off the
+ * relevant Prisma delegates — restoreSystem recreates each one with its
+ * original id, so a step's occurrences/an evaluation's date all come back
+ * exactly as they were, same shape deleteHabit/restoreHabit already
+ * established for CheckIn history (docs/adr/0011-v2-phase6-insights.md
+ * §"System deletion"). A System's own templateId/parentId already resolve
+ * ON DELETE SET NULL at the DB level — a run losing its template, or a
+ * child losing its parent, isn't part of what this captures or restores;
+ * deleteSystem inherits that behavior rather than overriding it. */
+export type DeletedSystem = {
+  system: NonNullable<Awaited<ReturnType<typeof prisma.system.findUnique>>>;
+  steps: Awaited<ReturnType<typeof prisma.systemStep.findMany>>;
+  occurrences: Awaited<ReturnType<typeof prisma.systemStepOccurrence.findMany>>;
+  decisions: Awaited<ReturnType<typeof prisma.systemDecision.findMany>>;
+  habitLinks: Awaited<ReturnType<typeof prisma.systemHabit.findMany>>;
+  goalLinks: Awaited<ReturnType<typeof prisma.systemGoal.findMany>>;
+  evaluations: Awaited<ReturnType<typeof prisma.systemEvaluation.findMany>>;
+};
+
+export type DeleteSystemResult = { ok: true; deleted: DeletedSystem } | { ok: false; error: string };
+
+export async function deleteSystem(systemId: string): Promise<DeleteSystemResult> {
+  let result: DeletedSystem;
+  try {
+    result = await prisma.$transaction(async (tx) => {
+      const system = await tx.system.findUniqueOrThrow({ where: { id: systemId } });
+      const steps = await tx.systemStep.findMany({ where: { systemId } });
+      const stepIds = steps.map((s) => s.id);
+      const occurrences = stepIds.length > 0 ? await tx.systemStepOccurrence.findMany({ where: { stepId: { in: stepIds } } }) : [];
+      const decisions = await tx.systemDecision.findMany({ where: { systemId } });
+      const habitLinks = await tx.systemHabit.findMany({ where: { systemId } });
+      const goalLinks = await tx.systemGoal.findMany({ where: { systemId } });
+      const evaluations = await tx.systemEvaluation.findMany({ where: { systemId } });
+      await tx.system.delete({ where: { id: systemId } });
+      return { system, steps, occurrences, decisions, habitLinks, goalLinks, evaluations };
+    });
+  } catch {
+    return { ok: false, error: "Couldn't delete — try again." };
+  }
+  revalidateSystemPaths(result.system.areaId);
+  return { ok: true, deleted: result };
+}
+
+/** Recreates a just-deleted System and its full step/decision/occurrence/
+ * evaluation/link history, for the delete-undo toast. */
+export async function restoreSystem(deleted: DeletedSystem): Promise<ActionResult> {
+  try {
+    await prisma.$transaction(async (tx) => {
+      await tx.system.create({ data: deleted.system });
+      if (deleted.steps.length > 0) await tx.systemStep.createMany({ data: deleted.steps });
+      if (deleted.occurrences.length > 0) await tx.systemStepOccurrence.createMany({ data: deleted.occurrences });
+      if (deleted.decisions.length > 0) await tx.systemDecision.createMany({ data: deleted.decisions });
+      if (deleted.habitLinks.length > 0) await tx.systemHabit.createMany({ data: deleted.habitLinks });
+      if (deleted.goalLinks.length > 0) await tx.systemGoal.createMany({ data: deleted.goalLinks });
+      if (deleted.evaluations.length > 0) await tx.systemEvaluation.createMany({ data: deleted.evaluations });
+    });
+  } catch {
+    return { ok: false, error: "Couldn't undo — the System may already be back." };
+  }
+  revalidateSystemPaths(deleted.system.areaId);
+  return { ok: true };
+}

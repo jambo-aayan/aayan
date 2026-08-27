@@ -1,6 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { sortRollup, timelineBar, describeLoad, type SystemType, type SystemState, type SystemVerdict } from "./logic";
+import { needsAttention, type NeedsAttentionEntry } from "./evaluation";
 
 const SYSTEM_INCLUDE = {
   steps: {
@@ -184,6 +185,7 @@ export type SystemsOverview = {
   timeline: TimelineRow[];
   rollup: RollupRow[];
   whatWorked: WhatWorkedRow[];
+  needsAttention: NeedsAttentionEntry | null;
 };
 
 const OVERVIEW_SELECT = {
@@ -200,6 +202,7 @@ const OVERVIEW_SELECT = {
   runOutcome: true,
   updatedAt: true,
   steps: { select: { done: true } },
+  evaluations: { select: { date: true, effectiveness: true, consistency: true, sustainability: true, note: true } },
 };
 
 /** The Systems tab's cross-cutting data: load per Area (including Areas at
@@ -251,5 +254,7 @@ export async function getSystemsOverview(today: Date): Promise<SystemsOverview> 
     .map((s) => ({ id: s.id, name: s.name, verdict: s.verdict, criteria: s.criteria, runOutcome: s.runOutcome, updatedAt: s.updatedAt }))
     .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
 
-  return { areaLoad, loadSummary, timeline, rollup, whatWorked };
+  const needsAttentionRow = needsAttention(active.map((s) => ({ id: s.id, name: s.name, entries: s.evaluations })));
+
+  return { areaLoad, loadSummary, timeline, rollup, whatWorked, needsAttention: needsAttentionRow };
 }

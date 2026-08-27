@@ -36,8 +36,11 @@ import {
   deleteSystemStep,
   addSystemDecision,
   logSystemEvaluation,
+  deleteSystem,
+  restoreSystem,
+  type DeletedSystem,
 } from "@/lib/systems/actions";
-import { evaluationScore } from "@/lib/systems/evaluation";
+import { evaluationScore, isEvaluationStale } from "@/lib/systems/evaluation";
 import {
   ratingTrend,
   ratingHistogram,
@@ -147,6 +150,84 @@ function progress(steps: SystemStepRow[]): number {
 }
 
 const EMPTY_FORM = { name: "", type: "PROCESS" as SystemType, body: "", review: "", criteria: "" };
+const UNDO_WINDOW_MS = 5000;
+
+/** Rebuilds an AreaSystem from a delete-undo's captured rows. `parent`/
+ * `children`/`runs` come back empty — those are OTHER Systems' own rows,
+ * not this System's history, so deleteSystem never captured them (see its
+ * doc comment); they'll reappear correctly on the next real page load.
+ * linkedHabits/linkedGoals resolve names from habitOptions/goalOptions
+ * (all this component has client-side) — status defaults to "ACTIVE" and
+ * checkInDates to [] since neither is part of what a System delete/undo
+ * owns, only a display nicety for the adherence widgets. */
+function systemFromDeleted(
+  deleted: DeletedSystem,
+  habitOptions: { id: string; name: string }[],
+  goalOptions: { id: string; name: string }[]
+): AreaSystem {
+  const s = deleted.system;
+  const occurrencesByStep = new Map<string, { id: string; occurredOn: Date }[]>();
+  for (const occ of deleted.occurrences) {
+    occurrencesByStep.set(occ.stepId, [...(occurrencesByStep.get(occ.stepId) ?? []), { id: occ.id, occurredOn: occ.occurredOn }]);
+  }
+  const habitById = new Map(habitOptions.map((h) => [h.id, h.name]));
+  const goalById = new Map(goalOptions.map((g) => [g.id, g.name]));
+
+  return {
+    id: s.id,
+    name: s.name,
+    type: s.type,
+    state: s.state,
+    body: s.body,
+    reference: s.reference,
+    review: s.review,
+    criteria: s.criteria,
+    sequential: s.sequential,
+    isTemplate: s.isTemplate,
+    runNoun: s.runNoun,
+    templateId: s.templateId,
+    runEnd: s.runEnd,
+    runOutcome: s.runOutcome,
+    runRating: s.runRating,
+    runStepsDone: s.runStepsDone,
+    verdict: s.verdict,
+    steps: deleted.steps.map((step) => ({
+      id: step.id,
+      type: step.type,
+      text: step.text,
+      done: step.done,
+      doneOn: step.doneOn,
+      rating: step.rating,
+      comment: step.comment,
+      photoUrl: step.photoUrl,
+      date: step.date,
+      value: step.value,
+      unit: step.unit,
+      target: step.target,
+      metricName: step.metricName,
+      cadenceDays: step.cadenceDays,
+      endCondition: step.endCondition,
+      endValue: step.endValue,
+      createdAt: step.createdAt,
+      occurrences: occurrencesByStep.get(step.id) ?? [],
+    })),
+    decisions: deleted.decisions.map((d) => ({ id: d.id, when: d.when, body: d.body })),
+    evaluations: deleted.evaluations.map((e) => ({
+      id: e.id,
+      date: e.date,
+      effectiveness: e.effectiveness,
+      consistency: e.consistency,
+      sustainability: e.sustainability,
+      note: e.note,
+    })),
+    children: [],
+    parentId: s.parentId,
+    parent: null,
+    linkedHabits: deleted.habitLinks.map((h) => ({ id: h.habitId, name: habitById.get(h.habitId) ?? "Habit", status: "ACTIVE", checkInDates: [] })),
+    linkedGoals: deleted.goalLinks.map((g) => ({ id: g.goalId, name: goalById.get(g.goalId) ?? "Goal", status: "ACTIVE" })),
+    runs: [],
+  };
+}
 
 export function SystemsList({
   areaId,
@@ -174,7 +255,30 @@ export function SystemsList({
   const [form, setForm] = useState(EMPTY_FORM);
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { notifyError } = useToast();
+  const { notifyError, notifyUndo } = useToast();
+
+  async function handleDeleteSystem(system: AreaSystem) {
+    setSystems((prev) => prev.filter((s) => s.id !== system.id));
+    const result = await withRetry(() => deleteSystem(system.id));
+    if (!result.ok) {
+      setSystems((prev) => [...prev, system]);
+      setError(result.error);
+      notifyError(result.error, { onRetry: () => handleDeleteSystem(system) });
+      return;
+    }
+    const deleted = result.deleted;
+    notifyUndo(`Deleted "${system.name}".`, () => handleUndoDeleteSystem(deleted), UNDO_WINDOW_MS);
+  }
+
+  async function handleUndoDeleteSystem(deleted: DeletedSystem) {
+    const result = await withRetry(() => restoreSystem(deleted));
+    if (!result.ok) {
+      setError(result.error);
+      notifyError(result.error, { onRetry: () => handleUndoDeleteSystem(deleted) });
+      return;
+    }
+    setSystems((prev) => [...prev, systemFromDeleted(deleted, habitOptions, goalOptions)]);
+  }
 
   async function handleAdd() {
     setAdding(true);
@@ -248,6 +352,7 @@ export function SystemsList({
           goalOptions={goalOptions}
           parentOptions={systems.filter((s) => s.id !== system.id && s.parentId === null)}
           onChange={(next) => setSystems((prev) => prev.map((s) => (s.id === system.id ? next : s)))}
+          onDelete={() => handleDeleteSystem(system)}
           focused={system.id === focusId}
           showFocusStrip={system.id === focusId && !stripDismissed}
           onDismissFocusStrip={() => setStripDismissed(true)}
@@ -309,6 +414,7 @@ export function SystemsList({
 function SystemCard({
   system,
   onChange,
+  onDelete,
   habitOptions,
   goalOptions,
   parentOptions,
@@ -318,6 +424,7 @@ function SystemCard({
 }: {
   system: AreaSystem;
   onChange: (next: AreaSystem) => void;
+  onDelete: () => void;
   habitOptions: { id: string; name: string }[];
   goalOptions: { id: string; name: string }[];
   parentOptions: { id: string; name: string }[];
@@ -901,8 +1008,14 @@ function SystemCard({
           <option value="DRAFT">Draft</option>
           <option value="ARCHIVED">Archived</option>
         </select>
+        {system.state === "ACTIVE" && isEvaluationStale(system.evaluations[0]?.date ?? null, now) && (
+          <span className={styles.badge}>It&apos;s been a while — log an evaluation</span>
+        )}
         <button type="button" className={styles.link} onClick={handleDuplicate}>
           Duplicate
+        </button>
+        <button type="button" className={styles.link} onClick={onDelete}>
+          Delete
         </button>
         <button type="button" className={styles.link} onClick={handleToggleSequential}>
           {system.sequential ? "Sequential ✓" : "Make sequential"}

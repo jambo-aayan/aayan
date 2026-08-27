@@ -29,6 +29,7 @@ export default async function SystemsPage() {
               timeline={overview.timeline}
               rollup={overview.rollup}
               whatWorked={overview.whatWorked}
+              needsAttention={overview.needsAttention}
               pillars={pillars}
               areas={areas}
               today={today}
