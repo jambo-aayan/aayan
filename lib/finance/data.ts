@@ -4,7 +4,7 @@ import { ensureBaselineExists } from "./ensure-baseline";
 import { BASELINE_ID } from "./baseline-id";
 import { ensureFinanceNorthStarExists } from "./ensure-north-star";
 import { FINANCE_NORTH_STAR_ID } from "./north-star-id";
-import { sortGoalsByPriority } from "./logic";
+import { CONFIDENCE_THRESHOLD, sortGoalsByPriority } from "./logic";
 
 // Prisma's Decimal isn't a plain serializable value — Client Components
 // need a plain number, so every read converts here at the DB boundary.
@@ -67,4 +67,21 @@ export async function getTransactions() {
 export async function getReceivables() {
   const receivables = await prisma.receivable.findMany({ orderBy: { openedAt: "desc" } });
   return receivables.map((r) => ({ ...r, amount: r.amount.toNumber() }));
+}
+
+/** Every held-back (low-confidence) statement-parsed transaction, across
+ * all accounts — the Uncategorised queue's source list (#117, ADR-0010).
+ * Filtered at the DB level with the same threshold isHeldForReview uses,
+ * so a manually entered transaction (confidence: null) never appears.
+ * Also excludes anything already flagged as a receivable — reclassifying
+ * it that way (reusing #114's flow, per #117's AC) already resolves it,
+ * even though it doesn't clear confidence the way resolveHeldTransaction
+ * does. */
+export async function getUncategorisedTransactions() {
+  const transactions = await prisma.transaction.findMany({
+    where: { confidence: { not: null, lt: CONFIDENCE_THRESHOLD }, receivableId: null },
+    orderBy: { date: "desc" },
+    include: { account: { select: { name: true } } },
+  });
+  return transactions.map((t) => ({ ...t, amount: t.amount.toNumber() }));
 }

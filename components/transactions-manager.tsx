@@ -5,17 +5,16 @@ import { Receipt } from "lucide-react";
 import {
   createTransaction,
   deleteTransaction,
-  flagAsReceivable,
   restoreTransaction,
   updateTransaction,
   type TransactionInput,
 } from "@/lib/finance/actions";
 import { useUndoableCrudList, type ActionResult } from "@/lib/hooks/use-undoable-crud-list";
-import { withRetry } from "@/lib/with-retry";
 import { isHeldForReview } from "@/lib/finance/logic";
 import { DEFAULT_CATEGORIES } from "@/lib/finance/categories";
 import { PrimaryButton } from "@/components/primary-button";
 import { EmptyState } from "@/components/empty-state";
+import { FlagReceivableForm } from "@/components/flag-receivable-form";
 import styles from "./transactions-manager.module.css";
 
 type Transaction = TransactionInput & { id: string; receivableId: string | null; confidence: number | null };
@@ -64,19 +63,6 @@ export function TransactionsManager({ initialTransactions }: { initialTransactio
   // updateTransaction) would be both wasted and semantically wrong here.
   const [receivableOverrides, setReceivableOverrides] = useState<Record<string, string>>({});
 
-  async function handleFlagAsReceivable(
-    transactionId: string,
-    amount: number,
-    note: string | null
-  ): Promise<ActionResult> {
-    const result = await withRetry(() => flagAsReceivable(transactionId, amount, note));
-    if (result.ok) {
-      setReceivableOverrides((prev) => ({ ...prev, [transactionId]: result.receivableId }));
-      return { ok: true };
-    }
-    return result;
-  }
-
   const sorted = [...transactions]
     .map((t) => (receivableOverrides[t.id] ? { ...t, receivableId: receivableOverrides[t.id] } : t))
     .sort((a, b) => b.date.getTime() - a.date.getTime());
@@ -114,16 +100,17 @@ export function TransactionsManager({ initialTransactions }: { initialTransactio
               }}
             />
           ) : flaggingRowId === t.id ? (
-            <FlagReceivableRow
-              key={t.id}
-              transaction={t}
-              onCancel={() => setFlaggingRowId(null)}
-              onConfirm={async (amount, note) => {
-                const result = await handleFlagAsReceivable(t.id, amount, note);
-                if (result.ok) setFlaggingRowId(null);
-                return result;
-              }}
-            />
+            <li key={t.id} className={styles.addForm}>
+              <FlagReceivableForm
+                transactionId={t.id}
+                initialAmount={t.amount}
+                onCancel={() => setFlaggingRowId(null)}
+                onConfirmed={(receivableId) => {
+                  setReceivableOverrides((prev) => ({ ...prev, [t.id]: receivableId }));
+                  setFlaggingRowId(null);
+                }}
+              />
+            </li>
           ) : (
             <li key={t.id} className={styles.row}>
               <div>
@@ -263,57 +250,6 @@ function TransactionEditRow({
       <TransactionFields form={form} onChange={setForm} />
       <PrimaryButton onClick={handleSave} disabled={saving}>
         {saving ? "Saving…" : "Save"}
-      </PrimaryButton>
-      <button type="button" className={styles.link} onClick={onCancel}>
-        Cancel
-      </button>
-      {error && <p className={styles.error}>{error}</p>}
-    </li>
-  );
-}
-
-function FlagReceivableRow({
-  transaction,
-  onCancel,
-  onConfirm,
-}: {
-  transaction: Transaction;
-  onCancel: () => void;
-  onConfirm: (amount: number, note: string | null) => Promise<ActionResult>;
-}) {
-  const [amount, setAmount] = useState(transaction.amount);
-  const [note, setNote] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  async function handleConfirm() {
-    setSaving(true);
-    setError(null);
-    const result = await onConfirm(amount, note || null);
-    setSaving(false);
-    if (!result.ok) setError(result.error);
-  }
-
-  return (
-    <li className={styles.addForm}>
-      <input
-        className={styles.input}
-        type="number"
-        step="0.01"
-        placeholder="Amount"
-        aria-label="Receivable amount"
-        value={amount}
-        onChange={(e) => setAmount(Number(e.target.value))}
-      />
-      <input
-        className={styles.input}
-        placeholder="Note (optional)"
-        aria-label="Receivable note"
-        value={note}
-        onChange={(e) => setNote(e.target.value)}
-      />
-      <PrimaryButton onClick={handleConfirm} disabled={saving}>
-        {saving ? "Flagging…" : "Confirm"}
       </PrimaryButton>
       <button type="button" className={styles.link} onClick={onCancel}>
         Cancel

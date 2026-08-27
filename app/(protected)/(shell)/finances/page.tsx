@@ -1,4 +1,4 @@
-import { Landmark } from "lucide-react";
+import { Landmark, ClipboardCheck } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import pageStyles from "@/components/page-header.module.css";
 import { PageTitle } from "@/components/page-title";
@@ -26,6 +26,7 @@ import {
   getFinanceNorthStar,
   getTransactions,
   getReceivables,
+  getUncategorisedTransactions,
 } from "@/lib/finance/data";
 import { getLinkedBanks } from "@/lib/enable-banking/data";
 import { netWorth } from "@/lib/finance/net-worth";
@@ -40,19 +41,31 @@ import { FINANCE_PILLAR_ID } from "@/lib/finance/pillar-id";
 
 export default async function FinancesPage({ searchParams }: { searchParams: Promise<{ focus?: string }> }) {
   const { focus } = await searchParams;
-  const [accounts, baseline, goals, financeNorthStar, transactions, receivables, linkedBanks, systems, systemHabitOptions, systemGoalOptions] =
-    await Promise.all([
-      getAccounts(),
-      getBaseline(),
-      getGoals(),
-      getFinanceNorthStar(),
-      getTransactions(),
-      getReceivables(),
-      getLinkedBanks(),
-      getSystemsForPillar(FINANCE_PILLAR_ID),
-      getHabitOptionsForPillar(FINANCE_PILLAR_ID),
-      getGoalOptionsForPillar(FINANCE_PILLAR_ID),
-    ]);
+  const [
+    accounts,
+    baseline,
+    goals,
+    financeNorthStar,
+    transactions,
+    receivables,
+    uncategorisedTransactions,
+    linkedBanks,
+    systems,
+    systemHabitOptions,
+    systemGoalOptions,
+  ] = await Promise.all([
+    getAccounts(),
+    getBaseline(),
+    getGoals(),
+    getFinanceNorthStar(),
+    getTransactions(),
+    getReceivables(),
+    getUncategorisedTransactions(),
+    getLinkedBanks(),
+    getSystemsForPillar(FINANCE_PILLAR_ID),
+    getHabitOptionsForPillar(FINANCE_PILLAR_ID),
+    getGoalOptionsForPillar(FINANCE_PILLAR_ID),
+  ]);
   const { accessible, total } = netWorth(accounts);
   const monthlySurplus = surplus(baseline.monthlyIncome, baseline.fixedOutgoings);
   const categorySpending = categoryBreakdown(transactions, new Date());
@@ -84,6 +97,17 @@ export default async function FinancesPage({ searchParams }: { searchParams: Pro
           accent="finance"
           title="Link a bank"
           status={linkedBanks.length === 0 ? "None linked yet" : `${linkedBanks.length} linked`}
+        />
+        <DashboardCard
+          href="/finances/uncategorised"
+          icon={ClipboardCheck}
+          accent="finance"
+          title="Uncategorised"
+          status={
+            uncategorisedTransactions.length === 0
+              ? "Nothing held for review"
+              : `${uncategorisedTransactions.length} held for review`
+          }
         />
 
         <Card title="North Star">

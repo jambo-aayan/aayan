@@ -364,6 +364,23 @@ export async function restoreTransaction(
   return { ok: true };
 }
 
+/** Corrects a held-for-review transaction's fields and clears its
+ * confidence, removing it from the Uncategorised queue — a corrected
+ * transaction is no longer "uncategorised" (#117, ADR-0010). Distinct
+ * from updateTransaction, which never touches confidence, so an edit
+ * from the regular ledger view doesn't accidentally clear a still-unverified
+ * transaction's held status. */
+export async function resolveHeldTransaction(id: string, input: TransactionInput): Promise<ActionResult> {
+  try {
+    await prisma.transaction.update({ where: { id }, data: { ...input, confidence: null } });
+  } catch {
+    return { ok: false, error: SAVE_ERROR };
+  }
+  revalidatePath("/finances");
+  revalidatePath("/finances/uncategorised");
+  return { ok: true };
+}
+
 export type ReceivableResult =
   | { ok: true; receivableId: string }
   | { ok: false; error: string };
@@ -405,6 +422,7 @@ export async function flagAsReceivable(
       return { ok: false, error: ALREADY_LINKED_ERROR };
     }
     revalidatePath("/finances");
+    revalidatePath("/finances/uncategorised");
     return { ok: true, receivableId: receivable.id };
   } catch {
     return { ok: false, error: SAVE_ERROR };
