@@ -28,3 +28,7 @@ export const HEALTH_AREAS_SEED = [
 /** Referenced by features scoped to this specific Area (e.g. Pain & Mobility
  * tracking) so they can't silently drift from the seeded id. */
 export const ANKYLOSING_SPONDYLITIS_AREA_ID = HEALTH_AREAS_SEED[0].id;
+
+/** Referenced by the daily log sheet's derived-field habit seeding (see
+ * lib/daily-log/habit-seed.ts) — the stretch-routine habit lives here. */
+export const TRAINING_AND_BODY_AREA_ID = HEALTH_AREAS_SEED[3].id;

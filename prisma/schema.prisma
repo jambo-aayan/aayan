@@ -278,6 +278,44 @@ model PainMobilityLog {
   @@index([areaId])
 }
 
+enum HeadacheLevel {
+  NONE
+  MILD
+  MODERATE
+  BAD
+}
+
+/// One cross-cutting entry per date (no Area scoping — unlike PainMobilityLog,
+/// which stays untouched as a separate, Area-scoped, 0-10-scale table; see
+/// docs/adr/0007-v2-phase3-daily-log-sheet.md). 1-5 is the only scale this
+/// model ever stores. stiffness stores the bucket's representative midpoint
+/// (7/22/45/75), never the raw bucket selection — the bucket is a UI-only
+/// concept. headache stores the day's worst value reached so far (see
+/// lib/daily-log's day's-worst logic — a lower tap later in the day is a
+/// no-op, enforced above the schema, not by a DB constraint). mobility/
+/// trained are deliberately NOT columns here — they're derived at read time
+/// from that day's check-ins on the two seeded habits in
+/// lib/daily-log/habit-seed.ts (see lib/daily-log/data.ts), never
+/// persisted, so they can never go stale relative to the CheckIn rows they
+/// come from.
+model DailyLog {
+  id           String        @id @default(cuid())
+  date         DateTime      @unique @db.Date
+  mood         Int
+  stress       Int
+  energy       Int
+  sleepQuality Int
+  pain         Int
+  headache     HeadacheLevel
+  stiffness    Int
+  weight       Float?
+  waist        Float?
+  bpSystolic   Int?
+  bpDiastolic  Int?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+}
+
 enum ItemType {
   ASSET
   LIABILITY

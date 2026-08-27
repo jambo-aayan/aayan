@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { ensureHealthAreasSeeded } from "@/lib/health/ensure-seeded";
 import { ensureFinancePillarSeeded } from "@/lib/finance/ensure-seeded";
 import { ensureMiscellaneousPillarSeeded } from "@/lib/miscellaneous/ensure-seeded";
+import { ensureDerivedFieldHabitsSeeded } from "@/lib/daily-log/ensure-seeded";
 
 export type PillarWithStats = {
   id: string;
@@ -18,6 +19,9 @@ export async function getPillarsWithStats(): Promise<PillarWithStats[]> {
   await ensureHealthAreasSeeded();
   await ensureFinancePillarSeeded();
   await ensureMiscellaneousPillarSeeded();
+  // Depends on Health's Pillar/Areas existing (FK) — must run after
+  // ensureHealthAreasSeeded.
+  await ensureDerivedFieldHabitsSeeded();
 
   const pillars = await prisma.pillar.findMany({
     orderBy: { createdAt: "asc" },
