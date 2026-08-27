@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { SystemType, SystemState } from "@/lib/systems/logic";
+import { expectedOccurrenceDates, classifyOccurrences } from "@/lib/systems/logic";
 import {
   createSystem,
   setSystemState,
@@ -14,6 +15,9 @@ import {
   addMilestoneStep,
   addMeasureStep,
   captureMeasureValue,
+  addRepeatingStep,
+  logSystemStepOccurrence,
+  deleteSystemStepOccurrence,
   updateChecklistStep,
   toggleSystemStep,
   backdateSystemStep,
@@ -29,6 +33,8 @@ import {
   numericTrend,
   targetGauge,
   distinctMetricNames,
+  streakGrid,
+  adherenceBreakdown,
   type KanbanColumn,
   type MilestoneStep,
 } from "@/lib/systems/widgets";
@@ -49,6 +55,11 @@ export type SystemStepRow = {
   unit: string | null;
   target: number | null;
   metricName: string | null;
+  cadenceDays: number | null;
+  endCondition: string | null;
+  endValue: number | null;
+  createdAt: Date;
+  occurrences: { id: string; occurredOn: Date }[];
 };
 export type SystemDecisionRow = { id: string; when: Date; body: string };
 export type AreaSystem = {
@@ -58,6 +69,7 @@ export type AreaSystem = {
   state: SystemState;
   body: string | null;
   reference: string | null;
+  review: Date | null;
   sequential: boolean;
   steps: SystemStepRow[];
   decisions: SystemDecisionRow[];
@@ -123,6 +135,7 @@ export function SystemsList({
         state: "ACTIVE",
         body: form.body.trim() || null,
         reference: null,
+        review: form.type === "EXPERIMENT" && form.review ? new Date(form.review) : null,
         sequential: false,
         steps: [],
         decisions: [],
@@ -198,11 +211,17 @@ export function SystemsList({
 
 function SystemCard({ system, onChange }: { system: AreaSystem; onChange: (next: AreaSystem) => void }) {
   const [stepText, setStepText] = useState("");
-  const [stepType, setStepType] = useState<"CHECKLIST" | "CHECKPOINT" | "MILESTONE" | "MEASURE">("CHECKLIST");
+  const [stepType, setStepType] = useState<"CHECKLIST" | "CHECKPOINT" | "MILESTONE" | "MEASURE" | "REPEATING">(
+    "CHECKLIST"
+  );
   const [stepDate, setStepDate] = useState("");
   const [stepMetricName, setStepMetricName] = useState("");
   const [stepUnit, setStepUnit] = useState("");
   const [stepTarget, setStepTarget] = useState("");
+  const [stepCadenceDays, setStepCadenceDays] = useState("7");
+  const [stepEndCondition, setStepEndCondition] = useState<"FIXED_COUNT" | "REVIEW_DATE">("FIXED_COUNT");
+  const [stepEndValue, setStepEndValue] = useState("4");
+  const [occurrenceDates, setOccurrenceDates] = useState<Record<string, string>>({});
   const [decisionText, setDecisionText] = useState("");
   const [referenceDraft, setReferenceDraft] = useState(system.reference ?? "");
   const [editingReference, setEditingReference] = useState(false);
@@ -250,7 +269,7 @@ function SystemCard({ system, onChange }: { system: AreaSystem; onChange: (next:
     if (!result.ok) notifyError(result.error, { onRetry: handleDuplicate });
   }
 
-  const EMPTY_STEP: Omit<SystemStepRow, "id" | "type" | "text"> = {
+  const EMPTY_STEP: Omit<SystemStepRow, "id" | "type" | "text" | "createdAt"> = {
     done: false,
     doneOn: null,
     rating: null,
@@ -260,6 +279,10 @@ function SystemCard({ system, onChange }: { system: AreaSystem; onChange: (next:
     unit: null,
     target: null,
     metricName: null,
+    cadenceDays: null,
+    endCondition: null,
+    endValue: null,
+    occurrences: [],
   };
 
   async function handleAddStep() {
@@ -268,11 +291,20 @@ function SystemCard({ system, onChange }: { system: AreaSystem; onChange: (next:
 
     if (stepType === "MILESTONE" && !stepDate) return;
     if (stepType === "MEASURE" && !stepMetricName.trim()) return;
+    if (stepType === "REPEATING" && !stepCadenceDays) return;
 
     const result = await withRetry(() => {
       if (stepType === "CHECKLIST") return addChecklistStep(system.id, text);
       if (stepType === "CHECKPOINT") return addCheckpointStep(system.id, text, null);
       if (stepType === "MILESTONE") return addMilestoneStep(system.id, text, new Date(stepDate));
+      if (stepType === "REPEATING") {
+        return addRepeatingStep(system.id, {
+          text,
+          cadenceDays: Number(stepCadenceDays),
+          endCondition: stepEndCondition,
+          endValue: stepEndCondition === "FIXED_COUNT" ? Number(stepEndValue) : null,
+        });
+      }
       return addMeasureStep(system.id, {
         text,
         metricName: stepMetricName,
@@ -292,11 +324,15 @@ function SystemCard({ system, onChange }: { system: AreaSystem; onChange: (next:
           id: result.id,
           type: stepType,
           text,
+          createdAt: new Date(),
           ...EMPTY_STEP,
           date: stepType === "MILESTONE" ? new Date(stepDate) : null,
           unit: stepType === "MEASURE" ? stepUnit.trim() || null : null,
           target: stepType === "MEASURE" && stepTarget ? Number(stepTarget) : null,
           metricName: stepType === "MEASURE" ? stepMetricName.trim() : null,
+          cadenceDays: stepType === "REPEATING" ? Number(stepCadenceDays) : null,
+          endCondition: stepType === "REPEATING" ? stepEndCondition : null,
+          endValue: stepType === "REPEATING" && stepEndCondition === "FIXED_COUNT" ? Number(stepEndValue) : null,
         },
       ],
     });
@@ -305,6 +341,38 @@ function SystemCard({ system, onChange }: { system: AreaSystem; onChange: (next:
     setStepMetricName("");
     setStepUnit("");
     setStepTarget("");
+  }
+
+  async function handleLogOccurrence(stepId: string) {
+    const raw = occurrenceDates[stepId];
+    const occurredOn = raw ? new Date(raw) : now;
+    const result = await withRetry(() => logSystemStepOccurrence(stepId, occurredOn));
+    if (!result.ok) {
+      notifyError(result.error, { onRetry: () => handleLogOccurrence(stepId) });
+      return;
+    }
+    onChange({
+      ...system,
+      steps: system.steps.map((s) =>
+        s.id === stepId ? { ...s, occurrences: [...s.occurrences, { id: result.id, occurredOn: result.occurredOn }] } : s
+      ),
+    });
+    setOccurrenceDates((prev) => ({ ...prev, [stepId]: "" }));
+  }
+
+  async function handleDeleteOccurrence(stepId: string, occurrenceId: string) {
+    const prevSteps = system.steps;
+    onChange({
+      ...system,
+      steps: system.steps.map((s) =>
+        s.id === stepId ? { ...s, occurrences: s.occurrences.filter((o) => o.id !== occurrenceId) } : s
+      ),
+    });
+    const result = await withRetry(() => deleteSystemStepOccurrence(occurrenceId));
+    if (!result.ok) {
+      onChange({ ...system, steps: prevSteps });
+      notifyError(result.error, { onRetry: () => handleDeleteOccurrence(stepId, occurrenceId) });
+    }
   }
 
   async function handleToggleStep(step: SystemStepRow) {
@@ -439,6 +507,7 @@ function SystemCard({ system, onChange }: { system: AreaSystem; onChange: (next:
     trend: numericTrend(system.steps, name),
     gauge: targetGauge(system.steps, name),
   }));
+  const repeatingSteps = system.steps.filter((s) => s.type === "REPEATING" && s.cadenceDays !== null);
 
   return (
     <div className={styles.systemCard}>
@@ -592,6 +661,39 @@ function SystemCard({ system, onChange }: { system: AreaSystem; onChange: (next:
             </div>
           )
       )}
+      {repeatingSteps.map((step) => {
+        const schedule = {
+          cadenceDays: step.cadenceDays!,
+          anchorDate: step.createdAt,
+          endCondition: step.endCondition as "FIXED_COUNT" | "REVIEW_DATE",
+          endValue: step.endValue,
+          reviewDate: system.review,
+        };
+        const expected = expectedOccurrenceDates(schedule, now);
+        const logged = step.occurrences.map((o) => o.occurredOn);
+        const statuses = classifyOccurrences(expected, logged, now);
+        const breakdown = adherenceBreakdown(statuses, step.occurrences.length);
+        const grid = streakGrid(logged, now);
+        return (
+          <div key={step.id} className={styles.section}>
+            <div className={styles.sectionLabel}>{step.text} — 90-day streak</div>
+            <div className={styles.streakGrid}>
+              {grid.map((d) => (
+                <span
+                  key={d.date.getTime()}
+                  className={d.done ? styles.streakDayDone : styles.streakDay}
+                  title={d.date.toISOString().slice(0, 10)}
+                />
+              ))}
+            </div>
+            {breakdown && (
+              <p className={styles.body}>
+                On time {breakdown.onTime} · Late {breakdown.late} · Skipped {breakdown.skipped}
+              </p>
+            )}
+          </div>
+        );
+      })}
 
       <div className={styles.section}>
         {system.sequential && system.steps.length > 0 && <div className={styles.sectionLabel}>Steps — in order</div>}
@@ -615,10 +717,21 @@ function SystemCard({ system, onChange }: { system: AreaSystem; onChange: (next:
             ) : (
               <li key={step.id} className={styles.stepRow}>
                 <div>
-                  <label>
-                    <input type="checkbox" checked={step.done} onChange={() => handleToggleStep(step)} />
-                    <span className={step.done ? styles.stepDone : undefined}>{step.text}</span>
-                  </label>
+                  {step.type === "REPEATING" ? (
+                    <RepeatingStepRow
+                      step={step}
+                      now={now}
+                      dateValue={occurrenceDates[step.id] ?? ""}
+                      onDateChange={(v) => setOccurrenceDates((prev) => ({ ...prev, [step.id]: v }))}
+                      onLog={() => handleLogOccurrence(step.id)}
+                      onDeleteOccurrence={(occurrenceId) => handleDeleteOccurrence(step.id, occurrenceId)}
+                    />
+                  ) : (
+                    <label>
+                      <input type="checkbox" checked={step.done} onChange={() => handleToggleStep(step)} />
+                      <span className={step.done ? styles.stepDone : undefined}>{step.text}</span>
+                    </label>
+                  )}
                   {step.done && step.rating !== null && (
                     <span className={styles.meta}> · rated {step.rating}</span>
                   )}
@@ -737,12 +850,15 @@ function SystemCard({ system, onChange }: { system: AreaSystem; onChange: (next:
           <select
             className={styles.input}
             value={stepType}
-            onChange={(e) => setStepType(e.target.value as "CHECKLIST" | "CHECKPOINT" | "MILESTONE" | "MEASURE")}
+            onChange={(e) =>
+              setStepType(e.target.value as "CHECKLIST" | "CHECKPOINT" | "MILESTONE" | "MEASURE" | "REPEATING")
+            }
           >
             <option value="CHECKLIST">Checklist</option>
             <option value="CHECKPOINT">Checkpoint</option>
             <option value="MILESTONE">Dated milestone</option>
             <option value="MEASURE">Measure</option>
+            <option value="REPEATING">Repeating</option>
           </select>
           {stepType === "MILESTONE" && (
             <input
@@ -775,6 +891,38 @@ function SystemCard({ system, onChange }: { system: AreaSystem; onChange: (next:
               />
             </>
           )}
+          {stepType === "REPEATING" && (
+            <>
+              <input
+                type="number"
+                min={1}
+                className={styles.input}
+                placeholder="Every N days"
+                value={stepCadenceDays}
+                onChange={(e) => setStepCadenceDays(e.target.value)}
+              />
+              <select
+                className={styles.input}
+                value={stepEndCondition}
+                onChange={(e) => setStepEndCondition(e.target.value as "FIXED_COUNT" | "REVIEW_DATE")}
+              >
+                <option value="FIXED_COUNT">Fixed count</option>
+                <option value="REVIEW_DATE" disabled={!system.review}>
+                  Until review date{!system.review ? " (Experiment only)" : ""}
+                </option>
+              </select>
+              {stepEndCondition === "FIXED_COUNT" && (
+                <input
+                  type="number"
+                  min={1}
+                  className={styles.input}
+                  placeholder="Occurrence count"
+                  value={stepEndValue}
+                  onChange={(e) => setStepEndValue(e.target.value)}
+                />
+              )}
+            </>
+          )}
           <button type="button" className={styles.link} onClick={handleAddStep}>
             + Add step
           </button>
@@ -788,6 +936,65 @@ function SystemCard({ system, onChange }: { system: AreaSystem; onChange: (next:
  * along a date axis (earliest milestone to latest, padded a week either
  * side), with a now-line marking today's position — not just a sorted
  * list with a glyph on past items. */
+function RepeatingStepRow({
+  step,
+  now,
+  dateValue,
+  onDateChange,
+  onLog,
+  onDeleteOccurrence,
+}: {
+  step: SystemStepRow;
+  now: Date;
+  dateValue: string;
+  onDateChange: (v: string) => void;
+  onLog: () => void;
+  onDeleteOccurrence: (occurrenceId: string) => void;
+}) {
+  const recent = [...step.occurrences].sort((a, b) => b.occurredOn.getTime() - a.occurredOn.getTime()).slice(0, 5);
+  return (
+    <div>
+      <div className={styles.repeatingRow}>
+        <span>
+          {step.text}
+          <span className={styles.meta}>
+            {" "}
+            · every {step.cadenceDays}d ·{" "}
+            {step.endCondition === "FIXED_COUNT" ? `${step.endValue} occurrences` : "until review"} · logged{" "}
+            {step.occurrences.length}
+          </span>
+        </span>
+        <span>
+          <input
+            type="date"
+            className={styles.input}
+            value={dateValue}
+            max={now.toISOString().slice(0, 10)}
+            onChange={(e) => onDateChange(e.target.value)}
+            placeholder="Today"
+          />
+          <button type="button" className={styles.link} onClick={onLog}>
+            Log occurrence
+          </button>
+        </span>
+      </div>
+      {recent.length > 0 && (
+        <div className={styles.meta}>
+          {recent.map((o) => (
+            <span key={o.id}>
+              {" "}
+              {o.occurredOn.toISOString().slice(0, 10)}
+              <button type="button" className={styles.link} onClick={() => onDeleteOccurrence(o.id)}>
+                ×
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function GanttTimeline({ milestones, now }: { milestones: MilestoneStep[]; now: Date }) {
   const sorted = [...milestones].sort((a, b) => a.date!.getTime() - b.date!.getTime());
   const padMs = 7 * 24 * 60 * 60 * 1000;

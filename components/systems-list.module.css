@@ -212,6 +212,33 @@
   background: var(--positive);
 }
 
+.repeatingRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  font-size: 13px;
+}
+
+.streakGrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+}
+
+.streakDay,
+.streakDayDone {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: var(--border-soft);
+}
+
+.streakDayDone {
+  background: var(--positive);
+}
+
 .kanban {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

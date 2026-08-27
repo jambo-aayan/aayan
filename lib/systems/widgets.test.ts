@@ -8,6 +8,8 @@ import {
   numericTrend,
   targetGauge,
   distinctMetricNames,
+  streakGrid,
+  adherenceBreakdown,
   type RatedStep,
   type MilestoneStep,
   type MeasureStep,
@@ -139,5 +141,32 @@ describe("distinctMetricNames", () => {
   it("returns distinct metric names once 2+ exist", () => {
     const steps = [measure("Weight", 80, null, "2026-08-01"), measure("Waist", 85, null, "2026-08-01")];
     expect(distinctMetricNames(steps)).toEqual(["Weight", "Waist"]);
+  });
+});
+
+describe("streakGrid", () => {
+  it("marks each of the last N days done/not against logged occurrences", () => {
+    const today = new Date("2026-08-10");
+    const grid = streakGrid([new Date("2026-08-09"), new Date("2026-08-10")], today, 3);
+    expect(grid.map((d) => d.done)).toEqual([false, true, true]);
+    expect(grid[0].date).toEqual(new Date("2026-08-08"));
+    expect(grid[2].date).toEqual(new Date("2026-08-10"));
+  });
+
+  it("still matches when `today` is full-precision (e.g. `new Date()`) against midnight-stored occurrences", () => {
+    const today = new Date("2026-08-10T16:45:00.000Z");
+    const grid = streakGrid([new Date("2026-08-10")], today, 1);
+    expect(grid[0].done).toBe(true);
+  });
+});
+
+describe("adherenceBreakdown", () => {
+  it("returns null below 3 logged occurrences", () => {
+    expect(adherenceBreakdown(["ON_TIME", "LATE"], 2)).toBeNull();
+  });
+
+  it("returns counts once 3+ occurrences are logged", () => {
+    const result = adherenceBreakdown(["ON_TIME", "ON_TIME", "LATE", "SKIPPED"], 3);
+    expect(result).toEqual({ onTime: 2, late: 1, skipped: 1 });
   });
 });

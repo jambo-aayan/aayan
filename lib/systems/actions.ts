@@ -293,6 +293,85 @@ export async function captureMeasureValue(stepId: string, value: number): Promis
   return { ok: true };
 }
 
+export type AddRepeatingStepInput = {
+  text: string;
+  cadenceDays: number;
+  endCondition: "FIXED_COUNT" | "REVIEW_DATE";
+  endValue: number | null;
+};
+
+export type AddRepeatingStepResult = { ok: true; id: string } | { ok: false; error: string };
+
+export async function addRepeatingStep(systemId: string, input: AddRepeatingStepInput): Promise<AddRepeatingStepResult> {
+  const text = input.text.trim();
+  if (!text) return { ok: false, error: "Give the step some text first." };
+  if (input.cadenceDays < 1) return { ok: false, error: "Cadence must be at least 1 day." };
+  if (input.endCondition === "FIXED_COUNT" && (!input.endValue || input.endValue < 1)) {
+    return { ok: false, error: "Give a fixed occurrence count of at least 1." };
+  }
+
+  try {
+    const [system, count] = await Promise.all([
+      prisma.system.findUniqueOrThrow({ where: { id: systemId } }),
+      prisma.systemStep.count({ where: { systemId } }),
+    ]);
+    if (input.endCondition === "REVIEW_DATE" && !system.review) {
+      return { ok: false, error: "This System has no review date to tie the cadence to." };
+    }
+    const step = await prisma.systemStep.create({
+      data: {
+        systemId,
+        type: "REPEATING",
+        text,
+        cadenceDays: input.cadenceDays,
+        endCondition: input.endCondition,
+        endValue: input.endCondition === "FIXED_COUNT" ? input.endValue : null,
+        sortOrder: count,
+      },
+    });
+    revalidateSystemPaths(system.areaId);
+    return { ok: true, id: step.id };
+  } catch {
+    return { ok: false, error: SAVE_ERROR };
+  }
+}
+
+export type LogOccurrenceResult = { ok: true; id: string; occurredOn: Date } | { ok: false; error: string };
+
+/** Logs a completion of a Repeating step, backdatable the same way as any
+ * other step (see resolveBackdate). */
+export async function logSystemStepOccurrence(stepId: string, occurredOn: Date): Promise<LogOccurrenceResult> {
+  const resolved = resolveBackdate(occurredOn, new Date());
+  if (!resolved.ok) return resolved;
+
+  try {
+    const step = await prisma.systemStep.findUniqueOrThrow({ where: { id: stepId }, include: { system: true } });
+    const occurrence = await prisma.systemStepOccurrence.create({
+      data: { stepId, occurredOn: resolved.date },
+    });
+    revalidateSystemPaths(step.system.areaId);
+    return { ok: true, id: occurrence.id, occurredOn: occurrence.occurredOn };
+  } catch {
+    return { ok: false, error: SAVE_ERROR };
+  }
+}
+
+/** Corrects a mis-logged occurrence (wrong date, duplicate log) — the
+ * counterpart to logSystemStepOccurrence, surfaced next to each logged
+ * date in the UI. */
+export async function deleteSystemStepOccurrence(occurrenceId: string): Promise<ActionResult> {
+  try {
+    const occurrence = await prisma.systemStepOccurrence.delete({
+      where: { id: occurrenceId },
+      include: { step: { include: { system: true } } },
+    });
+    revalidateSystemPaths(occurrence.step.system.areaId);
+  } catch {
+    return { ok: false, error: SAVE_ERROR };
+  }
+  return { ok: true };
+}
+
 export async function updateChecklistStep(stepId: string, text: string): Promise<ActionResult> {
   const trimmed = text.trim();
   if (!trimmed) return { ok: false, error: "Give the step some text first." };

@@ -346,6 +346,13 @@ enum SystemStepType {
   REPEATING
 }
 
+/// A Repeating step's end condition: a fixed occurrence count, or tied to
+/// its System's Experiment review date (DATA_MODEL.md §5).
+enum SystemStepEndCondition {
+  FIXED_COUNT
+  REVIEW_DATE
+}
+
 /// The core entity (DATA_MODEL.md §5): a named Process or Experiment. scope
 /// is real FKs — pillarId required, areaId nullable (null = pillar-level,
 /// e.g. Finances' own "Payday routine") — mirroring Habit/Task's existing
@@ -434,10 +441,34 @@ model SystemStep {
   target     Float?
   metricName String?
 
+  /// Repeating only. Expected occurrence dates are computed on the fly
+  /// from cadenceDays + createdAt (the anchor) — never materialized as
+  /// rows, same idiom as the Phase 1 habit schedule engine. Actual
+  /// completions are logged in SystemStepOccurrence.
+  cadenceDays    Int?
+  endCondition   SystemStepEndCondition?
+  /// FIXED_COUNT only — the target number of occurrences.
+  endValue       Int?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  occurrences SystemStepOccurrence[]
+
   @@index([systemId])
+}
+
+/// Actual completions of a Repeating step — the "occurrence log", mirroring
+/// Habit/CheckIn's definition-row/log-rows split. Backdatable the same way
+/// as any other step (see resolveBackdate).
+model SystemStepOccurrence {
+  id         String     @id @default(cuid())
+  stepId     String
+  step       SystemStep @relation(fields: [stepId], references: [id], onDelete: Cascade)
+  occurredOn DateTime   @db.Date
+  loggedAt   DateTime   @default(now())
+
+  @@index([stepId])
 }
 
 /// Dated decision-log entries, separate from System.body — "why did I

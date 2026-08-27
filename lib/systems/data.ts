@@ -2,7 +2,10 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 
 const SYSTEM_INCLUDE = {
-  steps: { orderBy: { sortOrder: "asc" as const } },
+  steps: {
+    orderBy: { sortOrder: "asc" as const },
+    include: { occurrences: { orderBy: { occurredOn: "asc" as const } } },
+  },
   children: { select: { id: true, name: true, state: true } },
   decisions: { orderBy: { when: "desc" as const } },
 };

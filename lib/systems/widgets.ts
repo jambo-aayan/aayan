@@ -90,3 +90,48 @@ export function distinctMetricNames(steps: MeasureStep[]): string[] | null {
   const names = [...new Set(steps.map((s) => s.metricName).filter((n): n is string => n !== null))];
   return names.length >= 2 ? names : null;
 }
+
+export type StreakDay = { date: Date; done: boolean };
+
+/** 90-day streak grid (schedule-aware) — appears once a System has a
+ * Repeating step. `occurrences` are the logged dates within the window;
+ * the grid marks each day of the last 90 as done/not, same shape as a
+ * habit's check-in grid. */
+const GRID_DAY_MS = 24 * 60 * 60 * 1000;
+
+function midnight(date: Date): Date {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+}
+
+/** `today` and `occurrences` are normalized to midnight UTC before
+ * comparing — `occurrences` come from a `@db.Date` column (already
+ * midnight), but `today` is typically `new Date()`, full-precision, and
+ * would otherwise never match. */
+export function streakGrid(occurrences: Date[], today: Date, days = 90): StreakDay[] {
+  const doneDates = new Set(occurrences.map((d) => midnight(d).getTime()));
+  const todayMidnight = midnight(today);
+  const grid: StreakDay[] = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const date = new Date(todayMidnight.getTime() - i * GRID_DAY_MS);
+    grid.push({ date, done: doneDates.has(date.getTime()) });
+  }
+  return grid;
+}
+
+export type OccurrenceStatusCounts = { onTime: number; late: number; skipped: number };
+
+/** Cadence-adherence breakdown — appears once 3+ occurrences are logged
+ * (loggedCount is the real SystemStepOccurrence row count, not derived
+ * from `statuses`, since a SKIPPED window has no logged row at all). */
+export function adherenceBreakdown(
+  statuses: ("ON_TIME" | "LATE" | "SKIPPED")[],
+  loggedCount: number
+): OccurrenceStatusCounts | null {
+  if (loggedCount < 3) return null;
+
+  return {
+    onTime: statuses.filter((s) => s === "ON_TIME").length,
+    late: statuses.filter((s) => s === "LATE").length,
+    skipped: statuses.filter((s) => s === "SKIPPED").length,
+  };
+}

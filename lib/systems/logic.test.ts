@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { validateCreateSystemInput, canSetParent, resolveBackdate, isValidRating, isValidMeasureNumber } from "./logic";
+import {
+  validateCreateSystemInput,
+  canSetParent,
+  resolveBackdate,
+  isValidRating,
+  isValidMeasureNumber,
+  expectedOccurrenceDates,
+  classifyOccurrences,
+} from "./logic";
 
 describe("validateCreateSystemInput", () => {
   it("rejects a blank name", () => {
@@ -102,5 +110,82 @@ describe("isValidMeasureNumber", () => {
   it("rejects NaN and Infinity", () => {
     expect(isValidMeasureNumber(NaN)).toBe(false);
     expect(isValidMeasureNumber(Infinity)).toBe(false);
+  });
+});
+
+describe("expectedOccurrenceDates", () => {
+  const anchor = new Date("2026-08-01");
+
+  it("computes every-N-days occurrences up to the bound", () => {
+    const dates = expectedOccurrenceDates(
+      { cadenceDays: 7, anchorDate: anchor, endCondition: "FIXED_COUNT", endValue: null, reviewDate: null },
+      new Date("2026-08-22")
+    );
+    expect(dates).toEqual([
+      new Date("2026-08-01"),
+      new Date("2026-08-08"),
+      new Date("2026-08-15"),
+      new Date("2026-08-22"),
+    ]);
+  });
+
+  it("stops at a fixed occurrence count", () => {
+    const dates = expectedOccurrenceDates(
+      { cadenceDays: 7, anchorDate: anchor, endCondition: "FIXED_COUNT", endValue: 2, reviewDate: null },
+      new Date("2026-12-01")
+    );
+    expect(dates).toEqual([new Date("2026-08-01"), new Date("2026-08-08")]);
+  });
+
+  it("stops at the System's review date for REVIEW_DATE templates", () => {
+    const dates = expectedOccurrenceDates(
+      { cadenceDays: 7, anchorDate: anchor, endCondition: "REVIEW_DATE", endValue: null, reviewDate: new Date("2026-08-10") },
+      new Date("2026-12-01")
+    );
+    expect(dates).toEqual([new Date("2026-08-01"), new Date("2026-08-08")]);
+  });
+
+  it("normalizes a full-precision anchor/bound (e.g. a step's createdAt, or `now`) to midnight UTC", () => {
+    const dates = expectedOccurrenceDates(
+      {
+        cadenceDays: 7,
+        anchorDate: new Date("2026-08-01T14:32:07.123Z"),
+        endCondition: "FIXED_COUNT",
+        endValue: null,
+        reviewDate: null,
+      },
+      new Date("2026-08-08T09:00:00.000Z")
+    );
+    expect(dates).toEqual([new Date("2026-08-01"), new Date("2026-08-08")]);
+  });
+});
+
+describe("classifyOccurrences", () => {
+  const expected = [new Date("2026-08-01"), new Date("2026-08-08"), new Date("2026-08-15")];
+
+  it("marks a log on the expected date as ON_TIME", () => {
+    const result = classifyOccurrences(expected, [new Date("2026-08-01")], new Date("2026-08-20"));
+    expect(result[0]).toBe("ON_TIME");
+  });
+
+  it("marks a log after the expected date (but before the next) as LATE", () => {
+    const result = classifyOccurrences(expected, [new Date("2026-08-03")], new Date("2026-08-20"));
+    expect(result[0]).toBe("LATE");
+  });
+
+  it("marks a window with no log, once closed, as SKIPPED", () => {
+    const result = classifyOccurrences(expected, [], new Date("2026-08-20"));
+    expect(result[0]).toBe("SKIPPED");
+    expect(result[1]).toBe("SKIPPED");
+  });
+
+  it("doesn't mark the final expected date as skipped while its window is still open", () => {
+    const result = classifyOccurrences(expected, [], new Date("2026-08-15"));
+    expect(result[2]).toBe("ON_TIME");
+  });
+
+  it("still matches ON_TIME when the logged date has time-of-day precision (a @db.Date column stores midnight, but callers may not normalize before passing)", () => {
+    const result = classifyOccurrences(expected, [new Date("2026-08-01T23:59:00.000Z")], new Date("2026-08-20"));
+    expect(result[0]).toBe("ON_TIME");
   });
 });
