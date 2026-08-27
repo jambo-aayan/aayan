@@ -485,8 +485,10 @@ const DAY_MS_TRAJECTORY = 24 * 60 * 60 * 1000;
  * 60-day lookback regardless of the range control, same reasoning as
  * Momentum/Task flow's fixed windows. */
 export async function getTrajectory(asOf: Date = new Date()) {
-  const [items, northStar, transactions] = await Promise.all([
-    prisma.item.findMany({ select: { value: true, type: true, excluded: true } }),
+  const [accounts, northStar, transactions] = await Promise.all([
+    prisma.account.findMany({
+      select: { type: true, excluded: true, snapshots: { orderBy: { date: "desc" }, take: 1, select: { balance: true } } },
+    }),
     prisma.financeNorthStar.findUnique({ where: { id: FINANCE_NORTH_STAR_ID }, select: { target: true, deadline: true } }),
     prisma.transaction.findMany({
       where: { date: { gte: new Date(asOf.getTime() - TRAJECTORY_LOOKBACK_DAYS * DAY_MS_TRAJECTORY), lte: asOf } },
@@ -496,7 +498,9 @@ export async function getTrajectory(asOf: Date = new Date()) {
 
   if (!northStar || northStar.target === null) return null;
 
-  const { accessible: currentValue } = netWorth(items.map((i) => ({ value: i.value.toNumber(), type: i.type, excluded: i.excluded })));
+  const { accessible: currentValue } = netWorth(
+    accounts.map((a) => ({ value: a.snapshots[0]?.balance.toNumber() ?? 0, type: a.type, excluded: a.excluded }))
+  );
 
   const dailyNet = new Map<string, number>();
   for (const tx of transactions) {

@@ -4,13 +4,23 @@ import { ensureBaselineExists } from "./ensure-baseline";
 import { BASELINE_ID } from "./baseline-id";
 import { ensureFinanceNorthStarExists } from "./ensure-north-star";
 import { FINANCE_NORTH_STAR_ID } from "./north-star-id";
+import { sortGoalsByPriority } from "./logic";
 
 // Prisma's Decimal isn't a plain serializable value — Client Components
 // need a plain number, so every read converts here at the DB boundary.
 
-export async function getItems() {
-  const items = await prisma.item.findMany({ orderBy: { createdAt: "asc" } });
-  return items.map((item) => ({ ...item, value: item.value.toNumber() }));
+/** Each Account's value is its most recent Snapshot's balance, not a
+ * stored column (ADR-0010) — resolved here in one batched query rather
+ * than N+1 per account. */
+export async function getAccounts() {
+  const accounts = await prisma.account.findMany({
+    orderBy: { createdAt: "asc" },
+    include: { snapshots: { orderBy: { date: "desc" }, take: 1 } },
+  });
+  return accounts.map(({ snapshots, ...account }) => ({
+    ...account,
+    value: snapshots[0] ? snapshots[0].balance.toNumber() : 0,
+  }));
 }
 
 export async function getBaseline() {
@@ -24,12 +34,13 @@ export async function getBaseline() {
 
 export async function getGoals() {
   const goals = await prisma.goal.findMany({ orderBy: { createdAt: "asc" } });
-  return goals.map((goal) => ({
+  const mapped = goals.map((goal) => ({
     ...goal,
     target: goal.target.toNumber(),
     saved: goal.saved.toNumber(),
     monthlyContribution: goal.monthlyContribution.toNumber(),
   }));
+  return sortGoalsByPriority(mapped);
 }
 
 export async function getFinanceNorthStar() {

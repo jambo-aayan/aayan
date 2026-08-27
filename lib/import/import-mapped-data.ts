@@ -80,10 +80,17 @@ export async function importMappedData(mapped: MappedImport): Promise<ImportSumm
   }
 
   for (const item of mapped.items) {
-    await prisma.item.upsert({
+    await prisma.account.upsert({
       where: { id: item.id },
-      update: { name: item.name, type: item.type, value: item.value, liquid: item.liquid, excluded: item.excluded },
-      create: { ...item },
+      update: { name: item.name, type: item.type, accessible: item.liquid, excluded: item.excluded },
+      create: {
+        id: item.id,
+        name: item.name,
+        type: item.type,
+        accessible: item.liquid,
+        excluded: item.excluded,
+        snapshots: { create: { date: new Date(), balance: item.value } },
+      },
     });
   }
 

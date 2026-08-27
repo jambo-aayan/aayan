@@ -39,6 +39,12 @@
   font-weight: 600;
 }
 
+.snapshotForm {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .link {
   border: none;
   background: none;

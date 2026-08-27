@@ -5,35 +5,50 @@ import { prisma } from "@/lib/prisma";
 import { BASELINE_ID } from "./baseline-id";
 import { FINANCE_NORTH_STAR_ID } from "./north-star-id";
 
-export type ItemInput = {
+export type AccountInput = {
   name: string;
   type: "ASSET" | "LIABILITY";
+  kind: "TRANSACTIONAL" | "VALUATION";
+  cls: string | null;
+  /** The account's starting/current value — used to seed a Snapshot on
+   * create/restore, never stored on the Account row itself (ADR-0010).
+   * Editing an existing account's value happens via addSnapshot, a
+   * separate dated log entry, not by overwriting this field in place. */
   value: number;
-  liquid: boolean;
+  accessible: boolean;
   excluded: boolean;
+  manualOnly: boolean;
+  active: boolean;
 };
 
-export type ItemResult =
-  | { ok: true; item: ItemInput & { id: string } }
+export type AccountResult =
+  | { ok: true; item: AccountInput & { id: string } }
   | { ok: false; error: string };
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
 const SAVE_ERROR = "Couldn't save — try again.";
 
-export async function createItem(input: ItemInput): Promise<ItemResult> {
+export async function createAccount(input: AccountInput): Promise<AccountResult> {
+  const { value, ...accountFields } = input;
   try {
-    const item = await prisma.item.create({ data: input });
+    const account = await prisma.account.create({
+      data: { ...accountFields, snapshots: { create: { date: new Date(), balance: value } } },
+    });
     revalidatePath("/finances");
-    return { ok: true, item: { ...input, id: item.id } };
+    return { ok: true, item: { ...input, id: account.id } };
   } catch {
     return { ok: false, error: SAVE_ERROR };
   }
 }
 
-export async function updateItem(id: string, input: ItemInput): Promise<ActionResult> {
+export async function updateAccount(id: string, input: AccountInput): Promise<ActionResult> {
+  const { name, type, kind, cls, accessible, excluded, manualOnly, active } = input;
   try {
-    await prisma.item.update({ where: { id }, data: input });
+    await prisma.account.update({
+      where: { id },
+      data: { name, type, kind, cls, accessible, excluded, manualOnly, active },
+    });
   } catch {
     return { ok: false, error: SAVE_ERROR };
   }
@@ -41,9 +56,9 @@ export async function updateItem(id: string, input: ItemInput): Promise<ActionRe
   return { ok: true };
 }
 
-export async function deleteItem(id: string): Promise<ActionResult> {
+export async function deleteAccount(id: string): Promise<ActionResult> {
   try {
-    await prisma.item.delete({ where: { id } });
+    await prisma.account.delete({ where: { id } });
   } catch {
     return { ok: false, error: "Couldn't delete — try again." };
   }
@@ -51,12 +66,32 @@ export async function deleteItem(id: string): Promise<ActionResult> {
   return { ok: true };
 }
 
-/** Recreates a just-deleted item with its original id, for the delete-undo toast. */
-export async function restoreItem(item: ItemInput & { id: string }): Promise<ActionResult> {
+/** Recreates a just-deleted account with its original id, for the
+ * delete-undo toast — seeds one fresh Snapshot at the value it held at
+ * delete time (its earlier Snapshot history is not recovered, matching
+ * every other delete-undo action in this app, which restores the row,
+ * not a full audit trail). */
+export async function restoreAccount(account: AccountInput & { id: string }): Promise<ActionResult> {
+  const { value, id, ...accountFields } = account;
   try {
-    await prisma.item.create({ data: item });
+    await prisma.account.create({
+      data: { id, ...accountFields, snapshots: { create: { date: new Date(), balance: value } } },
+    });
   } catch {
-    return { ok: false, error: "Couldn't undo — the item may already be back." };
+    return { ok: false, error: "Couldn't undo — the account may already be back." };
+  }
+  revalidatePath("/finances");
+  return { ok: true };
+}
+
+/** Logs a new dated Snapshot for an Account — an account's value comes
+ * from its own history, so updating it adds a row rather than overwriting
+ * one (ADR-0010). */
+export async function addSnapshot(accountId: string, date: Date, balance: number): Promise<ActionResult> {
+  try {
+    await prisma.snapshot.create({ data: { accountId, date, balance } });
+  } catch {
+    return { ok: false, error: SAVE_ERROR };
   }
   revalidatePath("/finances");
   return { ok: true };
@@ -79,7 +114,14 @@ export async function updateBaseline(
   return { ok: true };
 }
 
-export type GoalInput = { name: string; target: number; saved: number; monthlyContribution: number };
+export type GoalInput = {
+  name: string;
+  target: number;
+  saved: number;
+  monthlyContribution: number;
+  vehicle: "EMERGENCY_FUND" | "LISA" | "PENSION" | "STOCKS_ISA" | "CASH_ISA" | "GENERIC";
+  priority: number;
+};
 
 export type GoalResult =
   | { ok: true; goal: GoalInput & { id: string } }

@@ -5,7 +5,7 @@ import { PageTitle } from "@/components/page-title";
 import { Card } from "@/components/card";
 import { DashboardCard } from "@/components/dashboard-card";
 import { BaselineForm } from "@/components/baseline-form";
-import { ItemsManager } from "@/components/items-manager";
+import { AccountsManager } from "@/components/accounts-manager";
 import { GoalsManager } from "@/components/goals-manager";
 import { FinanceNorthStarCard } from "@/components/finance-north-star-card";
 import { TransactionsManager } from "@/components/transactions-manager";
@@ -19,7 +19,7 @@ import { ActivityTable } from "@/components/finance-dashboard/activity-table";
 import { SystemsList } from "@/components/systems-list";
 import dashboardStyles from "@/components/finance-dashboard/dashboard.module.css";
 import {
-  getItems,
+  getAccounts,
   getBaseline,
   getGoals,
   getFinanceNorthStar,
@@ -38,9 +38,9 @@ import { FINANCE_PILLAR_ID } from "@/lib/finance/pillar-id";
 
 export default async function FinancesPage({ searchParams }: { searchParams: Promise<{ focus?: string }> }) {
   const { focus } = await searchParams;
-  const [items, baseline, goals, financeNorthStar, transactions, linkedBanks, systems, systemHabitOptions, systemGoalOptions] =
+  const [accounts, baseline, goals, financeNorthStar, transactions, linkedBanks, systems, systemHabitOptions, systemGoalOptions] =
     await Promise.all([
-      getItems(),
+      getAccounts(),
       getBaseline(),
       getGoals(),
       getFinanceNorthStar(),
@@ -50,12 +50,12 @@ export default async function FinancesPage({ searchParams }: { searchParams: Pro
       getHabitOptionsForPillar(FINANCE_PILLAR_ID),
       getGoalOptionsForPillar(FINANCE_PILLAR_ID),
     ]);
-  const { accessible, total } = netWorth(items);
+  const { accessible, total } = netWorth(accounts);
   const monthlySurplus = surplus(baseline.monthlyIncome, baseline.fixedOutgoings);
   const categorySpending = categoryBreakdown(transactions, new Date());
   const northStarPercent = financeNorthStar.target !== null ? goalProgressPercent(accessible, financeNorthStar.target) : null;
   const trendPoints = cashFlowTrend(transactions);
-  const assetBreakdown = netWorthBreakdown(items);
+  const assetBreakdown = netWorthBreakdown(accounts);
 
   return (
     <>
@@ -105,8 +105,8 @@ export default async function FinancesPage({ searchParams }: { searchParams: Pro
         <Card title="Transactions">
           <TransactionsManager initialTransactions={transactions} />
         </Card>
-        <Card title="Items">
-          <ItemsManager initialItems={items} />
+        <Card title="Accounts">
+          <AccountsManager initialAccounts={accounts} />
         </Card>
         <Card title="Systems">
           <SystemsList

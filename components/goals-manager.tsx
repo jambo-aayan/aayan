@@ -5,13 +5,23 @@ import { Flag } from "lucide-react";
 import { createGoal, deleteGoal, restoreGoal, updateGoal, type GoalInput } from "@/lib/finance/actions";
 import { useUndoableCrudList, type ActionResult } from "@/lib/hooks/use-undoable-crud-list";
 import { goalProgressPercent, projectedCompletionDate, totalMonthlyContributions, isOvercommitted } from "@/lib/finance/goal-math";
+import { sortGoalsByPriority } from "@/lib/finance/logic";
 import { PrimaryButton } from "@/components/primary-button";
 import { EmptyState } from "@/components/empty-state";
 import styles from "./goals-manager.module.css";
 
 type Goal = GoalInput & { id: string };
 
-const EMPTY_FORM: GoalInput = { name: "", target: 0, saved: 0, monthlyContribution: 0 };
+const VEHICLE_LABEL: Record<GoalInput["vehicle"], string> = {
+  EMERGENCY_FUND: "Emergency Fund",
+  LISA: "LISA",
+  PENSION: "Pension",
+  STOCKS_ISA: "Stocks & Shares ISA",
+  CASH_ISA: "Cash ISA",
+  GENERIC: "Generic",
+};
+
+const EMPTY_FORM: GoalInput = { name: "", target: 0, saved: 0, monthlyContribution: 0, vehicle: "GENERIC", priority: 0 };
 
 function formatGBP(value: number): string {
   return new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP" }).format(value);
@@ -40,6 +50,7 @@ export function GoalsManager({ initialGoals, surplus }: { initialGoals: Goal[]; 
   const [editingId, setEditingId] = useState<string | null>(null);
 
   const overcommitted = isOvercommitted(totalMonthlyContributions(goals), surplus);
+  const sortedGoals = sortGoalsByPriority(goals);
 
   async function handleAdd() {
     if (!form.name.trim()) {
@@ -48,9 +59,33 @@ export function GoalsManager({ initialGoals, surplus }: { initialGoals: Goal[]; 
     }
     setAdding(true);
     setAddError(null);
-    const ok = await add(form);
+    const ok = await add({ ...form, priority: goals.length });
     setAdding(false);
     if (ok) setForm(EMPTY_FORM);
+  }
+
+  /** Moves a goal up/down in the priority order and renumbers the whole
+   * sorted list sequentially (0, 1, 2, …) rather than just swapping two
+   * values — pre-existing goals can share the same default priority, and
+   * swapping equal values would be a no-op, so the move would silently
+   * do nothing. Renumbering the full list makes every move deterministic
+   * regardless of the starting values. Priority is an explicit,
+   * user-editable rank, not implied by vehicle type (ADR-0010). */
+  async function handleMove(goal: Goal, direction: -1 | 1) {
+    const index = sortedGoals.findIndex((g) => g.id === goal.id);
+    const targetIndex = index + direction;
+    if (targetIndex < 0 || targetIndex >= sortedGoals.length) return;
+    const reordered = [...sortedGoals];
+    [reordered[index], reordered[targetIndex]] = [reordered[targetIndex], reordered[index]];
+    // Sequential, not Promise.all: stops at the first failure rather than
+    // racing several in-flight writes with no rollback if one fails
+    // partway — update() already retries and surfaces a toast on error,
+    // so stopping early keeps the blast radius to "reorder didn't finish"
+    // rather than an unpredictable partial renumbering.
+    for (const [i, g] of reordered.entries()) {
+      const result = await update(g.id, { ...g, priority: i }, { ...g, priority: i });
+      if (!result.ok) break;
+    }
   }
 
   return (
@@ -63,7 +98,7 @@ export function GoalsManager({ initialGoals, surplus }: { initialGoals: Goal[]; 
       )}
 
       <ul className={styles.list}>
-        {goals.map((goal) =>
+        {sortedGoals.map((goal, index) =>
           editingId === goal.id ? (
             <GoalEditRow
               key={goal.id}
@@ -78,7 +113,9 @@ export function GoalsManager({ initialGoals, surplus }: { initialGoals: Goal[]; 
           ) : (
             <li key={goal.id} className={styles.row}>
               <div className={styles.info}>
-                <div className={styles.name}>{goal.name}</div>
+                <div className={styles.name}>
+                  {index + 1}. {goal.name} <span className={styles.meta}>({VEHICLE_LABEL[goal.vehicle]})</span>
+                </div>
                 <div className={styles.bar}>
                   <div
                     className={styles.barFill}
@@ -99,6 +136,24 @@ export function GoalsManager({ initialGoals, surplus }: { initialGoals: Goal[]; 
                 </div>
               </div>
               <div className={styles.rowActions}>
+                <button
+                  type="button"
+                  className={styles.link}
+                  onClick={() => handleMove(goal, -1)}
+                  disabled={index === 0}
+                  aria-label={`Move ${goal.name} up`}
+                >
+                  ↑
+                </button>
+                <button
+                  type="button"
+                  className={styles.link}
+                  onClick={() => handleMove(goal, 1)}
+                  disabled={index === sortedGoals.length - 1}
+                  aria-label={`Move ${goal.name} down`}
+                >
+                  ↓
+                </button>
                 <button type="button" className={styles.link} onClick={() => setEditingId(goal.id)}>
                   Edit
                 </button>
@@ -143,6 +198,18 @@ function GoalFields({ form, onChange }: { form: GoalInput; onChange: (update: Go
         value={form.name}
         onChange={(e) => onChange({ ...form, name: e.target.value })}
       />
+      <select
+        className={styles.input}
+        aria-label="Vehicle"
+        value={form.vehicle}
+        onChange={(e) => onChange({ ...form, vehicle: e.target.value as GoalInput["vehicle"] })}
+      >
+        {Object.entries(VEHICLE_LABEL).map(([value, label]) => (
+          <option key={value} value={value}>
+            {label}
+          </option>
+        ))}
+      </select>
       <input
         className={styles.input}
         type="number"
