@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  adherenceForHabit,
+  computeAdherence,
   computeMomentumMetrics,
   computeMomentumHistory,
+  computeSurplusRate,
   momentumWindows,
   momentumWrittenRead,
   type MomentumInputs,
@@ -37,8 +40,8 @@ describe("computeMomentumMetrics", () => {
         { dueDate: d("2026-08-02"), completedAt: null },
       ],
       transactions: [
-        { date: d("2026-08-01"), amount: 100, direction: "IN" },
-        { date: d("2026-08-01"), amount: 60, direction: "OUT" },
+        { date: d("2026-08-01"), amount: 100, direction: "IN", receivableId: null, goalContributionId: null },
+        { date: d("2026-08-01"), amount: 60, direction: "OUT", receivableId: null, goalContributionId: null },
       ],
     };
     const metrics = computeMomentumMetrics(inputs, d("2026-08-01"), d("2026-08-02"));
@@ -72,12 +75,88 @@ describe("computeMomentumMetrics", () => {
       checkIns: [],
       tasks: [],
       transactions: [
-        { date: d("2026-08-01"), amount: 50, direction: "IN" },
-        { date: d("2026-08-01"), amount: 200, direction: "OUT" },
+        { date: d("2026-08-01"), amount: 50, direction: "IN", receivableId: null, goalContributionId: null },
+        { date: d("2026-08-01"), amount: 200, direction: "OUT", receivableId: null, goalContributionId: null },
       ],
     };
     const metrics = computeMomentumMetrics(inputs, d("2026-08-01"), d("2026-08-01"));
     expect(metrics.surplusRate).toBe(0);
+  });
+});
+
+describe("computeSurplusRate — receivable/goal-contribution exclusion", () => {
+  it("excludes a receivable-flagged transaction from both income and outgoings", () => {
+    const rate = computeSurplusRate(
+      [
+        { date: d("2026-08-01"), amount: 1000, direction: "IN", receivableId: null, goalContributionId: null },
+        { date: d("2026-08-01"), amount: 500, direction: "OUT", receivableId: "r1", goalContributionId: null },
+        { date: d("2026-08-01"), amount: 200, direction: "OUT", receivableId: null, goalContributionId: null },
+      ],
+      d("2026-08-01"),
+      d("2026-08-01")
+    );
+    // Without the exclusion this would be (1000-700)/1000=30%; with it, (1000-200)/1000=80%.
+    expect(rate).toBe(80);
+  });
+
+  it("excludes a goal-contribution-flagged transaction the same way", () => {
+    const rate = computeSurplusRate(
+      [
+        { date: d("2026-08-01"), amount: 1000, direction: "IN", receivableId: null, goalContributionId: null },
+        { date: d("2026-08-01"), amount: 300, direction: "OUT", receivableId: null, goalContributionId: "gc1" },
+      ],
+      d("2026-08-01"),
+      d("2026-08-01")
+    );
+    expect(rate).toBe(100);
+  });
+});
+
+describe("adherenceForHabit / computeAdherence — PER_WEEK", () => {
+  it("uses the proportional weekly target as the scheduled count, not one-due-every-day", () => {
+    // 4x/week target, over a 7-day window -> expectedCount = round(7/7*4) = 4, not 7.
+    const habit = {
+      id: "h1",
+      schedule: {
+        scheduleType: "PER_WEEK" as const,
+        scheduleWeekdays: [],
+        scheduleIntervalN: null,
+        scheduleAnchorDate: null,
+        scheduleTargetCount: 4,
+      },
+    };
+    const checkIns = [
+      { habitId: "h1", date: d("2026-08-03"), level: "FULL" as const },
+      { habitId: "h1", date: d("2026-08-04"), level: "FULL" as const },
+    ];
+    const result = adherenceForHabit(habit, checkIns, d("2026-08-03"), d("2026-08-09"));
+    expect(result.scheduled).toBe(4);
+    expect(result.logged).toBe(2);
+  });
+
+  it("computeAdherence reports a fair percentage for a PER_WEEK habit, not deflated by non-due days", () => {
+    const habits = [
+      {
+        id: "h1",
+        schedule: {
+          scheduleType: "PER_WEEK" as const,
+          scheduleWeekdays: [],
+          scheduleIntervalN: null,
+          scheduleAnchorDate: null,
+          scheduleTargetCount: 4,
+        },
+      },
+    ];
+    const checkIns = [
+      { habitId: "h1", date: d("2026-08-03"), level: "FULL" as const },
+      { habitId: "h1", date: d("2026-08-04"), level: "FULL" as const },
+      { habitId: "h1", date: d("2026-08-05"), level: "FULL" as const },
+      { habitId: "h1", date: d("2026-08-06"), level: "FULL" as const },
+    ];
+    // Hit the full weekly target (4/4) -> 100%, not 4/7 ≈ 57% as the old
+    // every-day-is-due math would have reported.
+    const pct = computeAdherence(habits, checkIns, d("2026-08-03"), d("2026-08-09"));
+    expect(pct).toBe(100);
   });
 });
 

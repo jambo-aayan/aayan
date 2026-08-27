@@ -84,9 +84,9 @@ describe("computeGoalVelocityKpi", () => {
 describe("computeSurplusRateKpi", () => {
   it("names the biggest outgoing category as the drain", () => {
     const transactions: CategorizedTransactionFixture[] = [
-      { date: d("2026-08-01"), amount: 3000, direction: "IN", category: "Salary" },
-      { date: d("2026-08-01"), amount: 1200, direction: "OUT", category: "Rent" },
-      { date: d("2026-08-02"), amount: 400, direction: "OUT", category: "Groceries" },
+      { date: d("2026-08-01"), amount: 3000, direction: "IN", category: "Salary", receivableId: null, goalContributionId: null },
+      { date: d("2026-08-01"), amount: 1200, direction: "OUT", category: "Rent", receivableId: null, goalContributionId: null },
+      { date: d("2026-08-02"), amount: 400, direction: "OUT", category: "Groceries", receivableId: null, goalContributionId: null },
     ];
     const result = computeSurplusRateKpi(transactions, d("2026-08-01"), d("2026-08-02"), d("2026-07-30"), d("2026-07-31"));
     expect(result.value).toBeCloseTo(46.7, 1);
@@ -120,7 +120,9 @@ describe("buildHabitAdherenceDrillDown", () => {
 
 describe("buildSurplusRateDrillDown", () => {
   it("caps entries at 20 for a long range without breaking the series/summary", () => {
-    const transactions: CategorizedTransactionFixture[] = [{ date: d("2026-06-01"), amount: 1000, direction: "IN", category: "Salary" }];
+    const transactions: CategorizedTransactionFixture[] = [
+      { date: d("2026-06-01"), amount: 1000, direction: "IN", category: "Salary", receivableId: null, goalContributionId: null },
+    ];
     const drillDown = buildSurplusRateDrillDown(transactions, d("2026-06-01"), d("2026-08-30"), d("2026-03-04"), d("2026-05-31"), "Read.");
     expect(drillDown.entries.length).toBeLessThanOrEqual(20);
     expect(drillDown.series).toHaveLength(14);

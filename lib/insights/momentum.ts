@@ -1,5 +1,4 @@
-import { habitOccursOn, type HabitSchedule } from "../habits/schedule";
-import { mondayOf } from "../habits/streak";
+import { doneEarlierThisWeek, expectedCount, habitOccursOn, type HabitSchedule } from "../habits/schedule";
 import { utcMidnight } from "../habits/date-utils";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -14,7 +13,17 @@ export const MOMENTUM_WEIGHTS = { adherence: 0.5, followThrough: 0.3, surplusRat
 export type HabitFixture = { id: string; schedule: HabitSchedule };
 export type CheckInFixture = { habitId: string; date: Date; level: "FULL" | "MINIMUM" };
 export type TaskFixture = { dueDate: Date; completedAt: Date | null };
-export type TransactionFixture = { date: Date; amount: number; direction: "IN" | "OUT" };
+export type TransactionFixture = {
+  date: Date;
+  amount: number;
+  direction: "IN" | "OUT";
+  /** A transaction flagged as a receivable or a goal contribution is a
+   * reclassification, not real income/spend — excluded here the same
+   * way lib/finance/category-breakdown.ts's categoryBreakdown and
+   * budgetVsActual already exclude both (ADR-0010/#114/#120). */
+  receivableId: string | null;
+  goalContributionId: string | null;
+};
 
 export type MomentumInputs = {
   habits: HabitFixture[];
@@ -44,7 +53,17 @@ export function inRange(date: Date, start: Date, end: Date): boolean {
  * computeAdherence sums across every habit, and lib/insights/kpis.ts reuses
  * directly for its per-habit adherence breakdown (naming the weakest
  * habit in a KPI card's diagnosis line needs the same math per-habit,
- * not just the aggregate). */
+ * not just the aggregate).
+ *
+ * `scheduled` comes from expectedCount — the schedule engine's single
+ * source of truth (see docs/adr/0006-v2-phase2-habits-tasks.md and
+ * lib/insights/consistency.ts's identical treatment) — not a second,
+ * separately-accumulated count. For every non-PER_WEEK type this is
+ * identical to counting habitOccursOn-true days directly; for PER_WEEK
+ * it's the proportional round(days/7 * target) rather than treating the
+ * habit as due every calendar day. `logged` stays a per-day accumulation
+ * (not doneCount) so MINIMUM check-ins keep their 0.5 partial credit,
+ * which a plain presence count can't model. */
 export function adherenceForHabit(
   habit: HabitFixture,
   checkIns: CheckInFixture[],
@@ -52,15 +71,14 @@ export function adherenceForHabit(
   end: Date
 ): { scheduled: number; logged: number } {
   const habitCheckIns = checkIns.filter((c) => c.habitId === habit.id);
-  let scheduled = 0;
+  const days = eachDay(start, end);
+  const checkInDates = habitCheckIns.map((c) => c.date);
+
+  const scheduled = expectedCount(habit.schedule, days, checkInDates);
+
   let logged = 0;
-  for (const day of eachDay(start, end)) {
-    const weekStart = mondayOf(day);
-    const doneThisWeek = habitCheckIns.some(
-      (c) => mondayOf(c.date).getTime() === weekStart.getTime() && c.date.getTime() <= day.getTime()
-    );
-    if (!habitOccursOn(habit.schedule, day, doneThisWeek)) continue;
-    scheduled += 1;
+  for (const day of days) {
+    if (!habitOccursOn(habit.schedule, day, doneEarlierThisWeek(day, checkInDates))) continue;
     const checkIn = habitCheckIns.find((c) => c.date.getTime() === day.getTime());
     if (checkIn) logged += checkIn.level === "FULL" ? 1 : 0.5;
   }
@@ -88,9 +106,13 @@ export function computeFollowThrough(tasks: TaskFixture[], start: Date, end: Dat
   return (closed / due.length) * 100;
 }
 
-/** (income − outgoings) ÷ income, clamped to 0–100, over [start, end]. */
+/** (income − outgoings) ÷ income, clamped to 0–100, over [start, end] —
+ * excludes receivable/goal-contribution-flagged transactions from both
+ * sides, since neither is real income or spend. */
 export function computeSurplusRate(transactions: TransactionFixture[], start: Date, end: Date): number {
-  const inRangeTx = transactions.filter((t) => inRange(t.date, start, end));
+  const inRangeTx = transactions.filter(
+    (t) => inRange(t.date, start, end) && t.receivableId === null && t.goalContributionId === null
+  );
   const income = inRangeTx.filter((t) => t.direction === "IN").reduce((sum, t) => sum + t.amount, 0);
   const outgoings = inRangeTx.filter((t) => t.direction === "OUT").reduce((sum, t) => sum + t.amount, 0);
   if (income <= 0) return 0;

@@ -58,7 +58,14 @@ async function getMomentumInputs(asOf: Date): Promise<MomentumInputs> {
   const [habits, checkIns, tasks, transactions] = await Promise.all([
     prisma.habit.findMany({
       where: { status: "ACTIVE" },
-      select: { id: true, scheduleType: true, scheduleWeekdays: true, scheduleIntervalN: true, scheduleAnchorDate: true },
+      select: {
+        id: true,
+        scheduleType: true,
+        scheduleWeekdays: true,
+        scheduleIntervalN: true,
+        scheduleAnchorDate: true,
+        scheduleTargetCount: true,
+      },
     }),
     prisma.checkIn.findMany({
       where: { date: { gte: lookbackStart, lte: asOf } },
@@ -70,7 +77,7 @@ async function getMomentumInputs(asOf: Date): Promise<MomentumInputs> {
     }),
     prisma.transaction.findMany({
       where: { date: { gte: lookbackStart, lte: asOf } },
-      select: { date: true, amount: true, direction: true },
+      select: { date: true, amount: true, direction: true, receivableId: true, goalContributionId: true },
     }),
   ]);
 
@@ -82,11 +89,18 @@ async function getMomentumInputs(asOf: Date): Promise<MomentumInputs> {
         scheduleWeekdays: h.scheduleWeekdays,
         scheduleIntervalN: h.scheduleIntervalN,
         scheduleAnchorDate: h.scheduleAnchorDate,
+        scheduleTargetCount: h.scheduleTargetCount,
       },
     })),
     checkIns,
     tasks: tasks.filter((t): t is { dueDate: Date; completedAt: Date | null } => t.dueDate !== null),
-    transactions: transactions.map((t) => ({ date: t.date, amount: t.amount.toNumber(), direction: t.direction })),
+    transactions: transactions.map((t) => ({
+      date: t.date,
+      amount: t.amount.toNumber(),
+      direction: t.direction,
+      receivableId: t.receivableId,
+      goalContributionId: t.goalContributionId,
+    })),
   };
 }
 
@@ -135,7 +149,15 @@ export async function getKpiSummary(range: InsightsRange, asOf: Date = new Date(
   const [habits, checkIns, tasks, transactions, goals] = await Promise.all([
     prisma.habit.findMany({
       where: { status: "ACTIVE" },
-      select: { id: true, name: true, scheduleType: true, scheduleWeekdays: true, scheduleIntervalN: true, scheduleAnchorDate: true },
+      select: {
+        id: true,
+        name: true,
+        scheduleType: true,
+        scheduleWeekdays: true,
+        scheduleIntervalN: true,
+        scheduleAnchorDate: true,
+        scheduleTargetCount: true,
+      },
     }),
     prisma.checkIn.findMany({
       where: { date: { gte: lookbackStart, lte: current[1] } },
@@ -147,7 +169,7 @@ export async function getKpiSummary(range: InsightsRange, asOf: Date = new Date(
     }),
     prisma.transaction.findMany({
       where: { date: { gte: lookbackStart, lte: current[1] } },
-      select: { date: true, amount: true, direction: true, category: true },
+      select: { date: true, amount: true, direction: true, category: true, receivableId: true, goalContributionId: true },
     }),
     prisma.lifeGoal.findMany({
       where: { status: "ACTIVE" },
@@ -163,14 +185,27 @@ export async function getKpiSummary(range: InsightsRange, asOf: Date = new Date(
   const habitFixtures = habits.map((h) => ({
     id: h.id,
     name: h.name,
-    schedule: { scheduleType: h.scheduleType, scheduleWeekdays: h.scheduleWeekdays, scheduleIntervalN: h.scheduleIntervalN, scheduleAnchorDate: h.scheduleAnchorDate },
+    schedule: {
+      scheduleType: h.scheduleType,
+      scheduleWeekdays: h.scheduleWeekdays,
+      scheduleIntervalN: h.scheduleIntervalN,
+      scheduleAnchorDate: h.scheduleAnchorDate,
+      scheduleTargetCount: h.scheduleTargetCount,
+    },
   }));
 
   const taskFixtures = tasks
     .filter((t): t is typeof t & { dueDate: Date } => t.dueDate !== null)
     .map((t) => ({ dueDate: t.dueDate, completedAt: t.completedAt, listName: t.list?.name ?? null }));
 
-  const transactionFixtures = transactions.map((t) => ({ date: t.date, amount: t.amount.toNumber(), direction: t.direction, category: t.category }));
+  const transactionFixtures = transactions.map((t) => ({
+    date: t.date,
+    amount: t.amount.toNumber(),
+    direction: t.direction,
+    category: t.category,
+    receivableId: t.receivableId,
+    goalContributionId: t.goalContributionId,
+  }));
 
   const goalFixtures = goals.map((g) => {
     const taskDates = g.tasks.map((t) => t.completedAt!.getTime());
@@ -409,17 +444,33 @@ export async function getCorrelations(range: InsightsRange, asOf: Date = new Dat
   const [habits, checkIns, tasks, painLogs, transactions] = await Promise.all([
     prisma.habit.findMany({
       where: { status: "ACTIVE" },
-      select: { id: true, scheduleType: true, scheduleWeekdays: true, scheduleIntervalN: true, scheduleAnchorDate: true },
+      select: {
+        id: true,
+        scheduleType: true,
+        scheduleWeekdays: true,
+        scheduleIntervalN: true,
+        scheduleAnchorDate: true,
+        scheduleTargetCount: true,
+      },
     }),
     prisma.checkIn.findMany({ where: { date: { gte: start, lte: end } }, select: { habitId: true, date: true, level: true } }),
     prisma.task.findMany({ where: { dueDate: { gte: start, lte: end }, deletedAt: null }, select: { dueDate: true, completedAt: true } }),
     prisma.painMobilityLog.findMany({ where: { date: { gte: start, lte: end } }, select: { date: true, pain: true } }),
-    prisma.transaction.findMany({ where: { date: { gte: start, lte: end } }, select: { date: true, amount: true, direction: true } }),
+    prisma.transaction.findMany({
+      where: { date: { gte: start, lte: end } },
+      select: { date: true, amount: true, direction: true, receivableId: true, goalContributionId: true },
+    }),
   ]);
 
   const habitFixtures = habits.map((h) => ({
     id: h.id,
-    schedule: { scheduleType: h.scheduleType, scheduleWeekdays: h.scheduleWeekdays, scheduleIntervalN: h.scheduleIntervalN, scheduleAnchorDate: h.scheduleAnchorDate },
+    schedule: {
+      scheduleType: h.scheduleType,
+      scheduleWeekdays: h.scheduleWeekdays,
+      scheduleIntervalN: h.scheduleIntervalN,
+      scheduleAnchorDate: h.scheduleAnchorDate,
+      scheduleTargetCount: h.scheduleTargetCount,
+    },
   }));
   const taskFixtures = tasks
     .filter((t): t is { dueDate: Date; completedAt: Date | null } => t.dueDate !== null)
@@ -435,9 +486,18 @@ export async function getCorrelations(range: InsightsRange, asOf: Date = new Dat
   }
   const avgPainByDay = new Map([...painByDay.entries()].map(([k, vs]) => [k, vs.reduce((s, v) => s + v, 0) / vs.length]));
 
+  // Same exclusion rule as computeSurplusRate (lib/insights/momentum.ts):
+  // a receivable/goal-contribution-flagged transaction is a
+  // reclassification, not real income/spend (ADR-0010/#114/#120). Not a
+  // literal call to computeSurplusRate itself — that returns a clamped
+  // 0-100 rate over a range, a different shape from this pair's raw
+  // signed daily net amount ("Daily surplus") — but the same underlying
+  // filter, kept in lockstep rather than re-derived.
+  const realTransactions = transactions.filter((tx) => tx.receivableId === null && tx.goalContributionId === null);
+
   const surplusByDay = new Map<string, number>();
   const hasTxByDay = new Set<string>();
-  for (const tx of transactions) {
+  for (const tx of realTransactions) {
     const key = dateKeyCorr(tx.date);
     hasTxByDay.add(key);
     const signed = tx.direction === "IN" ? tx.amount.toNumber() : -tx.amount.toNumber();
