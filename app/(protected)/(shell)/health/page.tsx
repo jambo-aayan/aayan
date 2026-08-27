@@ -4,12 +4,22 @@ import { PageTitle } from "@/components/page-title";
 import { Card } from "@/components/card";
 import { HealthMindmap } from "@/components/health-mindmap";
 import { EditableText } from "@/components/editable-text";
+import { SystemsList } from "@/components/systems-list";
 import { getHealthPillarWithAreas } from "@/lib/health/data";
 import { updateHealthPillarNorthStar } from "@/lib/health/actions";
+import { getSystemsForPillar, getHabitOptionsForPillar } from "@/lib/systems/data";
+import { getGoalOptions } from "@/lib/goals/data";
+import { HEALTH_PILLAR_ID } from "@/lib/health/seed-data";
 import { resolveColorHex, type ColorKey } from "@/lib/colors";
 
-export default async function HealthPage() {
-  const pillar = await getHealthPillarWithAreas();
+export default async function HealthPage({ searchParams }: { searchParams: Promise<{ focus?: string }> }) {
+  const { focus } = await searchParams;
+  const [pillar, systems, habitOptions, goalOptions] = await Promise.all([
+    getHealthPillarWithAreas(),
+    getSystemsForPillar(HEALTH_PILLAR_ID),
+    getHabitOptionsForPillar(HEALTH_PILLAR_ID),
+    getGoalOptions(HEALTH_PILLAR_ID),
+  ]);
   const accentColor = resolveColorHex(pillar.color as ColorKey | null);
 
   return (
@@ -28,6 +38,16 @@ export default async function HealthPage() {
             hint="Click to edit · saves as you type"
             fraunces={19}
             onSave={updateHealthPillarNorthStar}
+          />
+        </Card>
+        <Card title="Systems">
+          <SystemsList
+            areaId={null}
+            pillarId={HEALTH_PILLAR_ID}
+            initialSystems={systems}
+            habitOptions={habitOptions}
+            goalOptions={goalOptions}
+            focusId={focus ?? null}
           />
         </Card>
       </div>

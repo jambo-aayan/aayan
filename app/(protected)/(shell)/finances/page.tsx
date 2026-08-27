@@ -16,6 +16,7 @@ import { NorthStarRingCard } from "@/components/finance-dashboard/north-star-rin
 import { GoalRingsCard } from "@/components/finance-dashboard/goal-rings-card";
 import { BreakdownRingCard } from "@/components/finance-dashboard/breakdown-ring-card";
 import { ActivityTable } from "@/components/finance-dashboard/activity-table";
+import { SystemsList } from "@/components/systems-list";
 import dashboardStyles from "@/components/finance-dashboard/dashboard.module.css";
 import {
   getItems,
@@ -31,16 +32,24 @@ import { categoryBreakdown } from "@/lib/finance/category-breakdown";
 import { goalProgressPercent } from "@/lib/finance/goal-math";
 import { cashFlowTrend } from "@/lib/finance/cash-flow-trend";
 import { netWorthBreakdown } from "@/lib/finance/net-worth-breakdown";
+import { getSystemsForPillar, getHabitOptionsForPillar } from "@/lib/systems/data";
+import { getGoalOptions as getGoalOptionsForPillar } from "@/lib/goals/data";
+import { FINANCE_PILLAR_ID } from "@/lib/finance/pillar-id";
 
-export default async function FinancesPage() {
-  const [items, baseline, goals, financeNorthStar, transactions, linkedBanks] = await Promise.all([
-    getItems(),
-    getBaseline(),
-    getGoals(),
-    getFinanceNorthStar(),
-    getTransactions(),
-    getLinkedBanks(),
-  ]);
+export default async function FinancesPage({ searchParams }: { searchParams: Promise<{ focus?: string }> }) {
+  const { focus } = await searchParams;
+  const [items, baseline, goals, financeNorthStar, transactions, linkedBanks, systems, systemHabitOptions, systemGoalOptions] =
+    await Promise.all([
+      getItems(),
+      getBaseline(),
+      getGoals(),
+      getFinanceNorthStar(),
+      getTransactions(),
+      getLinkedBanks(),
+      getSystemsForPillar(FINANCE_PILLAR_ID),
+      getHabitOptionsForPillar(FINANCE_PILLAR_ID),
+      getGoalOptionsForPillar(FINANCE_PILLAR_ID),
+    ]);
   const { accessible, total } = netWorth(items);
   const monthlySurplus = surplus(baseline.monthlyIncome, baseline.fixedOutgoings);
   const categorySpending = categoryBreakdown(transactions, new Date());
@@ -98,6 +107,16 @@ export default async function FinancesPage() {
         </Card>
         <Card title="Items">
           <ItemsManager initialItems={items} />
+        </Card>
+        <Card title="Systems">
+          <SystemsList
+            areaId={null}
+            pillarId={FINANCE_PILLAR_ID}
+            initialSystems={systems}
+            habitOptions={systemHabitOptions}
+            goalOptions={systemGoalOptions}
+            focusId={focus ?? null}
+          />
         </Card>
       </div>
     </>

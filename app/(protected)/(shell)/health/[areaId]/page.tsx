@@ -34,10 +34,13 @@ const STIFFNESS_LABELS: Record<StiffnessBucket, string> = {
 
 export default async function AreaPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ areaId: string }>;
+  searchParams: Promise<{ focus?: string }>;
 }) {
   const { areaId } = await params;
+  const { focus } = await searchParams;
   const area = await getArea(areaId);
   if (!area) notFound();
 
@@ -110,6 +113,7 @@ export default async function AreaPage({
             initialSystems={systems}
             habitOptions={systemHabitOptions}
             goalOptions={goals}
+            focusId={focus ?? null}
           />
         </Card>
         {isPainMobilityArea && (

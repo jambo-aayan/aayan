@@ -8,6 +8,7 @@ import { createSystem } from "@/lib/systems/actions";
 import { withRetry } from "@/lib/with-retry";
 import { useToast } from "@/components/toast/toast-provider";
 import { HEALTH_PILLAR_ID } from "@/lib/health/seed-data";
+import { FINANCE_PILLAR_ID } from "@/lib/finance/pillar-id";
 import styles from "./systems-tab.module.css";
 
 export type { AreaLoadRow, TimelineRow, RollupRow, WhatWorkedRow };
@@ -23,17 +24,32 @@ const VERDICT_STYLE: Record<SystemVerdict, string> = {
 };
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-/** A System's card is only reachable today if it's Area-scoped under
- * Health, the only pillar with a wired-up detail page — no per-Pillar
- * route exists anywhere in the app (confirmed while fixing #100's
- * revalidateSystemPaths), and pillar-level Systems (no Area) have no card
- * at all yet, in any pillar. For those, link plainly to /pillars — the
- * general index, same fallback My Day's upcomingStepHref already uses —
- * rather than appending a `#system-…` anchor that would silently resolve
- * to nothing. */
+/** A pillar-scoped System (no Area — e.g. Finances' own "Payday routine")
+ * deep-links to its Pillar's own page rather than an Area page, per
+ * #108. Health and Finances are the only pillars with a dedicated page
+ * today (`/health`, `/finances`); any other pillar (and any Area-scoped
+ * System whose Area doesn't have a wired-up detail page — only Health's
+ * `/health/[areaId]` exists) falls back to the general /pillars index,
+ * same fallback My Day's upcomingStepHref already uses — that index has
+ * no System card to focus. */
+function pillarHref(pillarId: string): string | null {
+  if (pillarId === HEALTH_PILLAR_ID) return "/health";
+  if (pillarId === FINANCE_PILLAR_ID) return "/finances";
+  return null;
+}
+
+/** Deep-links into a System's card: Area-scoped under Health lands on
+ * that Area's page, pillar-scoped Systems land on their own Pillar's page
+ * (Health/Finances both render a pillar-level Systems list) — either way
+ * floated to the top, ringed in coral, with a dismissible "Opened from
+ * the Systems list" strip (SystemsList/SystemCard's `focusId` prop). The
+ * `#system-…` anchor is a same-page fallback for a no-JS load. A pillar
+ * with no dedicated page yet falls back to the general /pillars index,
+ * without a focus param since there's no card there to find. */
 function systemHref(row: { id: string; areaId: string | null; pillarId: string }): string {
-  if (row.areaId && row.pillarId === HEALTH_PILLAR_ID) return `/health/${row.areaId}#system-${row.id}`;
-  return "/pillars";
+  if (row.areaId && row.pillarId === HEALTH_PILLAR_ID) return `/health/${row.areaId}?focus=${row.id}#system-${row.id}`;
+  const pillarPage = pillarHref(row.pillarId);
+  return pillarPage ? `${pillarPage}?focus=${row.id}#system-${row.id}` : "/pillars";
 }
 
 /** Type-appropriate status text for a rollup row — matches the category a

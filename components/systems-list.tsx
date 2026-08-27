@@ -143,15 +143,23 @@ export function SystemsList({
   initialSystems,
   habitOptions = [],
   goalOptions = [],
+  focusId = null,
 }: {
   areaId: string | null;
   pillarId: string;
   initialSystems: AreaSystem[];
   habitOptions?: { id: string; name: string }[];
   goalOptions?: { id: string; name: string }[];
+  /** A System deep-linked into (e.g. from the Systems tab rollup, via a
+   * `?focus=` query param) — its card floats to the top of this list,
+   * rings in coral, and shows a dismissible "Opened from the Systems
+   * list" strip. Dismissing the strip only hides the strip; the float
+   * and ring are a one-time layout decision made at load, not undone. */
+  focusId?: string | null;
 }) {
   const [systems, setSystems] = useState(initialSystems);
   const [showArchived, setShowArchived] = useState(false);
+  const [stripDismissed, setStripDismissed] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -210,7 +218,13 @@ export function SystemsList({
     setForm(EMPTY_FORM);
   }
 
-  const visible = systems.filter((s) => showArchived || s.state !== "ARCHIVED");
+  const shown = systems.filter((s) => showArchived || s.state !== "ARCHIVED");
+  // The focused card floats to the top — a one-time layout decision made
+  // from the load-time focusId, not re-sorted as systems/showArchived
+  // change afterward.
+  const visible = focusId
+    ? [...shown].sort((a, b) => (a.id === focusId ? -1 : b.id === focusId ? 1 : 0))
+    : shown;
 
   return (
     <div>
@@ -222,6 +236,9 @@ export function SystemsList({
           goalOptions={goalOptions}
           parentOptions={systems.filter((s) => s.id !== system.id && s.parentId === null)}
           onChange={(next) => setSystems((prev) => prev.map((s) => (s.id === system.id ? next : s)))}
+          focused={system.id === focusId}
+          showFocusStrip={system.id === focusId && !stripDismissed}
+          onDismissFocusStrip={() => setStripDismissed(true)}
         />
       ))}
       {visible.length === 0 && <p className={styles.empty}>No Systems yet.</p>}
@@ -283,12 +300,18 @@ function SystemCard({
   habitOptions,
   goalOptions,
   parentOptions,
+  focused = false,
+  showFocusStrip = false,
+  onDismissFocusStrip,
 }: {
   system: AreaSystem;
   onChange: (next: AreaSystem) => void;
   habitOptions: { id: string; name: string }[];
   goalOptions: { id: string; name: string }[];
   parentOptions: { id: string; name: string }[];
+  focused?: boolean;
+  showFocusStrip?: boolean;
+  onDismissFocusStrip?: () => void;
 }) {
   const [stepText, setStepText] = useState("");
   const [stepType, setStepType] = useState<"CHECKLIST" | "CHECKPOINT" | "MILESTONE" | "MEASURE" | "REPEATING">(
@@ -798,7 +821,15 @@ function SystemCard({
   const overlay = ratingOverlay(runSummaries);
 
   return (
-    <div className={styles.systemCard} id={`system-${system.id}`}>
+    <div className={`${styles.systemCard} ${focused ? styles.systemCardFocused : ""}`} id={`system-${system.id}`}>
+      {showFocusStrip && (
+        <div className={styles.focusStrip}>
+          <span>Opened from the Systems list</span>
+          <button type="button" className={styles.link} onClick={onDismissFocusStrip}>
+            Dismiss
+          </button>
+        </div>
+      )}
       {system.parent && (
         <a href={`#system-${system.parent.id}`} className={styles.insideThis}>
           Part of {system.parent.name}

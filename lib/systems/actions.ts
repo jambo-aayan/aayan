@@ -23,6 +23,12 @@ const SAVE_ERROR = "Couldn't save — try again.";
  * so revalidating one isn't possible — only the index. */
 function revalidateSystemPaths(areaId: string | null) {
   if (areaId) revalidatePath(`/health/${areaId}`);
+  // A pillar-scoped System (areaId null) could belong to either pillar
+  // page that renders one — cheaper to revalidate both than to thread
+  // pillarId through every one of this file's call sites for a path that
+  // no-ops when unrelated.
+  revalidatePath("/health");
+  revalidatePath("/finances");
   revalidatePath("/pillars");
   revalidatePath("/my-day");
   revalidatePath("/systems");
