@@ -95,7 +95,7 @@ export default async function InsightsPage({
         </div>
 
         <div className={styles.section}>
-          <CorrelationsSection results={correlations} />
+          <CorrelationsSection results={correlations.pairs} trainedVsMood={correlations.trainedVsMood} />
         </div>
 
         <div className={styles.section}>

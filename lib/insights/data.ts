@@ -30,7 +30,9 @@ import { computeNeglectRadar, type NeglectFixture } from "./neglect";
 import { computeAttentionBalance, type ActivityFixture, type PillarFixture } from "./attention-balance";
 import { computeTaskFlow, TASK_FLOW_WEEKS } from "./task-flow";
 import { mondayOf } from "@/lib/habits/streak";
-import { computeCorrelations, type CorrelationPair } from "./correlations";
+import { computeCorrelations, CORRELATION_MIN_N, type CorrelationPair } from "./correlations";
+import { splitMean } from "./split-mean";
+import { TRAINED_HABIT_ID } from "@/lib/daily-log/habit-seed";
 import { computeTrajectory, type TrajectoryPoint } from "./trajectory";
 import { netWorth } from "@/lib/finance/net-worth";
 import { FINANCE_NORTH_STAR_ID } from "@/lib/finance/north-star-id";
@@ -453,7 +455,7 @@ export async function getCorrelations(range: InsightsRange, asOf: Date = new Dat
   const [start, end] = current;
   const days = eachDayCorr(start, end);
 
-  const [habits, checkIns, tasks, painLogs, transactions] = await Promise.all([
+  const [habits, checkIns, tasks, painLogs, transactions, dailyLogs] = await Promise.all([
     prisma.habit.findMany({
       where: { status: "ACTIVE" },
       select: {
@@ -472,6 +474,7 @@ export async function getCorrelations(range: InsightsRange, asOf: Date = new Dat
       where: { date: { gte: start, lte: end } },
       select: { date: true, amount: true, direction: true, receivableId: true, goalContributionId: true },
     }),
+    prisma.dailyLog.findMany({ where: { date: { gte: start, lte: end } }, select: { date: true, sleepQuality: true, stiffness: true, mood: true } }),
   ]);
 
   const habitFixtures = habits.map((h) => ({
@@ -533,13 +536,29 @@ export async function getCorrelations(range: InsightsRange, asOf: Date = new Dat
   const adherenceVsPain = pairedSeries(adherenceByDay, new Set(avgPainByDay.keys()), avgPainByDay);
   const adherenceVsSurplus = pairedSeries(adherenceByDay, hasTxByDay, surplusByDay);
 
+  // DailyLog is one row per date carrying both fields already, so no
+  // per-day aggregation is needed the way painByDay/surplusByDay require.
+  const sleepByDay = new Map(dailyLogs.map((l) => [dateKeyCorr(l.date), l.sleepQuality]));
+  const stiffnessByDay = new Map(dailyLogs.map((l) => [dateKeyCorr(l.date), l.stiffness]));
+  const sleepVsStiffness = pairedSeries(sleepByDay, new Set(stiffnessByDay.keys()), stiffnessByDay);
+
   const pairs: CorrelationPair[] = [
     { id: "adherence-followthrough", labelA: "Habit adherence", labelB: "Task follow-through", ...adherenceVsFollowThrough },
     { id: "adherence-pain", labelA: "Habit adherence", labelB: "Pain level", ...adherenceVsPain },
     { id: "adherence-surplus", labelA: "Habit adherence", labelB: "Daily surplus", ...adherenceVsSurplus },
+    { id: "sleep-stiffness", labelA: "Sleep quality", labelB: "Stiffness", ...sleepVsStiffness },
   ];
 
-  return computeCorrelations(pairs);
+  // Trained-vs-mood isn't a Pearson pair — "trained" is a boolean per day
+  // (from the TRAINED_HABIT_ID check-in, same derivation as
+  // lib/daily-log/data.ts's getDerivedStateFields), not a numeric series —
+  // so it's a mean-split (lib/insights/split-mean.ts), a different shape
+  // from CorrelationResult, surfaced as its own small card (#128, ADR-0011).
+  const moodLogs = dailyLogs.map((l) => ({ date: l.date, value: l.mood }));
+  const trainedDates = checkIns.filter((c) => c.habitId === TRAINED_HABIT_ID).map((c) => c.date);
+  const trainedVsMood = moodLogs.length >= CORRELATION_MIN_N ? splitMean(moodLogs, trainedDates) : null;
+
+  return { pairs: computeCorrelations(pairs), trainedVsMood };
 }
 
 const TRAJECTORY_LOOKBACK_DAYS = 60;
@@ -632,7 +651,7 @@ export async function getWeeklyDigest(asOf: Date = new Date()) {
     { label: "Surplus rate", delta: kpis.surplusRate.delta },
   ];
 
-  const correlationFixtures: CorrelationFixture[] = correlations.map((c) => ({
+  const correlationFixtures: CorrelationFixture[] = correlations.pairs.map((c) => ({
     labelA: c.labelA,
     labelB: c.labelB,
     r: c.r,
