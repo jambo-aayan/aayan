@@ -2,7 +2,16 @@ export type TaskStatus = "ACTIVE" | "COMPLETED";
 
 export type TaskReminderOffset = "AT_DUE" | "MIN_15_BEFORE" | "HOUR_1_BEFORE" | "DAY_1_BEFORE" | "CUSTOM";
 
-export type TaskRepeatRule = "DAILY" | "WEEKDAYS" | "SELECTED_WEEKDAYS" | "WEEKLY" | "EVERY_N_DAYS" | "MONTHLY" | "CUSTOM";
+export type TaskRepeatRule =
+  | "DAILY"
+  | "WEEKDAYS"
+  | "SELECTED_WEEKDAYS"
+  | "WEEKLY"
+  | "EVERY_N_DAYS"
+  | "EVERY_N_WEEKS"
+  | "EVERY_N_MONTHS"
+  | "MONTHLY"
+  | "CUSTOM";
 
 export const REMINDER_LABEL: Record<TaskReminderOffset, string> = {
   AT_DUE: "At due time",
@@ -18,6 +27,8 @@ export const REPEAT_LABEL: Record<TaskRepeatRule, string> = {
   SELECTED_WEEKDAYS: "Selected days",
   WEEKLY: "Weekly",
   EVERY_N_DAYS: "Every N days",
+  EVERY_N_WEEKS: "Every N weeks",
+  EVERY_N_MONTHS: "Every N months",
   MONTHLY: "Monthly",
   CUSTOM: "Custom",
 };

@@ -15,7 +15,9 @@ function addUtcMonths(date: Date, months: number): Date {
 export type RecurrenceOptions = {
   /** Required for SELECTED_WEEKDAYS — 0 (Sun) to 6 (Sat). */
   weekdays?: number[];
-  /** Required for EVERY_N_DAYS — must be >= 1. */
+  /** Required for EVERY_N_DAYS/EVERY_N_WEEKS/EVERY_N_MONTHS — must be >= 1.
+   * Same field across all three; the unit (days/weeks/months) comes from
+   * which rule it's paired with. */
   intervalN?: number | null;
 };
 
@@ -58,6 +60,16 @@ export function nextOccurrenceDate(rule: TaskRepeatRule, fromDueDate: Date, opti
       const intervalN = options.intervalN;
       if (!intervalN || intervalN < 1) return null;
       return addUtcDays(fromDueDate, intervalN);
+    }
+    case "EVERY_N_WEEKS": {
+      const intervalN = options.intervalN;
+      if (!intervalN || intervalN < 1) return null;
+      return addUtcDays(fromDueDate, intervalN * 7);
+    }
+    case "EVERY_N_MONTHS": {
+      const intervalN = options.intervalN;
+      if (!intervalN || intervalN < 1) return null;
+      return addUtcMonths(fromDueDate, intervalN);
     }
     case "CUSTOM":
       return null;

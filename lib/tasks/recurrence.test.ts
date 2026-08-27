@@ -60,4 +60,26 @@ describe("nextOccurrenceDate", () => {
     expect(nextOccurrenceDate("EVERY_N_DAYS", d("2026-08-17"), { intervalN: 0 })).toBeNull();
     expect(nextOccurrenceDate("EVERY_N_DAYS", d("2026-08-17"))).toBeNull();
   });
+
+  it("adds the interval in weeks for EVERY_N_WEEKS", () => {
+    expect(
+      nextOccurrenceDate("EVERY_N_WEEKS", d("2026-08-17"), { intervalN: 2 })?.toISOString().slice(0, 10)
+    ).toBe("2026-08-31");
+  });
+
+  it("returns null for EVERY_N_WEEKS with no positive interval", () => {
+    expect(nextOccurrenceDate("EVERY_N_WEEKS", d("2026-08-17"), { intervalN: 0 })).toBeNull();
+    expect(nextOccurrenceDate("EVERY_N_WEEKS", d("2026-08-17"))).toBeNull();
+  });
+
+  it("adds the interval in months for EVERY_N_MONTHS", () => {
+    expect(
+      nextOccurrenceDate("EVERY_N_MONTHS", d("2026-08-17"), { intervalN: 3 })?.toISOString().slice(0, 10)
+    ).toBe("2026-11-17");
+  });
+
+  it("returns null for EVERY_N_MONTHS with no positive interval", () => {
+    expect(nextOccurrenceDate("EVERY_N_MONTHS", d("2026-08-17"), { intervalN: 0 })).toBeNull();
+    expect(nextOccurrenceDate("EVERY_N_MONTHS", d("2026-08-17"))).toBeNull();
+  });
 });
