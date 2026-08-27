@@ -5,6 +5,7 @@ import { habitOccursOn } from "@/lib/habits/schedule";
 import { BASELINE_ID } from "@/lib/finance/baseline-id";
 import { APP_SETTINGS_ID } from "@/lib/settings/constants";
 import { resolveColorHex, type ColorKey } from "@/lib/colors";
+import { isVerdictDue, resolveReviewNudgeTarget, systemDeepLinkHref } from "@/lib/systems/logic";
 import {
   evaluateEligibility,
   reEvaluateSnoozed,
@@ -13,6 +14,7 @@ import {
   type HabitEligibilityFixture,
   type TaskEligibilityFixture,
   type MetricEligibilityFixture,
+  type SystemReviewEligibilityFixture,
   type ExistingNudgeFixture,
   type EligibleTargetFixture,
 } from "./eligibility";
@@ -105,6 +107,23 @@ async function getMetricFixtures(today: Date): Promise<MetricEligibilityFixture[
   return [{ key: "surplus", label: "Surplus", valuePct, baselinePct }];
 }
 
+/** Every Active Experiment (template, standalone, or an actual run) whose
+ * review date has arrived with no verdict recorded yet — reuses
+ * isVerdictDue directly rather than reimplementing the date comparison
+ * (#109/#111, docs/adr/0009-systems-review-nudges.md). `verdict: null` is
+ * filtered in the query; `isVerdictDue` itself is applied in JS since the
+ * expected dataset is small and it keeps the actual due-date logic in
+ * exactly one place. */
+async function getDueSystemReviewFixtures(now: Date): Promise<SystemReviewEligibilityFixture[]> {
+  const systems = await prisma.system.findMany({
+    where: { state: "ACTIVE", type: "EXPERIMENT", verdict: null, review: { not: null } },
+    select: { id: true, name: true, templateId: true, createdAt: true, review: true },
+  });
+  return systems
+    .filter((s) => isVerdictDue(s.review, now))
+    .map((s) => ({ id: s.id, name: s.name, isRun: s.templateId !== null, startedOn: s.createdAt }));
+}
+
 async function getExistingNudgesToday(now: Date): Promise<ExistingNudgeFixture[]> {
   const todayStart = utcMidnight(now);
   const tomorrowStart = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
@@ -146,7 +165,12 @@ async function persistCandidates(candidates: NudgeCandidate[], now: Date): Promi
  * (marking read) anything no longer eligible and clearing `snoozedUntil`
  * on anything that is — see reEvaluateSnoozed's doc comment for why this
  * matches by entity, not by the (date-scoped) dedupKey. */
-async function reEvaluateSnoozes(now: Date, habits: HabitEligibilityFixture[], overdueTasks: TaskEligibilityFixture[]): Promise<void> {
+async function reEvaluateSnoozes(
+  now: Date,
+  habits: HabitEligibilityFixture[],
+  overdueTasks: TaskEligibilityFixture[],
+  dueSystemReviews: SystemReviewEligibilityFixture[]
+): Promise<void> {
   const snoozed = await prisma.nudge.findMany({
     where: { snoozedUntil: { not: null, lte: now }, readAt: null },
     select: { id: true, type: true, targetType: true, targetId: true, snoozedUntil: true },
@@ -158,6 +182,7 @@ async function reEvaluateSnoozes(now: Date, habits: HabitEligibilityFixture[], o
     ...habits
       .filter((h) => h.scheduledToday && !h.checkedInToday)
       .map((h): EligibleTargetFixture => ({ type: h.streakDays > 7 ? "STREAK_AT_RISK" : "HABIT_DUE", targetType: "HABIT", targetId: h.id })),
+    ...dueSystemReviews.map((r): EligibleTargetFixture => ({ type: "SYSTEM_REVIEW_DUE", targetType: "SYSTEM", targetId: r.id })),
   ];
 
   const decisions = reEvaluateSnoozed(
@@ -182,16 +207,17 @@ async function reEvaluateSnoozes(now: Date, habits: HabitEligibilityFixture[], o
  * moment. */
 export async function runNudgeEvaluation(runKind: NudgeRunKind, now: Date = new Date()): Promise<{ delivered: number; held: boolean }> {
   const today = utcMidnight(now);
-  const [deliveryRules, habits, overdueTasks, topTasks, metrics, existingNudgesToday] = await Promise.all([
+  const [deliveryRules, habits, overdueTasks, topTasks, metrics, dueSystemReviews, existingNudgesToday] = await Promise.all([
     getDeliveryRules(),
     getHabitFixtures(today),
     getOverdueTaskFixtures(today),
     getTopTaskFixtures(today),
     getMetricFixtures(today),
+    getDueSystemReviewFixtures(now),
     getExistingNudgesToday(now),
   ]);
 
-  await reEvaluateSnoozes(now, habits, overdueTasks);
+  await reEvaluateSnoozes(now, habits, overdueTasks, dueSystemReviews);
 
   const result = evaluateEligibility({
     now,
@@ -201,6 +227,7 @@ export async function runNudgeEvaluation(runKind: NudgeRunKind, now: Date = new 
     overdueTasks,
     topTasks,
     metrics,
+    dueSystemReviews,
     existingNudgesToday,
   });
 
@@ -220,6 +247,21 @@ async function resolveHabitAccents(habitIds: string[]): Promise<Map<string, stri
   return new Map(habits.map((h) => [h.id, resolveColorHex(h.pillar?.color as ColorKey | null)]));
 }
 
+/** SYSTEM_REVIEW_DUE's primary action deep-links to the System's card
+ * (the first Nudge type whose primary action navigates rather than only
+ * marking read — docs/adr/0009-systems-review-nudges.md). `targetId` is
+ * the eligible System's own id (a run's own id for a run), so the actual
+ * link target — its template's card, for a run — is resolved here via
+ * resolveReviewNudgeTarget, in one batched query rather than N+1 per row. */
+async function resolveSystemHrefs(systemIds: string[]): Promise<Map<string, string>> {
+  if (systemIds.length === 0) return new Map();
+  const systems = await prisma.system.findMany({
+    where: { id: { in: systemIds } },
+    select: { id: true, templateId: true, areaId: true, pillarId: true },
+  });
+  return new Map(systems.map((s) => [s.id, systemDeepLinkHref(resolveReviewNudgeTarget(s))]));
+}
+
 export async function getNudges(filter: NudgeFilter) {
   const now = new Date();
   const where =
@@ -231,11 +273,13 @@ export async function getNudges(filter: NudgeFilter) {
 
   const rows = await prisma.nudge.findMany({ where, orderBy: { createdAt: "desc" }, take: 100 });
   const habitIds = [...new Set(rows.filter((r) => r.targetType === "HABIT" && r.targetId).map((r) => r.targetId!))];
-  const habitAccents = await resolveHabitAccents(habitIds);
+  const systemIds = [...new Set(rows.filter((r) => r.targetType === "SYSTEM" && r.targetId).map((r) => r.targetId!))];
+  const [habitAccents, systemHrefs] = await Promise.all([resolveHabitAccents(habitIds), resolveSystemHrefs(systemIds)]);
 
   return rows.map((row) => ({
     ...row,
     pillarAccentHex: row.targetType === "HABIT" && row.targetId ? (habitAccents.get(row.targetId) ?? null) : null,
+    systemHref: row.targetType === "SYSTEM" && row.targetId ? (systemHrefs.get(row.targetId) ?? null) : null,
   }));
 }
 

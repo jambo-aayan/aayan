@@ -31,6 +31,18 @@ export type MetricEligibilityFixture = {
   baselinePct: number;
 };
 
+export type SystemReviewEligibilityFixture = {
+  /** The eligible System's own id — a run's own id, not its template's
+   * (docs/adr/0009-systems-review-nudges.md). */
+  id: string;
+  /** A run's `name` is copied straight from its template at creation, so
+   * it can't distinguish one run from another on its own — `startedOn`
+   * (below) is what the title uses to disambiguate when `isRun`. */
+  name: string;
+  isRun: boolean;
+  startedOn: Date;
+};
+
 export type ExistingNudgeFixture = {
   dedupKey: string;
   severity: number;
@@ -44,6 +56,7 @@ export type NudgeContext = {
   overdueTasks: TaskEligibilityFixture[];
   topTasks: TaskEligibilityFixture[];
   metrics: MetricEligibilityFixture[];
+  dueSystemReviews: SystemReviewEligibilityFixture[];
   existingNudgesToday: ExistingNudgeFixture[];
 };
 
@@ -164,6 +177,22 @@ function generateCandidates(ctx: NudgeContext): NudgeCandidate[] {
         targetId: null,
         title: `${metric.label} is below target`,
         body: `${Math.round(metric.valuePct)}% vs a ${Math.round(metric.baselinePct)}% baseline.`,
+      });
+    }
+  }
+
+  if (ctx.runKind === "MORNING") {
+    for (const review of ctx.dueSystemReviews) {
+      candidates.push({
+        dedupKey: `system-review:${review.id}:${today}`,
+        type: "SYSTEM_REVIEW_DUE",
+        severity: NUDGE_SEVERITY.SYSTEM_REVIEW_DUE,
+        targetType: "SYSTEM",
+        targetId: review.id,
+        title: review.isRun
+          ? `"${review.name}" (started ${dateKey(review.startedOn)}) is ready for a verdict`
+          : `"${review.name}" is ready for a verdict`,
+        body: "Its review date has arrived — decide whether to continue, escalate, or stop.",
       });
     }
   }

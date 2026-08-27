@@ -809,11 +809,19 @@ enum NudgeType {
   WEEKLY_REVIEW_READY
   METRIC_OFF_TARGET
   MORNING_BRIEF
+  /// An Active Experiment (template, standalone, or an actual run) whose
+  /// review date has arrived with no verdict recorded yet — see #109/#111
+  /// and docs/adr/0009-systems-review-nudges.md.
+  SYSTEM_REVIEW_DUE
 }
 
 enum NudgeTargetType {
   HABIT
   TASK
+  /// The eligible System's own id (a run's own id, not its template's —
+  /// see docs/adr/0009-systems-review-nudges.md for why the displayed
+  /// link still resolves to the template's card).
+  SYSTEM
   NONE
 }
 

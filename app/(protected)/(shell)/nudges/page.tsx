@@ -24,6 +24,7 @@ export default async function NudgesPage({ searchParams }: { searchParams: Promi
     readAt: n.readAt?.toISOString() ?? null,
     snoozedUntil: n.snoozedUntil?.toISOString() ?? null,
     pillarAccentHex: n.pillarAccentHex,
+    systemHref: n.systemHref,
   }));
 
   return (

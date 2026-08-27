@@ -16,6 +16,7 @@ function baseCtx(overrides: Partial<NudgeContext> = {}): NudgeContext {
     overdueTasks: [],
     topTasks: [],
     metrics: [],
+    dueSystemReviews: [],
     existingNudgesToday: [],
     ...overrides,
   };
@@ -149,6 +150,46 @@ describe("evaluateEligibility — task overdue and metric off target", () => {
     const flagged = evaluateEligibility(ctx).deliver.filter((c) => c.type === "METRIC_OFF_TARGET");
     expect(flagged).toHaveLength(1);
     expect(flagged[0].dedupKey).toBe("metric:surplus:2026-08-21");
+  });
+});
+
+describe("evaluateEligibility — system review due", () => {
+  it("creates one SYSTEM_REVIEW_DUE candidate per due review, targeting the System's own id", () => {
+    const ctx = baseCtx({
+      dueSystemReviews: [
+        { id: "sys1", name: "Elimination diet", isRun: false, startedOn: d("2026-08-01") },
+        { id: "run1", name: "Training block", isRun: true, startedOn: d("2026-07-15") },
+      ],
+    });
+    const due = evaluateEligibility(ctx).deliver.filter((c) => c.type === "SYSTEM_REVIEW_DUE");
+    expect(due.map((c) => c.targetId).sort()).toEqual(["run1", "sys1"]);
+    expect(due.every((c) => c.targetType === "SYSTEM")).toBe(true);
+    expect(due.every((c) => c.severity === 3)).toBe(true);
+  });
+
+  it("only evaluates on the morning run, matching TASK_OVERDUE's own cadence choice for this ticket", () => {
+    const ctx = baseCtx({
+      runKind: "EVENING",
+      dueSystemReviews: [{ id: "sys1", name: "Elimination diet", isRun: false, startedOn: d("2026-08-01") }],
+    });
+    expect(evaluateEligibility(ctx).deliver.filter((c) => c.type === "SYSTEM_REVIEW_DUE")).toEqual([]);
+  });
+
+  it("dedup-keys per System id per day, independent of any other eligible review", () => {
+    const ctx = baseCtx({
+      dueSystemReviews: [{ id: "sys1", name: "Elimination diet", isRun: false, startedOn: d("2026-08-01") }],
+    });
+    const due = evaluateEligibility(ctx).deliver.filter((c) => c.type === "SYSTEM_REVIEW_DUE");
+    expect(due[0].dedupKey).toBe("system-review:sys1:2026-08-21");
+  });
+
+  it("names the run's own start date in the title, distinguishing it from its template's own review nudge", () => {
+    const ctx = baseCtx({
+      dueSystemReviews: [{ id: "run1", name: "Training block", isRun: true, startedOn: d("2026-07-15") }],
+    });
+    const [candidate] = evaluateEligibility(ctx).deliver.filter((c) => c.type === "SYSTEM_REVIEW_DUE");
+    expect(candidate.title).toContain("Training block");
+    expect(candidate.title).toContain("2026-07-15");
   });
 });
 

@@ -17,6 +17,8 @@ import {
   rollupCategory,
   sortRollup,
   filterRollupByName,
+  systemDeepLinkHref,
+  resolveReviewNudgeTarget,
   type RollupInput,
 } from "./logic";
 
@@ -430,5 +432,57 @@ describe("filterRollupByName", () => {
 
   it("returns an empty array when nothing matches", () => {
     expect(filterRollupByName(rows, "nonexistent")).toEqual([]);
+  });
+});
+
+describe("systemDeepLinkHref", () => {
+  it("links to the Area's page, focused, for an Area-scoped Health System", () => {
+    expect(systemDeepLinkHref({ id: "sys1", areaId: "area1", pillarId: "health" })).toBe(
+      "/health/area1?focus=sys1#system-sys1"
+    );
+  });
+
+  it("links to the Health pillar page, focused, for a pillar-scoped Health System", () => {
+    expect(systemDeepLinkHref({ id: "sys1", areaId: null, pillarId: "health" })).toBe(
+      "/health?focus=sys1#system-sys1"
+    );
+  });
+
+  it("links to the Finances pillar page, focused, for a pillar-scoped Finance System", () => {
+    expect(systemDeepLinkHref({ id: "sys1", areaId: null, pillarId: "finance" })).toBe(
+      "/finances?focus=sys1#system-sys1"
+    );
+  });
+
+  it("falls back to /pillars for any other pillar, with no focus param", () => {
+    expect(systemDeepLinkHref({ id: "sys1", areaId: null, pillarId: "miscellaneous" })).toBe("/pillars");
+  });
+
+  it("falls back to /pillars for an Area-scoped System under a non-Health pillar", () => {
+    expect(systemDeepLinkHref({ id: "sys1", areaId: "area1", pillarId: "finance" })).toBe("/finances?focus=sys1#system-sys1");
+  });
+});
+
+describe("resolveReviewNudgeTarget", () => {
+  it("resolves to itself for a standalone Experiment (no templateId)", () => {
+    expect(resolveReviewNudgeTarget({ id: "sys1", templateId: null, areaId: "area1", pillarId: "health" })).toEqual({
+      id: "sys1",
+      areaId: "area1",
+      pillarId: "health",
+    });
+  });
+
+  it("resolves to itself for a template Experiment (no templateId)", () => {
+    expect(resolveReviewNudgeTarget({ id: "template1", templateId: null, areaId: null, pillarId: "finance" })).toEqual({
+      id: "template1",
+      areaId: null,
+      pillarId: "finance",
+    });
+  });
+
+  it("resolves a run to its template's id, keeping the run's own (inherited) areaId/pillarId", () => {
+    expect(
+      resolveReviewNudgeTarget({ id: "run1", templateId: "template1", areaId: "area1", pillarId: "health" })
+    ).toEqual({ id: "template1", areaId: "area1", pillarId: "health" });
   });
 });

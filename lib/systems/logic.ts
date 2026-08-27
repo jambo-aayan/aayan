@@ -1,3 +1,6 @@
+import { HEALTH_PILLAR_ID } from "../health/seed-data";
+import { FINANCE_PILLAR_ID } from "../finance/pillar-id";
+
 export type SystemType = "PROCESS" | "EXPERIMENT";
 export type SystemState = "ACTIVE" | "PAUSED" | "DRAFT" | "ARCHIVED";
 export type SystemVerdict = "CONTINUE" | "ESCALATE" | "STOP";
@@ -276,4 +279,36 @@ export function filterRollupByName<T extends { name: string }>(rows: T[], query:
   const trimmed = query.trim().toLowerCase();
   if (!trimmed) return rows;
   return rows.filter((r) => r.name.toLowerCase().includes(trimmed));
+}
+
+export type SystemDeepLinkRow = { id: string; areaId: string | null; pillarId: string };
+
+/** Where a System's card actually lives, for deep-linking (#108): an
+ * Area-scoped System under Health opens that Area's page; a pillar-scoped
+ * System (no Area) opens its own Pillar's page where one exists (Health,
+ * Finances); anything else falls back to the general /pillars index,
+ * which has no card there to focus. */
+export function systemDeepLinkHref(system: SystemDeepLinkRow): string {
+  if (system.areaId && system.pillarId === HEALTH_PILLAR_ID) {
+    return `/health/${system.areaId}?focus=${system.id}#system-${system.id}`;
+  }
+  if (system.pillarId === HEALTH_PILLAR_ID) return `/health?focus=${system.id}#system-${system.id}`;
+  if (system.pillarId === FINANCE_PILLAR_ID) return `/finances?focus=${system.id}#system-${system.id}`;
+  return "/pillars";
+}
+
+/** A review-due Nudge for an actual run (`templateId` set) points at its
+ * TEMPLATE's card, not its own — a run never gets a card of its own, only
+ * a row inside its template's Runs section. A standalone or template
+ * Experiment (no `templateId`) resolves to itself. A run's own
+ * `areaId`/`pillarId` are always copied from its template at run-creation
+ * time (see `startSystemRun`), so no extra lookup is needed to build the
+ * link — only the id being linked to changes. */
+export function resolveReviewNudgeTarget(system: {
+  id: string;
+  templateId: string | null;
+  areaId: string | null;
+  pillarId: string;
+}): SystemDeepLinkRow {
+  return { id: system.templateId ?? system.id, areaId: system.areaId, pillarId: system.pillarId };
 }

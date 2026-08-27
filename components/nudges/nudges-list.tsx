@@ -21,6 +21,11 @@ export type NudgeRow = {
    * accent, resolved server-side — see lib/nudges/data.ts. Null for every
    * other type, which uses NUDGE_ACCENT's fixed semantic color instead. */
   pillarAccentHex: string | null;
+  /** SYSTEM_REVIEW_DUE only — the deep link its primary action navigates
+   * to, resolved server-side (a run's own link points at its template's
+   * card). Null for every other type, whose primary action only marks
+   * read. */
+  systemHref: string | null;
 };
 
 const ACCENT_CLASS: Record<"danger" | "coral" | "lavender" | "gold" | "ink", string> = {
@@ -139,9 +144,15 @@ export function NudgesList({ filter, nudges }: { filter: "unread" | "all" | "sno
                 </div>
                 <p className={styles.text}>{n.body}</p>
                 <div className={styles.actions}>
-                  <button type="button" className={styles.primaryAction} onClick={() => handleMarkRead(n.id)} disabled={pending}>
-                    {NUDGE_PRIMARY_ACTION_LABEL[n.type]}
-                  </button>
+                  {n.systemHref ? (
+                    <Link href={n.systemHref} className={styles.primaryAction} onClick={() => handleMarkRead(n.id)}>
+                      {NUDGE_PRIMARY_ACTION_LABEL[n.type]}
+                    </Link>
+                  ) : (
+                    <button type="button" className={styles.primaryAction} onClick={() => handleMarkRead(n.id)} disabled={pending}>
+                      {NUDGE_PRIMARY_ACTION_LABEL[n.type]}
+                    </button>
+                  )}
                   {!n.snoozedUntil && (
                     <button type="button" className={styles.snoozeAction} onClick={() => handleSnooze(n.id)} disabled={pending}>
                       Snooze
