@@ -64,6 +64,7 @@ model Pillar {
   tasks     Task[]
   goals     LifeGoal[]
   habits    Habit[]
+  systems   System[]
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
 }
@@ -89,6 +90,7 @@ model Area {
   tasks            Task[]
   painMobilityLogs PainMobilityLog[]
   thoughts         Thought[]
+  systems          System[]
 
   @@index([pillarId])
 }
@@ -314,6 +316,124 @@ model DailyLog {
   bpDiastolic  Int?
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
+}
+
+enum SystemType {
+  PROCESS
+  EXPERIMENT
+}
+
+/// Paused reads as "deliberately dormant, not failing" per DATA_MODEL.md —
+/// excluded from nudges/streak pressure by every reader that iterates
+/// Systems. Archived Systems are hidden behind a "Show archived" toggle,
+/// never deleted (see docs/adr/0008-v2-phase4-systems.md).
+enum SystemState {
+  ACTIVE
+  PAUSED
+  DRAFT
+  ARCHIVED
+}
+
+/// Fixed set of five (DATA_MODEL.md §5) — no generic user-defined field
+/// builder, per the handoff's explicit exclusion. SystemStep's type-specific
+/// columns are added incrementally, one ticket's worth at a time, as each
+/// step type's build lands (see docs/adr/0008-v2-phase4-systems.md).
+enum SystemStepType {
+  CHECKLIST
+  CHECKPOINT
+  MILESTONE
+  MEASURE
+  REPEATING
+}
+
+/// The core entity (DATA_MODEL.md §5): a named Process or Experiment. scope
+/// is real FKs — pillarId required, areaId nullable (null = pillar-level,
+/// e.g. Finances' own "Payday routine") — mirroring Habit/Task's existing
+/// shape rather than the prototype's string `scope`. A run is a System row
+/// with templateId set; its steps are copied (not referenced) from the
+/// template at creation time (see SystemStep). reviewOffsetDays/review are
+/// mutually exclusive at the template level (relative vs absolute review
+/// date, enforced in lib/systems/actions.ts) — a run always gets a
+/// concrete stamped `review`. parentId nesting is capped at one level,
+/// enforced in lib/systems/actions.ts, not the schema.
+model System {
+  id       String  @id @default(cuid())
+  name     String
+  pillarId String
+  pillar   Pillar  @relation(fields: [pillarId], references: [id])
+  areaId   String?
+  area     Area?   @relation(fields: [areaId], references: [id])
+
+  type  SystemType
+  state SystemState @default(ACTIVE)
+
+  body      String?
+  reference String?
+
+  /// Experiment only. Absolute review date; mutually exclusive with
+  /// reviewOffsetDays at the template level (enforced in actions.ts).
+  review DateTime? @db.Date
+  /// Experiment template only: "N days after this run's start" — resolved
+  /// to a concrete `review` on each run at creation time.
+  reviewOffsetDays Int?
+  /// Experiment only, required at creation (enforced in actions.ts).
+  criteria String?
+
+  sequential Boolean @default(false)
+
+  isTemplate Boolean @default(false)
+  runNoun    String?
+  templateId String?
+  template   System?  @relation("SystemRuns", fields: [templateId], references: [id])
+  runs       System[] @relation("SystemRuns")
+
+  parentId String?
+  parent   System?  @relation("SystemNesting", fields: [parentId], references: [id])
+  children System[] @relation("SystemNesting")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  steps     SystemStep[]
+  decisions SystemDecision[]
+
+  @@index([pillarId])
+  @@index([areaId])
+  @@index([templateId])
+  @@index([parentId])
+}
+
+/// One polymorphic table for all five step types (DATA_MODEL.md §5) —
+/// matches Habit/Task's existing shape (one table, nullable columns for
+/// what doesn't apply to every row) rather than five parallel models.
+/// doneOn holds the (possibly backdated) completion date; ticking stamps
+/// today, a "Not today?" picker corrects it after (see lib/systems/logic.ts).
+model SystemStep {
+  id        String         @id @default(cuid())
+  systemId  String
+  system    System         @relation(fields: [systemId], references: [id], onDelete: Cascade)
+  type      SystemStepType
+  text      String
+  done      Boolean        @default(false)
+  doneOn    DateTime?
+  sortOrder Int            @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([systemId])
+}
+
+/// Dated decision-log entries, separate from System.body — "why did I
+/// change this" stays answerable months later (DATA_MODEL.md §5).
+model SystemDecision {
+  id       String   @id @default(cuid())
+  systemId String
+  system   System   @relation(fields: [systemId], references: [id], onDelete: Cascade)
+  when     DateTime @default(now())
+  body     String
+
+  @@index([systemId])
 }
 
 enum ItemType {
