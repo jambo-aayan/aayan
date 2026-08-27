@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { BASELINE_ID } from "./baseline-id";
 import { canFlagAsReceivable, isHeldForReview, netTransactionAmount, validateStatementUpload } from "./logic";
 import { FINANCE_NORTH_STAR_ID } from "./north-star-id";
-import { parseStatement } from "./statement-parser";
+import { parseStatement, parseValuation } from "./statement-parser";
 
 export type AccountInput = {
   name: string;
@@ -166,6 +166,56 @@ export async function uploadStatement(accountId: string, file: File): Promise<Up
       importedCount: parsed.length,
       heldCount: parsed.filter((t) => isHeldForReview(t.confidence)).length,
     };
+  } catch {
+    return { ok: false, error: "Couldn't upload or parse the statement — try again." };
+  }
+}
+
+export type UploadValuationStatementResult =
+  | { ok: true; balance: number; held: boolean }
+  | { ok: false; error: string };
+
+/** Uploads a bank/pension statement (PDF/CSV) for a Valuation Account —
+ * the same upload flow as #115, but parsed for a single balance figure
+ * and as-of date rather than a transaction list; no Transaction rows are
+ * created (#116, ADR-0010). */
+export async function uploadValuationStatement(
+  accountId: string,
+  file: File
+): Promise<UploadValuationStatementResult> {
+  const validation = validateStatementUpload(file.type, file.size);
+  if (!validation.ok) return validation;
+
+  try {
+    const account = await prisma.account.findUnique({ where: { id: accountId } });
+    if (!account) return { ok: false, error: SAVE_ERROR };
+    if (account.kind !== "VALUATION") {
+      return { ok: false, error: "This upload is only for Valuation accounts." };
+    }
+
+    const blob = await put(`statements/${accountId}-${Date.now()}`, file, {
+      access: "public",
+      addRandomSuffix: true,
+    });
+
+    const fileBuffer = Buffer.from(await file.arrayBuffer());
+    const parsed = await parseValuation(fileBuffer, file.type);
+    if (!parsed) {
+      return { ok: false, error: "Couldn't find a balance in that statement — try again." };
+    }
+
+    await prisma.snapshot.create({
+      data: {
+        accountId,
+        date: new Date(parsed.asOfDate),
+        balance: parsed.balance,
+        sourceFileUrl: blob.url,
+        confidence: parsed.confidence,
+      },
+    });
+
+    revalidatePath("/finances");
+    return { ok: true, balance: parsed.balance, held: isHeldForReview(parsed.confidence) };
   } catch {
     return { ok: false, error: "Couldn't upload or parse the statement — try again." };
   }

@@ -20,6 +20,11 @@ export async function getAccounts() {
   return accounts.map(({ snapshots, ...account }) => ({
     ...account,
     value: snapshots[0] ? snapshots[0].balance.toNumber() : 0,
+    // A Valuation account's latest Snapshot may carry a confidence score
+    // from statement-upload parsing (#116, ADR-0010) — null for a
+    // manually entered value or a Transactional account (whose value
+    // comes from summed transactions, not a parsed balance figure).
+    valueConfidence: snapshots[0]?.confidence ?? null,
   }));
 }
 

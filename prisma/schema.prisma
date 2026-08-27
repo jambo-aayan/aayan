@@ -585,6 +585,10 @@ model Account {
 /// not one number overwritten in place. sourceFileUrl (Vercel Blob, same
 /// pattern as Phase 4's Checkpoint photos) is nullable: a manually
 /// entered Snapshot (no statement upload) has no original file to keep.
+/// confidence is set only by Valuation statement-upload parsing (#116,
+/// ADR-0010) — null for a manually entered or Transactional-derived
+/// Snapshot, which are never held for review (lib/finance/logic.ts's
+/// isHeldForReview treats null as "not held").
 model Snapshot {
   id            String   @id @default(cuid())
   accountId     String
@@ -592,6 +596,7 @@ model Snapshot {
   date          DateTime @db.Date
   balance       Decimal  @db.Decimal(12, 2)
   sourceFileUrl String?
+  confidence    Float?
   createdAt     DateTime @default(now())
 
   @@index([accountId, date])

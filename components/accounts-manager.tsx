@@ -10,15 +10,16 @@ import {
   updateAccount,
   addSnapshot,
   uploadStatement,
+  uploadValuationStatement,
   type AccountInput,
 } from "@/lib/finance/actions";
 import { useUndoableCrudList, type ActionResult } from "@/lib/hooks/use-undoable-crud-list";
-import { validateStatementUpload } from "@/lib/finance/logic";
+import { isHeldForReview, validateStatementUpload } from "@/lib/finance/logic";
 import { PrimaryButton } from "@/components/primary-button";
 import { EmptyState } from "@/components/empty-state";
 import styles from "./accounts-manager.module.css";
 
-type Account = AccountInput & { id: string };
+type Account = AccountInput & { id: string; valueConfidence: number | null };
 
 const EMPTY_FORM: AccountInput = {
   name: "",
@@ -39,7 +40,15 @@ function formatGBP(value: number): string {
 export function AccountsManager({ initialAccounts }: { initialAccounts: Account[] }) {
   const { items, error, undo, add, update, remove, undoDelete } = useUndoableCrudList<Account, AccountInput>(
     initialAccounts,
-    { create: createAccount, update: updateAccount, remove: deleteAccount, restore: restoreAccount }
+    {
+      create: async (input) => {
+        const result = await createAccount(input);
+        return result.ok ? { ok: true, item: { ...result.item, valueConfidence: null } } : result;
+      },
+      update: updateAccount,
+      remove: deleteAccount,
+      restore: restoreAccount,
+    }
   );
   const [form, setForm] = useState<AccountInput>(EMPTY_FORM);
   const [adding, setAdding] = useState(false);
@@ -67,7 +76,11 @@ export function AccountsManager({ initialAccounts }: { initialAccounts: Account[
         account={account}
         onCancel={() => setEditingId(null)}
         onSaved={async (input) => {
-          const result = await update(account.id, input, { ...input, id: account.id });
+          const result = await update(account.id, input, {
+            ...input,
+            id: account.id,
+            valueConfidence: account.valueConfidence,
+          });
           if (result.ok) setEditingId(null);
           return result;
         }}
@@ -87,8 +100,9 @@ export function AccountsManager({ initialAccounts }: { initialAccounts: Account[
         </div>
         <div className={styles.rowActions}>
           <span className={styles.value}>{formatGBP(account.value)}</span>
+          {isHeldForReview(account.valueConfidence) && <span className={styles.badge}>Held for review</span>}
           <AddSnapshotControl accountId={account.id} />
-          {account.kind === "TRANSACTIONAL" && <UploadStatementControl accountId={account.id} />}
+          <UploadStatementControl accountId={account.id} kind={account.kind} />
           <button type="button" className={styles.link} onClick={() => setEditingId(account.id)}>
             Edit
           </button>
@@ -254,6 +268,7 @@ function AccountEditRow({
  * field on the account itself — this logs a new one rather than editing
  * the account's own row (ADR-0010). */
 function AddSnapshotControl({ accountId }: { accountId: string }) {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState("");
   const [saving, setSaving] = useState(false);
@@ -275,6 +290,10 @@ function AddSnapshotControl({ accountId }: { accountId: string }) {
     }
     setOpen(false);
     setValue("");
+    // A manual value overwrite also clears any "Held for review" badge
+    // left by a prior low-confidence statement parse — valueConfidence
+    // comes from the latest Snapshot, so the badge needs a fresh read.
+    router.refresh();
   }
 
   if (!open) {
@@ -306,13 +325,15 @@ function AddSnapshotControl({ accountId }: { accountId: string }) {
   );
 }
 
-/** Uploads a bank statement for a Transactional account, parsed by Gemini
- * into dated Transactions (#115, ADR-0010). The parsed Transactions and
- * updated account value live in server-fetched sibling components
- * (TransactionsManager, the account's own value here), so a successful
- * upload refreshes the route rather than trying to thread new rows
- * through client state across component boundaries. */
-function UploadStatementControl({ accountId }: { accountId: string }) {
+/** Uploads a statement for either account kind, parsed by Gemini — a
+ * Transactional account's statement into dated Transactions (#115), a
+ * Valuation account's into a single balance Snapshot with no Transaction
+ * rows (#116), both per ADR-0010. The parsed result lives in server-
+ * fetched sibling components (TransactionsManager, the account's own
+ * value here), so a successful upload refreshes the route rather than
+ * trying to thread new rows through client state across component
+ * boundaries. */
+function UploadStatementControl({ accountId, kind }: { accountId: string; kind: AccountInput["kind"] }) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -330,7 +351,8 @@ function UploadStatementControl({ accountId }: { accountId: string }) {
     setUploading(true);
     setError(null);
     setStatus(null);
-    const result = await uploadStatement(accountId, file);
+    const result =
+      kind === "TRANSACTIONAL" ? await uploadStatement(accountId, file) : await uploadValuationStatement(accountId, file);
     setUploading(false);
     if (inputRef.current) inputRef.current.value = "";
     if (!result.ok) {
@@ -338,9 +360,13 @@ function UploadStatementControl({ accountId }: { accountId: string }) {
       return;
     }
     setStatus(
-      result.heldCount > 0
-        ? `Imported ${result.importedCount} transactions, ${result.heldCount} held for review.`
-        : `Imported ${result.importedCount} transactions.`
+      "importedCount" in result
+        ? result.heldCount > 0
+          ? `Imported ${result.importedCount} transactions, ${result.heldCount} held for review.`
+          : `Imported ${result.importedCount} transactions.`
+        : result.held
+          ? "Balance updated (held for review)."
+          : "Balance updated."
     );
     router.refresh();
   }

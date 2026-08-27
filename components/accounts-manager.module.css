@@ -39,6 +39,14 @@
   font-weight: 600;
 }
 
+.badge {
+  font-size: 11px;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  padding: 2px 8px;
+}
+
 .snapshotForm {
   display: flex;
   align-items: center;
