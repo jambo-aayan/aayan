@@ -1,9 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Wallet } from "lucide-react";
-import { createAccount, deleteAccount, restoreAccount, updateAccount, addSnapshot, type AccountInput } from "@/lib/finance/actions";
+import {
+  createAccount,
+  deleteAccount,
+  restoreAccount,
+  updateAccount,
+  addSnapshot,
+  uploadStatement,
+  type AccountInput,
+} from "@/lib/finance/actions";
 import { useUndoableCrudList, type ActionResult } from "@/lib/hooks/use-undoable-crud-list";
+import { validateStatementUpload } from "@/lib/finance/logic";
 import { PrimaryButton } from "@/components/primary-button";
 import { EmptyState } from "@/components/empty-state";
 import styles from "./accounts-manager.module.css";
@@ -78,6 +88,7 @@ export function AccountsManager({ initialAccounts }: { initialAccounts: Account[
         <div className={styles.rowActions}>
           <span className={styles.value}>{formatGBP(account.value)}</span>
           <AddSnapshotControl accountId={account.id} />
+          {account.kind === "TRANSACTIONAL" && <UploadStatementControl accountId={account.id} />}
           <button type="button" className={styles.link} onClick={() => setEditingId(account.id)}>
             Edit
           </button>
@@ -290,6 +301,64 @@ function AddSnapshotControl({ accountId }: { accountId: string }) {
       <button type="button" className={styles.link} onClick={() => setOpen(false)}>
         Cancel
       </button>
+      {error && <p className={styles.error}>{error}</p>}
+    </span>
+  );
+}
+
+/** Uploads a bank statement for a Transactional account, parsed by Gemini
+ * into dated Transactions (#115, ADR-0010). The parsed Transactions and
+ * updated account value live in server-fetched sibling components
+ * (TransactionsManager, the account's own value here), so a successful
+ * upload refreshes the route rather than trying to thread new rows
+ * through client state across component boundaries. */
+function UploadStatementControl({ accountId }: { accountId: string }) {
+  const router = useRouter();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [status, setStatus] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleFileSelect(file: File | undefined) {
+    if (!file) return;
+    const validation = validateStatementUpload(file.type, file.size);
+    if (!validation.ok) {
+      setError(validation.error);
+      if (inputRef.current) inputRef.current.value = "";
+      return;
+    }
+    setUploading(true);
+    setError(null);
+    setStatus(null);
+    const result = await uploadStatement(accountId, file);
+    setUploading(false);
+    if (inputRef.current) inputRef.current.value = "";
+    if (!result.ok) {
+      setError(result.error);
+      return;
+    }
+    setStatus(
+      result.heldCount > 0
+        ? `Imported ${result.importedCount} transactions, ${result.heldCount} held for review.`
+        : `Imported ${result.importedCount} transactions.`
+    );
+    router.refresh();
+  }
+
+  return (
+    <span className={styles.snapshotForm}>
+      <label className={styles.link}>
+        {uploading ? "Uploading…" : "Upload statement"}
+        <input
+          ref={inputRef}
+          type="file"
+          accept="application/pdf,text/csv"
+          style={{ display: "none" }}
+          disabled={uploading}
+          onChange={(e) => handleFileSelect(e.target.files?.[0])}
+        />
+      </label>
+      {status && <span className={styles.meta}>{status}</span>}
       {error && <p className={styles.error}>{error}</p>}
     </span>
   );

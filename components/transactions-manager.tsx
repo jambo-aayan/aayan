@@ -12,12 +12,13 @@ import {
 } from "@/lib/finance/actions";
 import { useUndoableCrudList, type ActionResult } from "@/lib/hooks/use-undoable-crud-list";
 import { withRetry } from "@/lib/with-retry";
+import { isHeldForReview } from "@/lib/finance/logic";
 import { DEFAULT_CATEGORIES } from "@/lib/finance/categories";
 import { PrimaryButton } from "@/components/primary-button";
 import { EmptyState } from "@/components/empty-state";
 import styles from "./transactions-manager.module.css";
 
-type Transaction = TransactionInput & { id: string; receivableId: string | null };
+type Transaction = TransactionInput & { id: string; receivableId: string | null; confidence: number | null };
 
 const EMPTY_FORM: TransactionInput = {
   date: new Date(),
@@ -46,7 +47,7 @@ export function TransactionsManager({ initialTransactions }: { initialTransactio
   >(initialTransactions, {
     create: async (input) => {
       const result = await createTransaction(input);
-      return result.ok ? { ok: true, item: { ...result.item, receivableId: null } } : result;
+      return result.ok ? { ok: true, item: { ...result.item, receivableId: null, confidence: null } } : result;
     },
     update: updateTransaction,
     remove: deleteTransaction,
@@ -102,7 +103,12 @@ export function TransactionsManager({ initialTransactions }: { initialTransactio
               transaction={t}
               onCancel={() => setEditingId(null)}
               onSaved={async (input) => {
-                const result = await update(t.id, input, { ...input, id: t.id, receivableId: t.receivableId });
+                const result = await update(t.id, input, {
+                  ...input,
+                  id: t.id,
+                  receivableId: t.receivableId,
+                  confidence: t.confidence,
+                });
                 if (result.ok) setEditingId(null);
                 return result;
               }}
@@ -125,6 +131,7 @@ export function TransactionsManager({ initialTransactions }: { initialTransactio
                   {t.category}
                   {t.source && <span className={styles.source}> · {t.source}</span>}
                   {t.receivableId && <span className={styles.badge}>Receivable</span>}
+                  {isHeldForReview(t.confidence) && <span className={styles.badge}>Held for review</span>}
                 </div>
                 <div className={styles.date}>{formatDate(t.date)}</div>
               </div>

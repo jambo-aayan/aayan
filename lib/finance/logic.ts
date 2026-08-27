@@ -28,3 +28,45 @@ export type ReceivableFlaggableTransaction = { receivableId: string | null };
 export function canFlagAsReceivable(transaction: ReceivableFlaggableTransaction): boolean {
   return transaction.receivableId === null;
 }
+
+/** Below this, a statement-parsed transaction is held for review rather
+ * than silently accepted with a possibly-wrong category (#115, ADR-0010).
+ * Chosen as a starting point balancing false-holds against silently
+ * accepting a miscategorized transaction — tunable without a schema
+ * change since it's read fresh on every parse. */
+export const CONFIDENCE_THRESHOLD = 0.7;
+
+/** A manually entered transaction has no confidence score (null) and is
+ * never held — the threshold only applies to statement-parsed ones. */
+export function isHeldForReview(confidence: number | null): boolean {
+  if (confidence === null) return false;
+  return confidence < CONFIDENCE_THRESHOLD;
+}
+
+export type ValidationResult = { ok: true } | { ok: false; error: string };
+
+export const MAX_STATEMENT_BYTES = 10 * 1024 * 1024;
+const ALLOWED_STATEMENT_MIME_TYPES = new Set(["application/pdf", "text/csv"]);
+
+/** Client-side and server-side pre-upload check for a statement upload —
+ * PDF or CSV only, 10MB cap, matching Phase 4's Checkpoint photo
+ * validation shape (#115, ADR-0010). */
+export function validateStatementUpload(mimeType: string, sizeBytes: number): ValidationResult {
+  if (!ALLOWED_STATEMENT_MIME_TYPES.has(mimeType)) {
+    return { ok: false, error: "That doesn't look like a statement — try a PDF or CSV." };
+  }
+  if (sizeBytes > MAX_STATEMENT_BYTES) {
+    return { ok: false, error: "That statement is too large — keep it under 10MB." };
+  }
+  return { ok: true };
+}
+
+export type SignedAmount = { amount: number; direction: "IN" | "OUT" };
+
+/** The net effect of a batch of parsed transactions on an account's
+ * balance — IN adds, OUT subtracts. Used to derive the Snapshot balance a
+ * statement upload creates, carrying the account's prior balance forward
+ * plus whatever the newly parsed transactions moved (#115, ADR-0010). */
+export function netTransactionAmount(transactions: SignedAmount[]): number {
+  return transactions.reduce((sum, t) => sum + (t.direction === "IN" ? t.amount : -t.amount), 0);
+}

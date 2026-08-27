@@ -679,8 +679,12 @@ enum TransactionDirection {
 /// (#114, ADR-0010) — not unique, since the same Receivable can be
 /// referenced by both the funding OUT transaction and an optional
 /// repayment IN transaction. A transaction with receivableId set is
-/// excluded from spend totals (lib/finance/category-breakdown.ts,
-/// lib/finance/cash-flow-trend.ts) since it's a loan, not real spend/income.
+/// excluded from spend totals (lib/finance/category-breakdown.ts) since
+/// it's a loan, not real spend/income — cash flow (lib/finance/cash-flow-
+/// trend.ts) stays receivable-unaware since real cash still moved.
+/// confidence is set only by statement-upload parsing (#115, ADR-0010) —
+/// null for manually entered transactions, which are never held for
+/// review (see lib/finance/logic.ts's isHeldForReview).
 model Transaction {
   id           String               @id @default(cuid())
   date         DateTime             @db.Date
@@ -691,6 +695,7 @@ model Transaction {
   accountId    String?
   account      Account?             @relation(fields: [accountId], references: [id])
   receivableId String?
+  confidence   Float?
   receivable   Receivable?          @relation(fields: [receivableId], references: [id])
   createdAt    DateTime             @default(now())
   updatedAt    DateTime             @updatedAt

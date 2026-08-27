@@ -34,7 +34,16 @@ System Checkpoint step photos are stored in Vercel Blob, not the database.
    store (or copy `BLOB_READ_WRITE_TOKEN` from the dashboard by hand) so
    photo uploads work outside of Vercel's own deploys too.
 
-## 4. Deploy (Vercel)
+## 4. Statement parsing (Gemini)
+
+Bank statement uploads (Finances → Statements) are parsed by Gemini 2.5 Flash
+via the `@google/genai` SDK.
+
+1. Get an API key from [Google AI Studio](https://aistudio.google.com/apikey).
+2. You'll set this as `GEMINI_API_KEY` in Vercel (step 5 below), same pattern
+   as `BLOB_READ_WRITE_TOKEN` above.
+
+## 5. Deploy (Vercel)
 
 1. Import this repo at [vercel.com/new](https://vercel.com/new). Framework
    preset should auto-detect as Next.js.
@@ -43,9 +52,10 @@ System Checkpoint step photos are stored in Vercel Blob, not the database.
    - `APP_PASSWORD_HASH_B64` — the hash from step 2
    - `BLOB_READ_WRITE_TOKEN` — set automatically once a Blob store is
      connected (step 3); confirm it's present if uploads don't work.
+   - `GEMINI_API_KEY` — the API key from step 4
 3. Deploy.
 
-## 5. Apply the database schema
+## 6. Apply the database schema
 
 After the first deploy (or any schema change), run migrations against the
 Neon database from your local machine:
@@ -54,7 +64,7 @@ Neon database from your local machine:
 DATABASE_URL="<neon connection string>" npx prisma migrate deploy
 ```
 
-## 6. Verify
+## 7. Verify
 
 - Visit the deployed URL — it should redirect to `/login`.
 - Enter the password from step 2 — it should redirect to `/` showing the

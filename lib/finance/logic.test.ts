@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { canFlagAsReceivable, resolveAccountValueAt, sortGoalsByPriority } from "./logic";
+import {
+  canFlagAsReceivable,
+  isHeldForReview,
+  netTransactionAmount,
+  resolveAccountValueAt,
+  sortGoalsByPriority,
+  validateStatementUpload,
+} from "./logic";
 
 describe("resolveAccountValueAt", () => {
   it("returns null when there are no snapshots on or before the given date", () => {
@@ -77,5 +84,55 @@ describe("canFlagAsReceivable", () => {
 
   it("refuses a transaction already linked to a receivable", () => {
     expect(canFlagAsReceivable({ receivableId: "rec1" })).toBe(false);
+  });
+});
+
+describe("isHeldForReview", () => {
+  it("holds a transaction below the confidence threshold", () => {
+    expect(isHeldForReview(0.4)).toBe(true);
+  });
+
+  it("does not hold a transaction at or above the confidence threshold", () => {
+    expect(isHeldForReview(0.7)).toBe(false);
+    expect(isHeldForReview(0.95)).toBe(false);
+  });
+
+  it("never holds a manually entered transaction (null confidence)", () => {
+    expect(isHeldForReview(null)).toBe(false);
+  });
+});
+
+describe("validateStatementUpload", () => {
+  it("accepts a PDF within the size limit", () => {
+    expect(validateStatementUpload("application/pdf", 1024)).toEqual({ ok: true });
+  });
+
+  it("accepts a CSV within the size limit", () => {
+    expect(validateStatementUpload("text/csv", 1024)).toEqual({ ok: true });
+  });
+
+  it("rejects an unsupported file type", () => {
+    const result = validateStatementUpload("image/png", 1024);
+    expect(result.ok).toBe(false);
+  });
+
+  it("rejects a file over the size cap", () => {
+    const result = validateStatementUpload("application/pdf", 11 * 1024 * 1024);
+    expect(result.ok).toBe(false);
+  });
+});
+
+describe("netTransactionAmount", () => {
+  it("is zero for no transactions", () => {
+    expect(netTransactionAmount([])).toBe(0);
+  });
+
+  it("sums IN as positive and OUT as negative", () => {
+    const result = netTransactionAmount([
+      { amount: 100, direction: "IN" },
+      { amount: 40, direction: "OUT" },
+      { amount: 10, direction: "OUT" },
+    ]);
+    expect(result).toBe(50);
   });
 });
