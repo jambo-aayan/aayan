@@ -9,6 +9,7 @@ import { HabitsList } from "@/components/habits-list";
 import { AreaTasks } from "@/components/tasks/area-tasks";
 import { PainMobilityTracker } from "@/components/pain-mobility-tracker";
 import { CorrelationView } from "@/components/correlation-view";
+import { DailyMetricHistory } from "@/components/daily-metric-history";
 import { getArea } from "@/lib/health/data";
 import { updateAreaCurrentState, updateAreaNorthStar } from "@/lib/health/actions";
 import { getHabitsForArea } from "@/lib/habits/data";
@@ -16,8 +17,18 @@ import { getTasksForArea, getTaskLists, getPillarOptions, getAreaOptions, getTas
 import { getGoalOptions } from "@/lib/goals/data";
 import { getPainMobilityLogs } from "@/lib/pain-mobility/data";
 import { PAIN_MOBILITY_AREA_ID } from "@/lib/pain-mobility/scope";
+import { getDailyLogs } from "@/lib/daily-log/data";
+import { SLEEP_AREA_ID, CARE_AREA_ID } from "@/lib/health/seed-data";
 import { resolveColorHex, type ColorKey } from "@/lib/colors";
+import type { StiffnessBucket } from "@/lib/daily-log/logic";
 import styles from "./area-detail.module.css";
+
+const STIFFNESS_LABELS: Record<StiffnessBucket, string> = {
+  UNDER_15: "Under 15 min",
+  "15_TO_30": "15–30 min",
+  "30_TO_60": "30–60 min",
+  OVER_60: "Over an hour",
+};
 
 export default async function AreaPage({
   params,
@@ -38,7 +49,12 @@ export default async function AreaPage({
     getTaskTags(),
   ]);
   const isPainMobilityArea = areaId === PAIN_MOBILITY_AREA_ID;
+  const isSleepArea = areaId === SLEEP_AREA_ID;
+  const isCareArea = areaId === CARE_AREA_ID;
   const painLogs = isPainMobilityArea ? await getPainMobilityLogs(areaId) : [];
+  // Raw daily-log-sheet values only, per docs/adr/0007-v2-phase3-daily-log-sheet.md
+  // — new correlation cards reading DailyLog are Phase 6, not this page.
+  const dailyLogs = isPainMobilityArea || isSleepArea || isCareArea ? await getDailyLogs() : [];
   const accentColor = resolveColorHex(pillars.find((p) => p.id === area.pillarId)?.color as ColorKey | null);
 
   return (
@@ -94,7 +110,39 @@ export default async function AreaPage({
                 painLogs={painLogs.map((l) => ({ date: l.date, pain: l.pain }))}
               />
             </Card>
+            <Card title="Pain (daily log)">
+              <DailyMetricHistory
+                entries={dailyLogs.map((l) => ({ date: l.date, label: `Pain ${l.pain}` }))}
+                emptyMessage="No daily log entries yet."
+              />
+            </Card>
+            <Card title="Morning stiffness (daily log)">
+              <DailyMetricHistory
+                entries={dailyLogs
+                  .filter((l) => l.stiffnessBucket !== null)
+                  .map((l) => ({ date: l.date, label: STIFFNESS_LABELS[l.stiffnessBucket!] }))}
+                emptyMessage="No daily log entries yet."
+              />
+            </Card>
           </>
+        )}
+        {isSleepArea && (
+          <Card title="Sleep quality (daily log)">
+            <DailyMetricHistory
+              entries={dailyLogs.map((l) => ({ date: l.date, label: `Sleep quality ${l.sleepQuality}` }))}
+              emptyMessage="No daily log entries yet."
+            />
+          </Card>
+        )}
+        {isCareArea && (
+          <Card title="Blood pressure (daily log)">
+            <DailyMetricHistory
+              entries={dailyLogs
+                .filter((l) => l.bpSystolic !== null && l.bpDiastolic !== null)
+                .map((l) => ({ date: l.date, label: `${l.bpSystolic}/${l.bpDiastolic}` }))}
+              emptyMessage="No blood pressure readings logged yet."
+            />
+          </Card>
         )}
       </div>
     </>

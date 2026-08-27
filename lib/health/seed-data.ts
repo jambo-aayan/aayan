@@ -32,3 +32,9 @@ export const ANKYLOSING_SPONDYLITIS_AREA_ID = HEALTH_AREAS_SEED[0].id;
 /** Referenced by the daily log sheet's derived-field habit seeding (see
  * lib/daily-log/habit-seed.ts) — the stretch-routine habit lives here. */
 export const TRAINING_AND_BODY_AREA_ID = HEALTH_AREAS_SEED[3].id;
+
+/** Referenced by the daily log sheet's area-page display (see
+ * docs/adr/0007-v2-phase3-daily-log-sheet.md) — Sleep shows sleep-quality
+ * history, Care shows BP history. */
+export const SLEEP_AREA_ID = HEALTH_AREAS_SEED[1].id;
+export const CARE_AREA_ID = HEALTH_AREAS_SEED[5].id;
