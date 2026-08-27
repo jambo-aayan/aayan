@@ -28,3 +28,18 @@ export function validateCreateSystemInput(input: CreateSystemInput): ValidationR
 export function canSetParent(hasChildren: boolean): boolean {
   return !hasChildren;
 }
+
+/** Any completed step supports backdating: ticking stamps today, a
+ * "Not today?" picker corrects it after. A backdated date can't be in the
+ * future — that would misrepresent work not yet done. */
+export function resolveBackdate(candidate: Date, today: Date): { ok: true; date: Date } | { ok: false; error: string } {
+  if (candidate.getTime() > today.getTime()) {
+    return { ok: false, error: "That date hasn't happened yet." };
+  }
+  return { ok: true, date: candidate };
+}
+
+/** Checkpoint ratings are 1-5, same scale as the rest of this app. */
+export function isValidRating(rating: number): boolean {
+  return Number.isInteger(rating) && rating >= 1 && rating <= 5;
+}

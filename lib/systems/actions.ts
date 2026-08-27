@@ -2,7 +2,14 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { validateCreateSystemInput, canSetParent, type SystemType, type SystemState } from "./logic";
+import {
+  validateCreateSystemInput,
+  canSetParent,
+  resolveBackdate,
+  isValidRating,
+  type SystemType,
+  type SystemState,
+} from "./logic";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 const SAVE_ERROR = "Couldn't save — try again.";
@@ -151,6 +158,54 @@ export async function addChecklistStep(systemId: string, text: string): Promise<
   }
 }
 
+export type AddCheckpointStepResult = { ok: true; id: string } | { ok: false; error: string };
+
+export async function addCheckpointStep(
+  systemId: string,
+  text: string,
+  targetDate: Date | null
+): Promise<AddCheckpointStepResult> {
+  const trimmed = text.trim();
+  if (!trimmed) return { ok: false, error: "Give the step some text first." };
+
+  try {
+    const [system, count] = await Promise.all([
+      prisma.system.findUniqueOrThrow({ where: { id: systemId } }),
+      prisma.systemStep.count({ where: { systemId } }),
+    ]);
+    const step = await prisma.systemStep.create({
+      data: { systemId, type: "CHECKPOINT", text: trimmed, targetDate, sortOrder: count },
+    });
+    revalidateSystemPaths(system.areaId, system.pillarId);
+    return { ok: true, id: step.id };
+  } catch {
+    return { ok: false, error: SAVE_ERROR };
+  }
+}
+
+/** The tick-then-prompt capture — rating/comment are always optional and
+ * skippable, never blocking the tick itself. */
+export async function captureCheckpoint(
+  stepId: string,
+  input: { rating: number | null; comment: string | null }
+): Promise<ActionResult> {
+  if (input.rating !== null && !isValidRating(input.rating)) {
+    return { ok: false, error: "Rating must be 1-5." };
+  }
+
+  try {
+    const step = await prisma.systemStep.update({
+      where: { id: stepId },
+      data: { rating: input.rating, comment: input.comment?.trim() || null },
+      include: { system: true },
+    });
+    revalidateSystemPaths(step.system.areaId, step.system.pillarId);
+  } catch {
+    return { ok: false, error: SAVE_ERROR };
+  }
+  return { ok: true };
+}
+
 export async function updateChecklistStep(stepId: string, text: string): Promise<ActionResult> {
   const trimmed = text.trim();
   if (!trimmed) return { ok: false, error: "Give the step some text first." };
@@ -212,10 +267,13 @@ export async function addSystemDecision(systemId: string, body: string): Promise
 }
 
 export async function backdateSystemStep(stepId: string, doneOn: Date): Promise<ActionResult> {
+  const resolved = resolveBackdate(doneOn, new Date());
+  if (!resolved.ok) return resolved;
+
   try {
     const step = await prisma.systemStep.update({
       where: { id: stepId },
-      data: { doneOn },
+      data: { doneOn: resolved.date },
       include: { system: true },
     });
     revalidateSystemPaths(step.system.areaId, step.system.pillarId);

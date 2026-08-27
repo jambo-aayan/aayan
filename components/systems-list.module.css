@@ -157,3 +157,8 @@
   text-decoration: line-through;
   color: var(--muted);
 }
+
+.meta {
+  font-size: 11.5px;
+  color: var(--muted);
+}

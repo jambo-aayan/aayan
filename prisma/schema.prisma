@@ -418,6 +418,12 @@ model SystemStep {
   doneOn    DateTime?
   sortOrder Int            @default(0)
 
+  /// Checkpoint only. Captured through the tick-then-prompt flow — ticking
+  /// never blocks on these, they're always optional and skippable.
+  targetDate DateTime? @db.Date
+  rating     Int?
+  comment    String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

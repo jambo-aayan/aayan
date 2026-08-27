@@ -8,16 +8,28 @@ import {
   updateSystemReference,
   duplicateSystem,
   addChecklistStep,
+  addCheckpointStep,
+  captureCheckpoint,
   updateChecklistStep,
   toggleSystemStep,
+  backdateSystemStep,
   deleteSystemStep,
   addSystemDecision,
 } from "@/lib/systems/actions";
+import { ratingTrend, ratingHistogram } from "@/lib/systems/widgets";
 import { withRetry } from "@/lib/with-retry";
 import { useToast } from "@/components/toast/toast-provider";
 import styles from "./systems-list.module.css";
 
-export type SystemStepRow = { id: string; type: string; text: string; done: boolean };
+export type SystemStepRow = {
+  id: string;
+  type: string;
+  text: string;
+  done: boolean;
+  doneOn: Date | null;
+  rating: number | null;
+  comment: string | null;
+};
 export type SystemDecisionRow = { id: string; when: Date; body: string };
 export type AreaSystem = {
   id: string;
@@ -164,11 +176,17 @@ export function SystemsList({
 
 function SystemCard({ system, onChange }: { system: AreaSystem; onChange: (next: AreaSystem) => void }) {
   const [stepText, setStepText] = useState("");
+  const [stepType, setStepType] = useState<"CHECKLIST" | "CHECKPOINT">("CHECKLIST");
   const [decisionText, setDecisionText] = useState("");
   const [referenceDraft, setReferenceDraft] = useState(system.reference ?? "");
   const [editingReference, setEditingReference] = useState(false);
   const [editingStepId, setEditingStepId] = useState<string | null>(null);
   const [editStepText, setEditStepText] = useState("");
+  const [capturingStepId, setCapturingStepId] = useState<string | null>(null);
+  const [captureRating, setCaptureRating] = useState("");
+  const [captureComment, setCaptureComment] = useState("");
+  const [backdatingStepId, setBackdatingStepId] = useState<string | null>(null);
+  const [backdateValue, setBackdateValue] = useState("");
   const { notifyError } = useToast();
 
   async function handleSetState(state: SystemState) {
@@ -196,26 +214,72 @@ function SystemCard({ system, onChange }: { system: AreaSystem; onChange: (next:
   async function handleAddStep() {
     const text = stepText.trim();
     if (!text) return;
-    const result = await withRetry(() => addChecklistStep(system.id, text));
+    const result = await withRetry(() =>
+      stepType === "CHECKLIST" ? addChecklistStep(system.id, text) : addCheckpointStep(system.id, text, null)
+    );
     if (!result.ok) {
       notifyError(result.error, { onRetry: handleAddStep });
       return;
     }
-    onChange({ ...system, steps: [...system.steps, { id: result.id, type: "CHECKLIST", text, done: false }] });
+    onChange({
+      ...system,
+      steps: [
+        ...system.steps,
+        { id: result.id, type: stepType, text, done: false, doneOn: null, rating: null, comment: null },
+      ],
+    });
     setStepText("");
   }
 
-  async function handleToggleStep(stepId: string) {
+  async function handleToggleStep(step: SystemStepRow) {
+    const nowDone = !step.done;
     const prevSteps = system.steps;
     onChange({
       ...system,
-      steps: system.steps.map((s) => (s.id === stepId ? { ...s, done: !s.done } : s)),
+      steps: system.steps.map((s) =>
+        s.id === step.id ? { ...s, done: nowDone, doneOn: nowDone ? new Date() : null } : s
+      ),
     });
-    const result = await withRetry(() => toggleSystemStep(stepId));
+    const result = await withRetry(() => toggleSystemStep(step.id));
     if (!result.ok) {
       onChange({ ...system, steps: prevSteps });
-      notifyError(result.error, { onRetry: () => handleToggleStep(stepId) });
+      notifyError(result.error, { onRetry: () => handleToggleStep(step) });
+      return;
     }
+    // Tick-then-prompt: never blocks the tick, always optional/skippable.
+    if (nowDone && step.type === "CHECKPOINT") {
+      setCapturingStepId(step.id);
+      setCaptureRating("");
+      setCaptureComment("");
+    }
+  }
+
+  async function handleSaveCapture(stepId: string) {
+    const rating = captureRating ? Number(captureRating) : null;
+    const comment = captureComment.trim() || null;
+    const prevSteps = system.steps;
+    onChange({ ...system, steps: system.steps.map((s) => (s.id === stepId ? { ...s, rating, comment } : s)) });
+    const result = await withRetry(() => captureCheckpoint(stepId, { rating, comment }));
+    if (!result.ok) {
+      onChange({ ...system, steps: prevSteps });
+      notifyError(result.error, { onRetry: () => handleSaveCapture(stepId) });
+      return;
+    }
+    setCapturingStepId(null);
+  }
+
+  async function handleBackdate(stepId: string) {
+    if (!backdateValue) return;
+    const doneOn = new Date(backdateValue);
+    const prevSteps = system.steps;
+    onChange({ ...system, steps: system.steps.map((s) => (s.id === stepId ? { ...s, doneOn } : s)) });
+    const result = await withRetry(() => backdateSystemStep(stepId, doneOn));
+    if (!result.ok) {
+      onChange({ ...system, steps: prevSteps });
+      notifyError(result.error, { onRetry: () => handleBackdate(stepId) });
+      return;
+    }
+    setBackdatingStepId(null);
   }
 
   async function handleSaveStepEdit(stepId: string) {
@@ -265,6 +329,8 @@ function SystemCard({ system, onChange }: { system: AreaSystem; onChange: (next:
   }
 
   const note = STATE_NOTE[system.state];
+  const ratingTrendData = ratingTrend(system.steps);
+  const histogram = ratingHistogram(system.steps);
 
   return (
     <div className={styles.systemCard}>
@@ -340,6 +406,28 @@ function SystemCard({ system, onChange }: { system: AreaSystem; onChange: (next:
         </div>
       </div>
 
+      {ratingTrendData && (
+        <div className={styles.section}>
+          <div className={styles.sectionLabel}>Rating over time</div>
+          <ul className={styles.stepList}>
+            {ratingTrendData.map((p) => (
+              <li key={p.date.getTime()} className={styles.stepRow}>
+                <span>{p.date.toISOString().slice(0, 10)}</span>
+                <span>{p.rating}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {histogram && (
+        <div className={styles.section}>
+          <div className={styles.sectionLabel}>Rating distribution</div>
+          <p className={styles.body}>
+            Mean {histogram.mean.toFixed(1)}, spread {histogram.spread.toFixed(1)}
+          </p>
+        </div>
+      )}
+
       <div className={styles.section}>
         <ul className={styles.stepList}>
           {system.steps.map((step) =>
@@ -360,11 +448,73 @@ function SystemCard({ system, onChange }: { system: AreaSystem; onChange: (next:
               </li>
             ) : (
               <li key={step.id} className={styles.stepRow}>
-                <label>
-                  <input type="checkbox" checked={step.done} onChange={() => handleToggleStep(step.id)} />
-                  <span className={step.done ? styles.stepDone : undefined}>{step.text}</span>
-                </label>
+                <div>
+                  <label>
+                    <input type="checkbox" checked={step.done} onChange={() => handleToggleStep(step)} />
+                    <span className={step.done ? styles.stepDone : undefined}>{step.text}</span>
+                  </label>
+                  {step.done && step.rating !== null && (
+                    <span className={styles.meta}> · rated {step.rating}</span>
+                  )}
+                  {capturingStepId === step.id && (
+                    <div className={styles.addForm}>
+                      <select
+                        className={styles.input}
+                        value={captureRating}
+                        onChange={(e) => setCaptureRating(e.target.value)}
+                      >
+                        <option value="">No rating</option>
+                        {[1, 2, 3, 4, 5].map((n) => (
+                          <option key={n} value={n}>
+                            {n}
+                          </option>
+                        ))}
+                      </select>
+                      <input
+                        className={styles.input}
+                        placeholder="Comment (optional)"
+                        value={captureComment}
+                        onChange={(e) => setCaptureComment(e.target.value)}
+                      />
+                      <button type="button" className={styles.link} onClick={() => handleSaveCapture(step.id)}>
+                        Save
+                      </button>
+                      <button type="button" className={styles.link} onClick={() => setCapturingStepId(null)}>
+                        Skip
+                      </button>
+                    </div>
+                  )}
+                  {step.done && backdatingStepId === step.id && (
+                    <div className={styles.addForm}>
+                      <input
+                        type="date"
+                        className={styles.input}
+                        value={backdateValue}
+                        max={new Date().toISOString().slice(0, 10)}
+                        onChange={(e) => setBackdateValue(e.target.value)}
+                      />
+                      <button type="button" className={styles.link} onClick={() => handleBackdate(step.id)}>
+                        Save
+                      </button>
+                      <button type="button" className={styles.link} onClick={() => setBackdatingStepId(null)}>
+                        Cancel
+                      </button>
+                    </div>
+                  )}
+                </div>
                 <span>
+                  {step.done && (
+                    <button
+                      type="button"
+                      className={styles.link}
+                      onClick={() => {
+                        setBackdatingStepId(step.id);
+                        setBackdateValue(step.doneOn ? step.doneOn.toISOString().slice(0, 10) : "");
+                      }}
+                    >
+                      Not today?
+                    </button>
+                  )}{" "}
                   <button
                     type="button"
                     className={styles.link}
@@ -390,6 +540,14 @@ function SystemCard({ system, onChange }: { system: AreaSystem; onChange: (next:
             value={stepText}
             onChange={(e) => setStepText(e.target.value)}
           />
+          <select
+            className={styles.input}
+            value={stepType}
+            onChange={(e) => setStepType(e.target.value as "CHECKLIST" | "CHECKPOINT")}
+          >
+            <option value="CHECKLIST">Checklist</option>
+            <option value="CHECKPOINT">Checkpoint</option>
+          </select>
           <button type="button" className={styles.link} onClick={handleAddStep}>
             + Add step
           </button>

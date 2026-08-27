@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { validateCreateSystemInput, canSetParent } from "./logic";
+import { validateCreateSystemInput, canSetParent, resolveBackdate, isValidRating } from "./logic";
 
 describe("validateCreateSystemInput", () => {
   it("rejects a blank name", () => {
@@ -56,5 +56,38 @@ describe("canSetParent", () => {
 
   it("rejects setting a parent when the System already has children", () => {
     expect(canSetParent(true)).toBe(false);
+  });
+});
+
+describe("resolveBackdate", () => {
+  const today = new Date("2026-08-27");
+
+  it("accepts a past date", () => {
+    const result = resolveBackdate(new Date("2026-08-20"), today);
+    expect(result.ok).toBe(true);
+  });
+
+  it("accepts today", () => {
+    const result = resolveBackdate(new Date("2026-08-27"), today);
+    expect(result.ok).toBe(true);
+  });
+
+  it("rejects a future date", () => {
+    expect(resolveBackdate(new Date("2026-08-28"), today)).toEqual({
+      ok: false,
+      error: "That date hasn't happened yet.",
+    });
+  });
+});
+
+describe("isValidRating", () => {
+  it("accepts 1 through 5", () => {
+    expect([1, 2, 3, 4, 5].every(isValidRating)).toBe(true);
+  });
+
+  it("rejects out-of-range and non-integer values", () => {
+    expect(isValidRating(0)).toBe(false);
+    expect(isValidRating(6)).toBe(false);
+    expect(isValidRating(3.5)).toBe(false);
   });
 });
