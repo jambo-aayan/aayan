@@ -5,17 +5,19 @@ import { Receipt } from "lucide-react";
 import {
   createTransaction,
   deleteTransaction,
+  flagAsReceivable,
   restoreTransaction,
   updateTransaction,
   type TransactionInput,
 } from "@/lib/finance/actions";
 import { useUndoableCrudList, type ActionResult } from "@/lib/hooks/use-undoable-crud-list";
+import { withRetry } from "@/lib/with-retry";
 import { DEFAULT_CATEGORIES } from "@/lib/finance/categories";
 import { PrimaryButton } from "@/components/primary-button";
 import { EmptyState } from "@/components/empty-state";
 import styles from "./transactions-manager.module.css";
 
-type Transaction = TransactionInput & { id: string };
+type Transaction = TransactionInput & { id: string; receivableId: string | null };
 
 const EMPTY_FORM: TransactionInput = {
   date: new Date(),
@@ -42,7 +44,10 @@ export function TransactionsManager({ initialTransactions }: { initialTransactio
     Transaction,
     TransactionInput
   >(initialTransactions, {
-    create: createTransaction,
+    create: async (input) => {
+      const result = await createTransaction(input);
+      return result.ok ? { ok: true, item: { ...result.item, receivableId: null } } : result;
+    },
     update: updateTransaction,
     remove: deleteTransaction,
     restore: restoreTransaction,
@@ -51,8 +56,29 @@ export function TransactionsManager({ initialTransactions }: { initialTransactio
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [flaggingRowId, setFlaggingRowId] = useState<string | null>(null);
+  // Overlays flagAsReceivable's result onto the list without a redundant
+  // updateTransaction write — flagAsReceivable already persisted
+  // receivableId server-side, so the hook's update() (which calls
+  // updateTransaction) would be both wasted and semantically wrong here.
+  const [receivableOverrides, setReceivableOverrides] = useState<Record<string, string>>({});
 
-  const sorted = [...transactions].sort((a, b) => b.date.getTime() - a.date.getTime());
+  async function handleFlagAsReceivable(
+    transactionId: string,
+    amount: number,
+    note: string | null
+  ): Promise<ActionResult> {
+    const result = await withRetry(() => flagAsReceivable(transactionId, amount, note));
+    if (result.ok) {
+      setReceivableOverrides((prev) => ({ ...prev, [transactionId]: result.receivableId }));
+      return { ok: true };
+    }
+    return result;
+  }
+
+  const sorted = [...transactions]
+    .map((t) => (receivableOverrides[t.id] ? { ...t, receivableId: receivableOverrides[t.id] } : t))
+    .sort((a, b) => b.date.getTime() - a.date.getTime());
 
   async function handleAdd() {
     if (!form.category.trim()) {
@@ -76,8 +102,19 @@ export function TransactionsManager({ initialTransactions }: { initialTransactio
               transaction={t}
               onCancel={() => setEditingId(null)}
               onSaved={async (input) => {
-                const result = await update(t.id, input, { ...input, id: t.id });
+                const result = await update(t.id, input, { ...input, id: t.id, receivableId: t.receivableId });
                 if (result.ok) setEditingId(null);
+                return result;
+              }}
+            />
+          ) : flaggingRowId === t.id ? (
+            <FlagReceivableRow
+              key={t.id}
+              transaction={t}
+              onCancel={() => setFlaggingRowId(null)}
+              onConfirm={async (amount, note) => {
+                const result = await handleFlagAsReceivable(t.id, amount, note);
+                if (result.ok) setFlaggingRowId(null);
                 return result;
               }}
             />
@@ -87,6 +124,7 @@ export function TransactionsManager({ initialTransactions }: { initialTransactio
                 <div className={styles.category}>
                   {t.category}
                   {t.source && <span className={styles.source}> · {t.source}</span>}
+                  {t.receivableId && <span className={styles.badge}>Receivable</span>}
                 </div>
                 <div className={styles.date}>{formatDate(t.date)}</div>
               </div>
@@ -95,6 +133,11 @@ export function TransactionsManager({ initialTransactions }: { initialTransactio
                   {t.direction === "IN" ? "+" : "−"}
                   {formatGBP(t.amount)}
                 </span>
+                {t.direction === "OUT" && !t.receivableId && (
+                  <button type="button" className={styles.link} onClick={() => setFlaggingRowId(t.id)}>
+                    Flag as receivable
+                  </button>
+                )}
                 <button type="button" className={styles.link} onClick={() => setEditingId(t.id)}>
                   Edit
                 </button>
@@ -213,6 +256,57 @@ function TransactionEditRow({
       <TransactionFields form={form} onChange={setForm} />
       <PrimaryButton onClick={handleSave} disabled={saving}>
         {saving ? "Saving…" : "Save"}
+      </PrimaryButton>
+      <button type="button" className={styles.link} onClick={onCancel}>
+        Cancel
+      </button>
+      {error && <p className={styles.error}>{error}</p>}
+    </li>
+  );
+}
+
+function FlagReceivableRow({
+  transaction,
+  onCancel,
+  onConfirm,
+}: {
+  transaction: Transaction;
+  onCancel: () => void;
+  onConfirm: (amount: number, note: string | null) => Promise<ActionResult>;
+}) {
+  const [amount, setAmount] = useState(transaction.amount);
+  const [note, setNote] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleConfirm() {
+    setSaving(true);
+    setError(null);
+    const result = await onConfirm(amount, note || null);
+    setSaving(false);
+    if (!result.ok) setError(result.error);
+  }
+
+  return (
+    <li className={styles.addForm}>
+      <input
+        className={styles.input}
+        type="number"
+        step="0.01"
+        placeholder="Amount"
+        aria-label="Receivable amount"
+        value={amount}
+        onChange={(e) => setAmount(Number(e.target.value))}
+      />
+      <input
+        className={styles.input}
+        placeholder="Note (optional)"
+        aria-label="Receivable note"
+        value={note}
+        onChange={(e) => setNote(e.target.value)}
+      />
+      <PrimaryButton onClick={handleConfirm} disabled={saving}>
+        {saving ? "Flagging…" : "Confirm"}
       </PrimaryButton>
       <button type="button" className={styles.link} onClick={onCancel}>
         Cancel

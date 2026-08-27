@@ -609,14 +609,15 @@ enum ReceivableStatus {
 /// in this ticket — the "this became a receivable" review action and
 /// settle flow (and Transaction's receivableId link) are #114.
 model Receivable {
-  id        String           @id @default(cuid())
-  amount    Decimal          @db.Decimal(12, 2)
-  status    ReceivableStatus @default(OPEN)
-  note      String?
-  openedAt  DateTime         @default(now())
-  settledAt DateTime?
-  createdAt DateTime         @default(now())
-  updatedAt DateTime         @updatedAt
+  id           String           @id @default(cuid())
+  amount       Decimal          @db.Decimal(12, 2)
+  status       ReceivableStatus @default(OPEN)
+  note         String?
+  openedAt     DateTime         @default(now())
+  settledAt    DateTime?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  transactions Transaction[]
 }
 
 /// Singleton: the fixed monthly income/outgoings summary, distinct from the
@@ -673,21 +674,30 @@ enum TransactionDirection {
 
 /// A dated, categorized ledger entry — distinct from Baseline's fixed
 /// monthly summary. accountId replaces v1's linkedItemId placeholder
-/// (nothing ever populated it) with a real FK, per ADR-0010.
+/// (nothing ever populated it) with a real FK, per ADR-0010. receivableId
+/// is set by the "this became a receivable" reclassification action
+/// (#114, ADR-0010) — not unique, since the same Receivable can be
+/// referenced by both the funding OUT transaction and an optional
+/// repayment IN transaction. A transaction with receivableId set is
+/// excluded from spend totals (lib/finance/category-breakdown.ts,
+/// lib/finance/cash-flow-trend.ts) since it's a loan, not real spend/income.
 model Transaction {
-  id        String               @id @default(cuid())
-  date      DateTime             @db.Date
-  amount    Decimal              @db.Decimal(12, 2)
-  direction TransactionDirection
-  category  String
-  source    String?
-  accountId String?
-  account   Account?             @relation(fields: [accountId], references: [id])
-  createdAt DateTime             @default(now())
-  updatedAt DateTime             @updatedAt
+  id           String               @id @default(cuid())
+  date         DateTime             @db.Date
+  amount       Decimal              @db.Decimal(12, 2)
+  direction    TransactionDirection
+  category     String
+  source       String?
+  accountId    String?
+  account      Account?             @relation(fields: [accountId], references: [id])
+  receivableId String?
+  receivable   Receivable?          @relation(fields: [receivableId], references: [id])
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
 
   @@index([date])
   @@index([accountId])
+  @@index([receivableId])
 }
 
 /// A live Enable Banking authorization — the result of one `POST /sessions`

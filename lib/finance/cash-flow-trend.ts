@@ -1,10 +1,18 @@
-export type TransactionForTrend = { date: Date; amount: number; direction: "IN" | "OUT" };
+export type TransactionForTrend = {
+  date: Date;
+  amount: number;
+  direction: "IN" | "OUT";
+};
 
 /**
  * A cumulative running balance from actual Transactions, ordered by date —
  * the only real time-series signal available. Not the same thing as
  * "net worth over time" (no historical Item-value snapshots exist to
  * chart that honestly), so this is presented as cash flow, not net worth.
+ * Unlike categoryBreakdown, this is NOT receivable-aware — a Receivable
+ * flag excludes a transaction from spend *totals* (ADR-0010's Receivable
+ * section), but real cash still left the account, so it stays in the
+ * actual cash-movement trend.
  */
 export function cashFlowTrend(transactions: TransactionForTrend[]): { date: Date; cumulative: number }[] {
   const byDay = new Map<number, number>();

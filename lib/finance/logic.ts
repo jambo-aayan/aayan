@@ -19,3 +19,12 @@ export type GoalPriorityRow = { priority: number };
 export function sortGoalsByPriority<T extends GoalPriorityRow>(goals: T[]): T[] {
   return [...goals].sort((a, b) => a.priority - b.priority);
 }
+
+export type ReceivableFlaggableTransaction = { receivableId: string | null };
+
+/** A transaction can only be linked to one reclassification at a time
+ * (#114, ADR-0010) — a transaction already flagged as a receivable can't
+ * be flagged again without first being unflagged/settled. */
+export function canFlagAsReceivable(transaction: ReceivableFlaggableTransaction): boolean {
+  return transaction.receivableId === null;
+}

@@ -28,4 +28,15 @@ describe("cashFlowTrend", () => {
     ]);
     expect(result).toEqual([{ date: d("2026-08-01"), cumulative: 900 }]);
   });
+
+  it("includes a transaction flagged as a receivable — real cash still left the account", () => {
+    const result = cashFlowTrend([
+      { date: d("2026-08-01"), amount: 3000, direction: "IN" },
+      { date: d("2026-08-02"), amount: 500, direction: "OUT" },
+    ]);
+    expect(result).toEqual([
+      { date: d("2026-08-01"), cumulative: 3000 },
+      { date: d("2026-08-02"), cumulative: 2500 },
+    ]);
+  });
 });

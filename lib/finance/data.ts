@@ -58,3 +58,8 @@ export async function getTransactions() {
   const transactions = await prisma.transaction.findMany({ orderBy: { date: "desc" } });
   return transactions.map((t) => ({ ...t, amount: t.amount.toNumber() }));
 }
+
+export async function getReceivables() {
+  const receivables = await prisma.receivable.findMany({ orderBy: { openedAt: "desc" } });
+  return receivables.map((r) => ({ ...r, amount: r.amount.toNumber() }));
+}

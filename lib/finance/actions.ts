@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { BASELINE_ID } from "./baseline-id";
+import { canFlagAsReceivable } from "./logic";
 import { FINANCE_NORTH_STAR_ID } from "./north-star-id";
 
 export type AccountInput = {
@@ -235,6 +236,85 @@ export async function restoreTransaction(
     await prisma.transaction.create({ data: transaction });
   } catch {
     return { ok: false, error: "Couldn't undo — the transaction may already be back." };
+  }
+  revalidatePath("/finances");
+  return { ok: true };
+}
+
+export type ReceivableResult =
+  | { ok: true; receivableId: string }
+  | { ok: false; error: string };
+
+const ALREADY_LINKED_ERROR = "Already linked to a receivable.";
+
+/** Atomically claims a transaction for a reclassification link — the
+ * WHERE clause (not just the pure canFlagAsReceivable check, which only
+ * catches the common case) is what actually prevents two concurrent
+ * flags/settles on the same transaction from both succeeding: only one
+ * UPDATE can match receivableId: null, so the loser's count is 0. */
+async function claimTransactionForReceivable(transactionId: string, receivableId: string): Promise<boolean> {
+  const claimed = await prisma.transaction.updateMany({
+    where: { id: transactionId, receivableId: null },
+    data: { receivableId },
+  });
+  return claimed.count === 1;
+}
+
+/** "This became a receivable" — reclassifies an outgoing transaction as
+ * money owed to the user rather than real spend, creating a new open
+ * Receivable linked to it, its amount pre-filled from the transaction but
+ * editable (#114, ADR-0010). Refuses a transaction already linked to a
+ * reclassification. */
+export async function flagAsReceivable(
+  transactionId: string,
+  amount: number,
+  note: string | null
+): Promise<ReceivableResult> {
+  try {
+    const transaction = await prisma.transaction.findUnique({ where: { id: transactionId } });
+    if (!transaction) return { ok: false, error: SAVE_ERROR };
+    if (!canFlagAsReceivable({ receivableId: transaction.receivableId })) {
+      return { ok: false, error: ALREADY_LINKED_ERROR };
+    }
+    const receivable = await prisma.receivable.create({ data: { amount, note } });
+    if (!(await claimTransactionForReceivable(transactionId, receivable.id))) {
+      await prisma.receivable.delete({ where: { id: receivable.id } });
+      return { ok: false, error: ALREADY_LINKED_ERROR };
+    }
+    revalidatePath("/finances");
+    return { ok: true, receivableId: receivable.id };
+  } catch {
+    return { ok: false, error: SAVE_ERROR };
+  }
+}
+
+/** Marks a Receivable settled — no net-worth change, since the money was
+ * already excluded from spend totals when it was flagged (ADR-0010).
+ * Settling is independent of finding a matching incoming transaction, but
+ * one can optionally be linked as the repayment record — that linked
+ * transaction is excluded from spend totals the same way the original
+ * flagged transaction is, so it's not double-counted as new income. */
+export async function settleReceivable(
+  receivableId: string,
+  repaymentTransactionId: string | null
+): Promise<ActionResult> {
+  try {
+    if (repaymentTransactionId !== null) {
+      const repayment = await prisma.transaction.findUnique({ where: { id: repaymentTransactionId } });
+      if (!repayment) return { ok: false, error: SAVE_ERROR };
+      if (!canFlagAsReceivable({ receivableId: repayment.receivableId })) {
+        return { ok: false, error: ALREADY_LINKED_ERROR };
+      }
+      if (!(await claimTransactionForReceivable(repaymentTransactionId, receivableId))) {
+        return { ok: false, error: ALREADY_LINKED_ERROR };
+      }
+    }
+    await prisma.receivable.update({
+      where: { id: receivableId },
+      data: { status: "SETTLED", settledAt: new Date() },
+    });
+  } catch {
+    return { ok: false, error: SAVE_ERROR };
   }
   revalidatePath("/finances");
   return { ok: true };

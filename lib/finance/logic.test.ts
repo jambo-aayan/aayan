@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resolveAccountValueAt, sortGoalsByPriority } from "./logic";
+import { canFlagAsReceivable, resolveAccountValueAt, sortGoalsByPriority } from "./logic";
 
 describe("resolveAccountValueAt", () => {
   it("returns null when there are no snapshots on or before the given date", () => {
@@ -67,5 +67,15 @@ describe("sortGoalsByPriority", () => {
     ];
     sortGoalsByPriority(goals);
     expect(goals.map((g) => g.id)).toEqual(["a", "b"]);
+  });
+});
+
+describe("canFlagAsReceivable", () => {
+  it("allows flagging a transaction with no existing reclassification", () => {
+    expect(canFlagAsReceivable({ receivableId: null })).toBe(true);
+  });
+
+  it("refuses a transaction already linked to a receivable", () => {
+    expect(canFlagAsReceivable({ receivableId: "rec1" })).toBe(false);
   });
 });

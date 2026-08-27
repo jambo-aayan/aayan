@@ -9,6 +9,7 @@ import { AccountsManager } from "@/components/accounts-manager";
 import { GoalsManager } from "@/components/goals-manager";
 import { FinanceNorthStarCard } from "@/components/finance-north-star-card";
 import { TransactionsManager } from "@/components/transactions-manager";
+import { ReceivablesList } from "@/components/receivables-list";
 import { CategoryBreakdownView } from "@/components/category-breakdown-view";
 import { StatRow } from "@/components/finance-dashboard/stat-row";
 import { TrendChart } from "@/components/finance-dashboard/trend-chart";
@@ -24,6 +25,7 @@ import {
   getGoals,
   getFinanceNorthStar,
   getTransactions,
+  getReceivables,
 } from "@/lib/finance/data";
 import { getLinkedBanks } from "@/lib/enable-banking/data";
 import { netWorth } from "@/lib/finance/net-worth";
@@ -38,13 +40,14 @@ import { FINANCE_PILLAR_ID } from "@/lib/finance/pillar-id";
 
 export default async function FinancesPage({ searchParams }: { searchParams: Promise<{ focus?: string }> }) {
   const { focus } = await searchParams;
-  const [accounts, baseline, goals, financeNorthStar, transactions, linkedBanks, systems, systemHabitOptions, systemGoalOptions] =
+  const [accounts, baseline, goals, financeNorthStar, transactions, receivables, linkedBanks, systems, systemHabitOptions, systemGoalOptions] =
     await Promise.all([
       getAccounts(),
       getBaseline(),
       getGoals(),
       getFinanceNorthStar(),
       getTransactions(),
+      getReceivables(),
       getLinkedBanks(),
       getSystemsForPillar(FINANCE_PILLAR_ID),
       getHabitOptionsForPillar(FINANCE_PILLAR_ID),
@@ -56,6 +59,7 @@ export default async function FinancesPage({ searchParams }: { searchParams: Pro
   const northStarPercent = financeNorthStar.target !== null ? goalProgressPercent(accessible, financeNorthStar.target) : null;
   const trendPoints = cashFlowTrend(transactions);
   const assetBreakdown = netWorthBreakdown(accounts);
+  const repaymentCandidates = transactions.filter((t) => t.direction === "IN" && t.receivableId === null);
 
   return (
     <>
@@ -104,6 +108,9 @@ export default async function FinancesPage({ searchParams }: { searchParams: Pro
         </Card>
         <Card title="Transactions">
           <TransactionsManager initialTransactions={transactions} />
+        </Card>
+        <Card title="Receivables">
+          <ReceivablesList initialReceivables={receivables} repaymentCandidates={repaymentCandidates} />
         </Card>
         <Card title="Accounts">
           <AccountsManager initialAccounts={accounts} />

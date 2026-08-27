@@ -3,6 +3,9 @@ export type TransactionForBreakdown = {
   amount: number;
   direction: "IN" | "OUT";
   category: string;
+  /** A transaction flagged "this became a receivable" is a loan, not
+   * real spending — excluded from spend totals (ADR-0010). */
+  receivableId: string | null;
 };
 
 function isSameUtcMonth(date: Date, month: Date): boolean {
@@ -17,7 +20,7 @@ export function categoryBreakdown(
   const totals = new Map<string, number>();
 
   for (const t of transactions) {
-    if (t.direction !== "OUT" || !isSameUtcMonth(t.date, month)) continue;
+    if (t.direction !== "OUT" || !isSameUtcMonth(t.date, month) || t.receivableId !== null) continue;
     totals.set(t.category, (totals.get(t.category) ?? 0) + t.amount);
   }
 
