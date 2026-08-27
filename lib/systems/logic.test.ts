@@ -7,6 +7,8 @@ import {
   isValidMeasureNumber,
   expectedOccurrenceDates,
   classifyOccurrences,
+  validatePhotoUpload,
+  MAX_PHOTO_BYTES,
 } from "./logic";
 
 describe("validateCreateSystemInput", () => {
@@ -187,5 +189,29 @@ describe("classifyOccurrences", () => {
   it("still matches ON_TIME when the logged date has time-of-day precision (a @db.Date column stores midnight, but callers may not normalize before passing)", () => {
     const result = classifyOccurrences(expected, [new Date("2026-08-01T23:59:00.000Z")], new Date("2026-08-20"));
     expect(result[0]).toBe("ON_TIME");
+  });
+});
+
+describe("validatePhotoUpload", () => {
+  it("accepts a standard image type under the size cap", () => {
+    expect(validatePhotoUpload("image/jpeg", 1024)).toEqual({ ok: true });
+  });
+
+  it("rejects a non-image MIME type", () => {
+    expect(validatePhotoUpload("application/pdf", 1024)).toEqual({
+      ok: false,
+      error: "That doesn't look like an image — try a JPEG, PNG, WebP, GIF, or HEIC.",
+    });
+  });
+
+  it("rejects a file over 10MB", () => {
+    expect(validatePhotoUpload("image/png", MAX_PHOTO_BYTES + 1)).toEqual({
+      ok: false,
+      error: "That photo is too large — keep it under 10MB.",
+    });
+  });
+
+  it("accepts a file exactly at the size cap", () => {
+    expect(validatePhotoUpload("image/png", MAX_PHOTO_BYTES)).toEqual({ ok: true });
   });
 });

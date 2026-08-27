@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { put, del } from "@vercel/blob";
 import { prisma } from "@/lib/prisma";
 import {
   validateCreateSystemInput,
@@ -8,6 +9,7 @@ import {
   resolveBackdate,
   isValidRating,
   isValidMeasureNumber,
+  validatePhotoUpload,
   type SystemType,
   type SystemState,
 } from "./logic";
@@ -457,9 +459,66 @@ export async function updateChecklistStep(stepId: string, text: string): Promise
   return { ok: true };
 }
 
+/** Deletes the Blob object alongside the Prisma delete when the step
+ * carries a photo — a stray Blob otherwise has no code path that ever
+ * cleans it up. Best-effort: if the Blob delete fails (already gone,
+ * network issue) it's swallowed rather than blocking the step delete —
+ * an orphaned Blob object is a cost, not a correctness problem, and the
+ * step row is the source of truth the user is acting on. */
 export async function deleteSystemStep(stepId: string): Promise<ActionResult> {
   try {
     const step = await prisma.systemStep.delete({ where: { id: stepId }, include: { system: true } });
+    if (step.photoUrl) {
+      await del(step.photoUrl).catch(() => {});
+    }
+    revalidateSystemPaths(step.system.areaId);
+  } catch {
+    return { ok: false, error: SAVE_ERROR };
+  }
+  return { ok: true };
+}
+
+export type UploadCheckpointPhotoResult = { ok: true; photoUrl: string } | { ok: false; error: string };
+
+/** Uploads a Checkpoint photo to Vercel Blob and stores only the returned
+ * CDN URL — no binary data in Postgres. Replaces (and deletes) any
+ * existing photo on the step, since a Checkpoint step carries at most
+ * one photo per DATA_MODEL.md §5. */
+export async function uploadCheckpointPhoto(stepId: string, file: File): Promise<UploadCheckpointPhotoResult> {
+  const validation = validatePhotoUpload(file.type, file.size);
+  if (!validation.ok) return validation;
+
+  try {
+    const step = await prisma.systemStep.findUniqueOrThrow({ where: { id: stepId }, include: { system: true } });
+    const blob = await put(`system-checkpoints/${stepId}-${Date.now()}`, file, {
+      access: "public",
+      addRandomSuffix: true,
+    });
+    // The DB write is confirmed durable before the old blob is touched —
+    // if it were the other way around and this update failed, the old
+    // (working) photo would already be gone from storage while the row
+    // still pointed at its now-dead URL. Only once the row points at the
+    // new blob is the old one's deletion safe to attempt (best-effort,
+    // per deleteSystemStep's rationale — an orphan here is a cost, not a
+    // correctness problem, unlike a broken reference would be).
+    await prisma.systemStep.update({ where: { id: stepId }, data: { photoUrl: blob.url } });
+    if (step.photoUrl) {
+      await del(step.photoUrl).catch(() => {});
+    }
+    revalidateSystemPaths(step.system.areaId);
+    return { ok: true, photoUrl: blob.url };
+  } catch {
+    return { ok: false, error: "Couldn't upload the photo — try again." };
+  }
+}
+
+export async function deleteCheckpointPhoto(stepId: string): Promise<ActionResult> {
+  try {
+    const step = await prisma.systemStep.findUniqueOrThrow({ where: { id: stepId }, include: { system: true } });
+    if (step.photoUrl) {
+      await del(step.photoUrl).catch(() => {});
+    }
+    await prisma.systemStep.update({ where: { id: stepId }, data: { photoUrl: null } });
     revalidateSystemPaths(step.system.areaId);
   } catch {
     return { ok: false, error: SAVE_ERROR };

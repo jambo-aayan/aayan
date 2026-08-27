@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import type { SystemType, SystemState } from "@/lib/systems/logic";
-import { expectedOccurrenceDates, classifyOccurrences } from "@/lib/systems/logic";
+import { expectedOccurrenceDates, classifyOccurrences, validatePhotoUpload } from "@/lib/systems/logic";
 import {
   createSystem,
   setSystemState,
@@ -19,6 +19,8 @@ import {
   addRepeatingStep,
   logSystemStepOccurrence,
   deleteSystemStepOccurrence,
+  uploadCheckpointPhoto,
+  deleteCheckpointPhoto,
   linkSystemHabit,
   unlinkSystemHabit,
   linkSystemGoal,
@@ -41,6 +43,8 @@ import {
   streakGrid,
   adherenceBreakdown,
   ratingVsAdherence,
+  photoStrip,
+  thenAndNow,
   type KanbanColumn,
   type MilestoneStep,
 } from "@/lib/systems/widgets";
@@ -56,6 +60,7 @@ export type SystemStepRow = {
   doneOn: Date | null;
   rating: number | null;
   comment: string | null;
+  photoUrl: string | null;
   date: Date | null;
   value: number | null;
   unit: string | null;
@@ -259,6 +264,7 @@ function SystemCard({
   const [captureRating, setCaptureRating] = useState("");
   const [captureComment, setCaptureComment] = useState("");
   const [captureValue, setCaptureValue] = useState("");
+  const [uploadingStepId, setUploadingStepId] = useState<string | null>(null);
   const [backdatingStepId, setBackdatingStepId] = useState<string | null>(null);
   const [backdateValue, setBackdateValue] = useState("");
   const [kanbanView, setKanbanView] = useState(false);
@@ -371,6 +377,7 @@ function SystemCard({
     doneOn: null,
     rating: null,
     comment: null,
+    photoUrl: null,
     date: null,
     value: null,
     unit: null,
@@ -529,6 +536,36 @@ function SystemCard({
     setCapturingStepId(null);
   }
 
+  async function handlePhotoSelect(stepId: string, file: File | undefined) {
+    if (!file) return;
+    const validation = validatePhotoUpload(file.type, file.size);
+    if (!validation.ok) {
+      notifyError(validation.error);
+      return;
+    }
+    setUploadingStepId(stepId);
+    const result = await withRetry(() => uploadCheckpointPhoto(stepId, file));
+    setUploadingStepId(null);
+    if (!result.ok) {
+      notifyError(result.error, { onRetry: () => handlePhotoSelect(stepId, file) });
+      return;
+    }
+    onChange({
+      ...system,
+      steps: system.steps.map((s) => (s.id === stepId ? { ...s, photoUrl: result.photoUrl } : s)),
+    });
+  }
+
+  async function handleDeletePhoto(stepId: string) {
+    const prevSteps = system.steps;
+    onChange({ ...system, steps: system.steps.map((s) => (s.id === stepId ? { ...s, photoUrl: null } : s)) });
+    const result = await withRetry(() => deleteCheckpointPhoto(stepId));
+    if (!result.ok) {
+      onChange({ ...system, steps: prevSteps });
+      notifyError(result.error, { onRetry: () => handleDeletePhoto(stepId) });
+    }
+  }
+
   async function handleBackdate(stepId: string) {
     if (!backdateValue) return;
     const doneOn = new Date(backdateValue);
@@ -606,6 +643,8 @@ function SystemCard({
   }));
   const repeatingSteps = system.steps.filter((s) => s.type === "REPEATING" && s.cadenceDays !== null);
   const scatterHabit = system.linkedHabits.find((h) => h.id === scatterHabitId) ?? system.linkedHabits[0] ?? null;
+  const photos = photoStrip(system.steps);
+  const beforeAfter = thenAndNow(system.steps);
   const scatter = scatterHabit ? ratingVsAdherence(system.steps, scatterHabit.checkInDates) : null;
 
   return (
@@ -713,6 +752,34 @@ function SystemCard({
               at least 3 days on each side of &ldquo;{scatterHabit.name}&rdquo;.
             </p>
           )}
+        </div>
+      )}
+      {photos && (
+        <div className={styles.section}>
+          <div className={styles.sectionLabel}>Photos</div>
+          <div className={styles.photoStrip}>
+            {photos.map((p) => (
+              // eslint-disable-next-line @next/next/no-img-element -- Blob CDN URLs, not a static/local asset
+              <img key={p.url} src={p.url} alt="" className={styles.photoThumb} title={p.date.toISOString().slice(0, 10)} />
+            ))}
+          </div>
+        </div>
+      )}
+      {beforeAfter && (
+        <div className={styles.section}>
+          <div className={styles.sectionLabel}>Then and now</div>
+          <div className={styles.thenAndNow}>
+            <div>
+              <div className={styles.meta}>{beforeAfter.then.date.toISOString().slice(0, 10)}</div>
+              {/* eslint-disable-next-line @next/next/no-img-element -- Blob CDN URLs, not a static/local asset */}
+              <img src={beforeAfter.then.url} alt="Earliest" className={styles.photoThumbLarge} />
+            </div>
+            <div>
+              <div className={styles.meta}>{beforeAfter.now.date.toISOString().slice(0, 10)}</div>
+              {/* eslint-disable-next-line @next/next/no-img-element -- Blob CDN URLs, not a static/local asset */}
+              <img src={beforeAfter.now.url} alt="Latest" className={styles.photoThumbLarge} />
+            </div>
+          </div>
         </div>
       )}
 
@@ -941,6 +1008,34 @@ function SystemCard({
                       <button type="button" className={styles.link} onClick={() => setCapturingStepId(null)}>
                         Skip
                       </button>
+                    </div>
+                  )}
+                  {step.type === "CHECKPOINT" && (
+                    <div className={styles.meta}>
+                      {step.photoUrl ? (
+                        <>
+                          {" "}
+                          · photo attached{" "}
+                          <button type="button" className={styles.link} onClick={() => handleDeletePhoto(step.id)}>
+                            remove
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          {" "}
+                          ·{" "}
+                          <label className={styles.link}>
+                            {uploadingStepId === step.id ? "Uploading…" : "add photo"}
+                            <input
+                              type="file"
+                              accept="image/*"
+                              hidden
+                              disabled={uploadingStepId === step.id}
+                              onChange={(e) => handlePhotoSelect(step.id, e.target.files?.[0])}
+                            />
+                          </label>
+                        </>
+                      )}
                     </div>
                   )}
                   {capturingStepId === step.id && step.type === "MEASURE" && (

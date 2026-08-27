@@ -44,6 +44,23 @@ export function isValidRating(rating: number): boolean {
   return Number.isInteger(rating) && rating >= 1 && rating <= 5;
 }
 
+export const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
+const ALLOWED_PHOTO_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif", "image/heic"]);
+
+/** Client-side and server-side pre-upload check for a Checkpoint photo —
+ * standard image MIME types, 10MB cap. Enforced on both sides: the client
+ * check gives an instant rejection message, the server check is the real
+ * trust boundary (a direct action call bypasses the client). */
+export function validatePhotoUpload(mimeType: string, sizeBytes: number): ValidationResult {
+  if (!ALLOWED_PHOTO_MIME_TYPES.has(mimeType)) {
+    return { ok: false, error: "That doesn't look like an image — try a JPEG, PNG, WebP, GIF, or HEIC." };
+  }
+  if (sizeBytes > MAX_PHOTO_BYTES) {
+    return { ok: false, error: "That photo is too large — keep it under 10MB." };
+  }
+  return { ok: true };
+}
+
 /** A Measure step's value/target must be a real, finite number — guards
  * against a blank or malformed numeric input parsing to NaN and getting
  * silently persisted. */

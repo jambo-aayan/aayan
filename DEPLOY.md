@@ -22,16 +22,30 @@ node -e "console.log(Buffer.from(require('bcryptjs').hashSync(process.argv[1], 1
 
 Copy the output — you'll set it as `APP_PASSWORD_HASH_B64` in Vercel.
 
-## 3. Deploy (Vercel)
+## 3. Photo storage (Vercel Blob)
+
+System Checkpoint step photos are stored in Vercel Blob, not the database.
+
+1. In the Vercel dashboard, open your project → Storage → Create Database →
+   Blob. This provisions a Blob store and, once connected to the project,
+   automatically sets `BLOB_READ_WRITE_TOKEN` as an environment variable —
+   no manual token copying needed.
+2. For local development, run `vercel env pull .env` after connecting the
+   store (or copy `BLOB_READ_WRITE_TOKEN` from the dashboard by hand) so
+   photo uploads work outside of Vercel's own deploys too.
+
+## 4. Deploy (Vercel)
 
 1. Import this repo at [vercel.com/new](https://vercel.com/new). Framework
    preset should auto-detect as Next.js.
 2. In Project Settings → Environment Variables, add:
    - `DATABASE_URL` — the Neon pooled connection string from step 1
    - `APP_PASSWORD_HASH_B64` — the hash from step 2
+   - `BLOB_READ_WRITE_TOKEN` — set automatically once a Blob store is
+     connected (step 3); confirm it's present if uploads don't work.
 3. Deploy.
 
-## 4. Apply the database schema
+## 5. Apply the database schema
 
 After the first deploy (or any schema change), run migrations against the
 Neon database from your local machine:
@@ -40,7 +54,7 @@ Neon database from your local machine:
 DATABASE_URL="<neon connection string>" npx prisma migrate deploy
 ```
 
-## 5. Verify
+## 6. Verify
 
 - Visit the deployed URL — it should redirect to `/login`.
 - Enter the password from step 2 — it should redirect to `/` showing the

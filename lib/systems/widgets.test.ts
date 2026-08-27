@@ -11,7 +11,10 @@ import {
   streakGrid,
   adherenceBreakdown,
   ratingVsAdherence,
+  photoStrip,
+  thenAndNow,
   type RatedStep,
+  type PhotoStep,
   type MilestoneStep,
   type MeasureStep,
 } from "./widgets";
@@ -191,5 +194,38 @@ describe("ratingVsAdherence", () => {
     const result = ratingVsAdherence(steps, habitDates);
     expect(result).not.toBeNull();
     expect(result!.ready).toBe(true);
+  });
+});
+
+function photo(url: string | null, doneOn: string | null): PhotoStep {
+  return { photoUrl: url, doneOn: doneOn ? new Date(doneOn) : null };
+}
+
+describe("photoStrip", () => {
+  it("returns null with no photos", () => {
+    expect(photoStrip([photo(null, "2026-08-01")])).toBeNull();
+  });
+
+  it("returns sorted photo entries once 1+ exist", () => {
+    const result = photoStrip([photo("b.jpg", "2026-08-02"), photo("a.jpg", "2026-08-01")]);
+    expect(result).toEqual([
+      { url: "a.jpg", date: new Date("2026-08-01") },
+      { url: "b.jpg", date: new Date("2026-08-02") },
+    ]);
+  });
+});
+
+describe("thenAndNow", () => {
+  it("returns null below 2 photos", () => {
+    expect(thenAndNow([photo("a.jpg", "2026-08-01")])).toBeNull();
+  });
+
+  it("returns earliest vs latest once 2+ photos exist", () => {
+    const steps = [photo("c.jpg", "2026-08-03"), photo("a.jpg", "2026-08-01"), photo("b.jpg", "2026-08-02")];
+    const result = thenAndNow(steps);
+    expect(result).toEqual({
+      then: { url: "a.jpg", date: new Date("2026-08-01") },
+      now: { url: "c.jpg", date: new Date("2026-08-03") },
+    });
   });
 });

@@ -434,6 +434,9 @@ model SystemStep {
   targetDate DateTime? @db.Date
   rating     Int?
   comment    String?
+  /// A Vercel Blob CDN URL — no binary data in Postgres. Deleting this
+  /// step deletes the Blob object too (see lib/systems/actions.ts).
+  photoUrl   String?
 
   /// Dated milestone only.
   date DateTime? @db.Date

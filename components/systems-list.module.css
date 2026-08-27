@@ -267,6 +267,33 @@
   padding: 0;
 }
 
+.photoStrip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.photoThumb {
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+
+.thenAndNow {
+  display: flex;
+  gap: 16px;
+}
+
+.photoThumbLarge {
+  width: 140px;
+  height: 140px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
 .kanban {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

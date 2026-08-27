@@ -15,6 +15,28 @@ export function ratingTrend(steps: RatedStep[]): RatingPoint[] | null {
   return points.length >= 2 ? points : null;
 }
 
+export type PhotoStep = { photoUrl: string | null; doneOn: Date | null };
+export type PhotoEntry = { url: string; date: Date };
+
+/** Photo strip — appears once a System has 1+ photo. */
+export function photoStrip(steps: PhotoStep[]): PhotoEntry[] | null {
+  const photos = steps
+    .filter((s): s is PhotoStep & { photoUrl: string; doneOn: Date } => s.photoUrl !== null && s.doneOn !== null)
+    .map((s) => ({ url: s.photoUrl, date: s.doneOn }))
+    .sort((a, b) => a.date.getTime() - b.date.getTime());
+  return photos.length > 0 ? photos : null;
+}
+
+export type ThenAndNow = { then: PhotoEntry; now: PhotoEntry };
+
+/** Then-and-now pair (earliest vs latest) — appears once a System has 2+
+ * photos. */
+export function thenAndNow(steps: PhotoStep[]): ThenAndNow | null {
+  const photos = photoStrip(steps);
+  if (!photos || photos.length < 2) return null;
+  return { then: photos[0], now: photos[photos.length - 1] };
+}
+
 export type RatingHistogram = { mean: number; spread: number; counts: Record<number, number> };
 
 /** Rating histogram (mean + spread) — appears once a System has 5+
