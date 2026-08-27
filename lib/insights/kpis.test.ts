@@ -4,12 +4,14 @@ import {
   computeTaskFollowThroughKpi,
   computeGoalVelocityKpi,
   computeSurplusRateKpi,
+  computeSystemsOnTrackKpi,
   buildHabitAdherenceDrillDown,
   buildSurplusRateDrillDown,
   type HabitAdherenceFixture,
   type TaskWithListFixture,
   type GoalActivityFixture,
   type CategorizedTransactionFixture,
+  type ExperimentReviewFixture,
 } from "./kpis";
 
 function d(iso: string): Date {
@@ -91,6 +93,31 @@ describe("computeSurplusRateKpi", () => {
     const result = computeSurplusRateKpi(transactions, d("2026-08-01"), d("2026-08-02"), d("2026-07-30"), d("2026-07-31"));
     expect(result.value).toBeCloseTo(46.7, 1);
     expect(result.diagnosis).toContain("Rent is the biggest drain.");
+  });
+});
+
+describe("computeSystemsOnTrackKpi", () => {
+  it("reports the share of Experiments not overdue for a verdict", () => {
+    const experiments: ExperimentReviewFixture[] = [
+      { id: "e1", name: "Cold showers", review: d("2026-07-01"), verdict: null }, // overdue
+      { id: "e2", name: "No caffeine after noon", review: d("2026-09-01"), verdict: null }, // not due yet
+    ];
+    const result = computeSystemsOnTrackKpi(experiments, d("2026-08-01"), d("2026-08-10"), d("2026-07-22"), d("2026-07-31"));
+    expect(result.value).toBe(50);
+    expect(result.diagnosis).toContain('"Cold showers" needs a verdict.');
+  });
+
+  it("treats a resolved verdict as on track even past the review date", () => {
+    const experiments: ExperimentReviewFixture[] = [{ id: "e1", name: "Cold showers", review: d("2026-07-01"), verdict: "CONTINUE" }];
+    const result = computeSystemsOnTrackKpi(experiments, d("2026-08-01"), d("2026-08-10"), d("2026-07-22"), d("2026-07-31"));
+    expect(result.value).toBe(100);
+    expect(result.diagnosis).toBe("Every active Experiment is on track.");
+  });
+
+  it("reports no active Experiments distinctly from zero on-track", () => {
+    const result = computeSystemsOnTrackKpi([], d("2026-08-01"), d("2026-08-10"), d("2026-07-22"), d("2026-07-31"));
+    expect(result.value).toBe(0);
+    expect(result.diagnosis).toBe("No active Experiments yet.");
   });
 });
 

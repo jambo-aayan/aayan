@@ -15,10 +15,12 @@ import {
   computeTaskFollowThroughKpi,
   computeGoalVelocityKpi,
   computeSurplusRateKpi,
+  computeSystemsOnTrackKpi,
   buildHabitAdherenceDrillDown,
   buildTaskFollowThroughDrillDown,
   buildGoalVelocityDrillDown,
   buildSurplusRateDrillDown,
+  buildSystemsOnTrackDrillDown,
   type KpiResult,
   type DrillDownData,
 } from "./kpis";
@@ -136,6 +138,7 @@ export type KpiSummary = {
   followThrough: KpiWithDrillDown;
   goalVelocity: KpiWithDrillDown;
   surplusRate: KpiWithDrillDown;
+  systemsOnTrack: KpiWithDrillDown;
 };
 
 /** Every KPI computed over the page's actual selected range (and the
@@ -146,7 +149,7 @@ export async function getKpiSummary(range: InsightsRange, asOf: Date = new Date(
   const { current, previous } = insightsWindows(range, asOf);
   const lookbackStart = previous[0];
 
-  const [habits, checkIns, tasks, transactions, goals] = await Promise.all([
+  const [habits, checkIns, tasks, transactions, goals, experiments] = await Promise.all([
     prisma.habit.findMany({
       where: { status: "ACTIVE" },
       select: {
@@ -179,6 +182,10 @@ export async function getKpiSummary(range: InsightsRange, asOf: Date = new Date(
         tasks: { select: { completedAt: true }, where: { completedAt: { not: null } } },
         habits: { select: { habit: { select: { checkIns: { select: { date: true } } } } } },
       },
+    }),
+    prisma.system.findMany({
+      where: { state: "ACTIVE", type: "EXPERIMENT" },
+      select: { id: true, name: true, review: true, verdict: true },
     }),
   ]);
 
@@ -218,6 +225,7 @@ export async function getKpiSummary(range: InsightsRange, asOf: Date = new Date(
   const followThrough = computeTaskFollowThroughKpi(taskFixtures, current[0], current[1], previous[0], previous[1]);
   const goalVelocity = computeGoalVelocityKpi(goalFixtures, current[0], current[1], previous[0], previous[1]);
   const surplusRate = computeSurplusRateKpi(transactionFixtures, current[0], current[1], previous[0], previous[1]);
+  const systemsOnTrack = computeSystemsOnTrackKpi(experiments, current[0], current[1], previous[0], previous[1]);
 
   return {
     adherence: {
@@ -235,6 +243,10 @@ export async function getKpiSummary(range: InsightsRange, asOf: Date = new Date(
     surplusRate: {
       ...surplusRate,
       drillDown: buildSurplusRateDrillDown(transactionFixtures, current[0], current[1], previous[0], previous[1], surplusRate.diagnosis),
+    },
+    systemsOnTrack: {
+      ...systemsOnTrack,
+      drillDown: buildSystemsOnTrackDrillDown(experiments, current[0], current[1], previous[0], previous[1], systemsOnTrack.diagnosis),
     },
   };
 }

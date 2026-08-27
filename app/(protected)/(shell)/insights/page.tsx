@@ -75,6 +75,7 @@ export default async function InsightsPage({
           <KpiCard label="Task follow-through" unit="%" kpi={kpis.followThrough} />
           <KpiCard label="Goal velocity" unit="%" kpi={kpis.goalVelocity} />
           <KpiCard label="Surplus rate" unit="%" kpi={kpis.surplusRate} />
+          <KpiCard label="Systems on track" unit="%" kpi={kpis.systemsOnTrack} />
         </div>
 
         <div className={styles.section}>

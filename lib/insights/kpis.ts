@@ -10,12 +10,14 @@ import {
   type TaskFixture,
   type TransactionFixture,
 } from "./momentum";
+import { isVerdictDue } from "../systems/logic";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const SPARKLINE_BARS = 10;
 const GOAL_VELOCITY_LABEL = "Goal velocity";
+const SYSTEMS_ON_TRACK_LABEL = "Systems on track";
 
-export type KpiKey = "adherence" | "followThrough" | "goalVelocity" | "surplusRate";
+export type KpiKey = "adherence" | "followThrough" | "goalVelocity" | "surplusRate" | "systemsOnTrack";
 
 export type KpiResult = {
   value: number;
@@ -178,11 +180,64 @@ export function computeSurplusRateKpi(
   return { value: round1(value), delta: round1(value - previous), sparkline: sparkline.map(round1), diagnosis };
 }
 
+// --- Systems on track ---
+
+export type ExperimentReviewFixture = {
+  id: string;
+  name: string;
+  review: Date | null;
+  verdict: "CONTINUE" | "ESCALATE" | "STOP" | null;
+};
+
+/** A run is "on track" once it already has a verdict (its review cycle is
+ * resolved) or its review isn't due yet — isVerdictDue (lib/systems/logic.ts)
+ * is the same render-time check Systems' own "Set verdict" prompt uses, so
+ * this KPI never disagrees with what a System's card is showing (#127,
+ * ADR-0011). Experiments only — Processes have no verdict/review cycle to
+ * be "on track" against. */
+function isOnTrack(experiment: ExperimentReviewFixture, asOf: Date): boolean {
+  if (experiment.verdict !== null) return true;
+  return !isVerdictDue(experiment.review, asOf);
+}
+
+/** Unlike the other KPIs (a rate accumulated over a range), "on track" is a
+ * point-in-time status — so the sparkline/delta re-evaluate the same
+ * snapshot check at different `asOf` dates rather than aggregating over
+ * sub-windows. */
+export function computeSystemsOnTrackKpi(
+  experiments: ExperimentReviewFixture[],
+  currentStart: Date,
+  currentEnd: Date,
+  previousStart: Date,
+  previousEnd: Date
+): KpiResult {
+  function onTrackPct(asOf: Date): number {
+    if (experiments.length === 0) return 0;
+    const onTrack = experiments.filter((e) => isOnTrack(e, asOf)).length;
+    return (onTrack / experiments.length) * 100;
+  }
+
+  const value = onTrackPct(currentEnd);
+  const previous = onTrackPct(previousEnd);
+  const sparkline = splitIntoBars(currentStart, currentEnd, SPARKLINE_BARS).map(([, end]) => onTrackPct(end));
+
+  const overdue = experiments.filter((e) => !isOnTrack(e, currentEnd));
+  const diagnosis =
+    experiments.length === 0
+      ? "No active Experiments yet."
+      : overdue.length === 0
+        ? "Every active Experiment is on track."
+        : `${overdue.length} Experiment${overdue.length === 1 ? "" : "s"} overdue for review — "${overdue[0].name}" needs a verdict.`;
+
+  return { value: round1(value), delta: round1(value - previous), sparkline: sparkline.map(round1), diagnosis };
+}
+
 export const KPI_LABEL: Record<KpiKey, string> = {
   adherence: "Habit adherence",
   followThrough: "Task follow-through",
   goalVelocity: GOAL_VELOCITY_LABEL,
   surplusRate: "Surplus rate",
+  systemsOnTrack: SYSTEMS_ON_TRACK_LABEL,
 };
 
 // --- Shared drill-down (opened from any KPI card, and later correlation
@@ -341,6 +396,37 @@ export function buildSurplusRateDrillDown(
     start: currentStart,
     end: currentEnd,
     rangeValue: (s, e) => computeSurplusRate(transactions, s, e),
+    entryLabel: (day) => day.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }),
+    tone: pctTone,
+    writtenRead,
+  });
+}
+
+export function buildSystemsOnTrackDrillDown(
+  experiments: ExperimentReviewFixture[],
+  currentStart: Date,
+  currentEnd: Date,
+  previousStart: Date,
+  previousEnd: Date,
+  writtenRead: string
+): DrillDownData {
+  function onTrackPct(asOf: Date): number {
+    if (experiments.length === 0) return 0;
+    const onTrack = experiments.filter((e) => isOnTrack(e, asOf)).length;
+    return (onTrack / experiments.length) * 100;
+  }
+  return buildDrillDown({
+    kindEyebrow: "KPI breakdown",
+    title: KPI_LABEL.systemsOnTrack,
+    value: onTrackPct(currentEnd),
+    previous: onTrackPct(previousEnd),
+    unit: "%",
+    start: currentStart,
+    end: currentEnd,
+    // Same snapshot-at-a-point framing as computeSystemsOnTrackKpi's
+    // sparkline — a range's "value" here is just onTrack status as of that
+    // range's end date, not an aggregate over the range.
+    rangeValue: (_s, e) => onTrackPct(e),
     entryLabel: (day) => day.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }),
     tone: pctTone,
     writtenRead,
