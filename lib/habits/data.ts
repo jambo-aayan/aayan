@@ -22,6 +22,7 @@ type HabitRow = {
   scheduleType: HabitScheduleType;
   scheduleWeekdays: number[];
   scheduleIntervalN: number | null;
+  scheduleTargetCount: number | null;
   scheduleAnchorDate: Date | null;
   scheduleCustomText: string | null;
   createdAt: Date;

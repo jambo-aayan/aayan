@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { dailyStreak, weeklyStreak, isEstablished } from "@/lib/habits/streak";
+import { streakForHabit, streakUnitLabel, isEstablished } from "@/lib/habits/streak";
 import { formatScheduleLabel, type HabitScheduleType } from "@/lib/habits/schedule";
 import { nextCheckInLevel, type CheckInLevel } from "@/lib/habits/check-in";
+import { HABIT_STATUS_LABEL, type HabitStatus } from "@/lib/habits/status";
 import {
   createHabit,
   updateHabit,
@@ -23,8 +24,6 @@ import styles from "./habits-list.module.css";
 
 const UNDO_WINDOW_MS = 5000;
 
-type HabitStatus = "ACTIVE" | "PAUSED" | "ARCHIVED";
-
 const QUICK_SCHEDULES: HabitScheduleType[] = ["DAILY", "WEEKDAYS", "WEEKLY", "MONTHLY"];
 
 export type AreaHabit = {
@@ -36,12 +35,15 @@ export type AreaHabit = {
   scheduleType: HabitScheduleType;
   scheduleWeekdays: number[];
   scheduleIntervalN: number | null;
+  scheduleTargetCount: number | null;
   checkInDates: Date[];
   todayLevel: CheckInLevel;
 };
 
-function streakFor(habit: AreaHabit): number {
-  return habit.scheduleType === "WEEKLY" ? weeklyStreak(habit.checkInDates) : dailyStreak(habit.checkInDates);
+/** established-badge threshold reuses the WEEKLY frequency for PER_WEEK too
+ * — same 4-consecutive-weeks bar, no separate number invented (ADR-0006). */
+function establishedFrequency(scheduleType: HabitScheduleType): "DAILY" | "WEEKLY" {
+  return scheduleType === "WEEKLY" || scheduleType === "PER_WEEK" ? "WEEKLY" : "DAILY";
 }
 
 const EMPTY_FORM = { name: "", scheduleType: "DAILY" as HabitScheduleType };
@@ -117,6 +119,7 @@ export function HabitsList({
         scheduleType: form.scheduleType,
         scheduleWeekdays: [],
         scheduleIntervalN: null,
+        scheduleTargetCount: null,
         checkInDates: [],
         todayLevel: null,
       },
@@ -195,6 +198,7 @@ export function HabitsList({
         scheduleType: deleted.scheduleType,
         scheduleWeekdays: deleted.scheduleWeekdays,
         scheduleIntervalN: deleted.scheduleIntervalN,
+        scheduleTargetCount: deleted.scheduleTargetCount,
         checkInDates: deleted.checkIns.map((c) => c.date),
         todayLevel:
           deleted.checkIns.find((c) => c.date.getTime() === utcMidnight(new Date()).getTime())?.level ?? null,
@@ -224,13 +228,14 @@ export function HabitsList({
                 <div className={styles.name}>{habit.name}</div>
                 {habit.status === "ACTIVE" ? (
                   <div className={styles.meta}>
-                    {formatScheduleLabel({ ...habit, scheduleAnchorDate: null })} · {streakFor(habit)} day streak
-                    {isEstablished(streakFor(habit), habit.scheduleType === "WEEKLY" ? "WEEKLY" : "DAILY") && (
+                    {formatScheduleLabel({ ...habit, scheduleAnchorDate: null })} · {streakForHabit(habit)}{" "}
+                    {streakUnitLabel(habit.scheduleType)} streak
+                    {isEstablished(streakForHabit(habit), establishedFrequency(habit.scheduleType)) && (
                       <span className={styles.established}>Established</span>
                     )}
                   </div>
                 ) : (
-                  <div className={styles.meta}>{habit.status === "PAUSED" ? "Paused" : "Archived"}</div>
+                  <div className={styles.meta}>{HABIT_STATUS_LABEL[habit.status]}</div>
                 )}
               </div>
               <div className={styles.rowActions}>

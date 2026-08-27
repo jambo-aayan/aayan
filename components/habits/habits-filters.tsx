@@ -1,13 +1,14 @@
 "use client";
 
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
+import { HABIT_STATUS_LABEL } from "@/lib/habits/status";
 import styles from "@/components/tasks/task-filters.module.css";
 
 const STATUSES = [
   { value: "", label: "All statuses" },
-  { value: "ACTIVE", label: "Active" },
-  { value: "PAUSED", label: "Paused" },
-  { value: "ARCHIVED", label: "Archived" },
+  { value: "ACTIVE", label: HABIT_STATUS_LABEL.ACTIVE },
+  { value: "PAUSED", label: HABIT_STATUS_LABEL.PAUSED },
+  { value: "ARCHIVED", label: HABIT_STATUS_LABEL.ARCHIVED },
 ];
 
 export function HabitsFilters({

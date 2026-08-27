@@ -108,6 +108,7 @@ export type DeletedHabit = {
   scheduleType: HabitScheduleType;
   scheduleWeekdays: number[];
   scheduleIntervalN: number | null;
+  scheduleTargetCount: number | null;
   scheduleAnchorDate: Date | null;
   checkIns: { date: Date; level: "FULL" | "MINIMUM" }[];
 };
@@ -143,6 +144,7 @@ export async function deleteHabit(habitId: string): Promise<DeleteHabitResult> {
       scheduleType: result.habit.scheduleType,
       scheduleWeekdays: result.habit.scheduleWeekdays,
       scheduleIntervalN: result.habit.scheduleIntervalN,
+      scheduleTargetCount: result.habit.scheduleTargetCount,
       scheduleAnchorDate: result.habit.scheduleAnchorDate,
       checkIns: result.checkIns.map((c) => ({ date: c.date, level: c.level })),
     },
@@ -163,6 +165,7 @@ export async function restoreHabit(deleted: DeletedHabit): Promise<ActionResult>
           scheduleType: deleted.scheduleType,
           scheduleWeekdays: deleted.scheduleWeekdays,
           scheduleIntervalN: deleted.scheduleIntervalN,
+          scheduleTargetCount: deleted.scheduleTargetCount,
           scheduleAnchorDate: deleted.scheduleAnchorDate,
         },
       });

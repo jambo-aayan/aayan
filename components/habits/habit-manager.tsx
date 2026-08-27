@@ -16,20 +16,16 @@ import {
   type DeletedHabit,
 } from "@/lib/habits/actions";
 import { formatScheduleLabel } from "@/lib/habits/schedule";
-import { dailyStreak, weeklyStreak } from "@/lib/habits/streak";
+import { streakForHabit, streakUnitLabel } from "@/lib/habits/streak";
 import { nextCheckInLevel } from "@/lib/habits/check-in";
+import { HABIT_STATUS_LABEL } from "@/lib/habits/status";
 import { resolveColorHex, type ColorKey } from "@/lib/colors";
 import { HabitDot } from "@/components/habit-dot";
 import { TaskMenu } from "@/components/tasks/task-menu";
 import type { HabitWithRelations } from "@/lib/habits/data";
 import styles from "./habit-manager.module.css";
 
-const STATUS_LABEL: Record<string, string> = { ACTIVE: "Active", PAUSED: "Paused", ARCHIVED: "Archived" };
 const UNDO_WINDOW_MS = 5000;
-
-function streakFor(habit: HabitWithRelations): number {
-  return habit.scheduleType === "WEEKLY" ? weeklyStreak(habit.checkInDates) : dailyStreak(habit.checkInDates);
-}
 
 export function HabitManager({
   habits: initialHabits,
@@ -110,6 +106,7 @@ export function HabitManager({
         scheduleType: deleted.scheduleType,
         scheduleWeekdays: deleted.scheduleWeekdays,
         scheduleIntervalN: deleted.scheduleIntervalN,
+        scheduleTargetCount: deleted.scheduleTargetCount,
         scheduleAnchorDate: deleted.scheduleAnchorDate,
         scheduleCustomText: null,
         createdAt: new Date(),
@@ -195,6 +192,7 @@ export function HabitManager({
           scheduleType: input.scheduleType,
           scheduleWeekdays: input.scheduleWeekdays,
           scheduleIntervalN: input.scheduleIntervalN,
+          scheduleTargetCount: null,
           scheduleAnchorDate: new Date(),
           scheduleCustomText: null,
           createdAt: new Date(),
@@ -254,7 +252,11 @@ export function HabitManager({
                       </span>
                       {habit.areaName && <span className={styles.pillMuted}>{habit.areaName}</span>}
                       <span className={styles.scheduleChip}>{formatScheduleLabel(habit)}</span>
-                      {habit.status === "ACTIVE" && <span className={styles.pillMuted}>{streakFor(habit)} day streak</span>}
+                      {habit.status === "ACTIVE" && (
+                        <span className={styles.pillMuted}>
+                          {streakForHabit(habit)} {streakUnitLabel(habit.scheduleType)} streak
+                        </span>
+                      )}
                       {habit.goals.map((g) => (
                         <span key={g.id} className={styles.goalPill}>
                           {g.isPrimary ? "★ " : ""}
@@ -273,7 +275,7 @@ export function HabitManager({
                         className={`${styles.statusBtn} ${habit.status === s ? styles.statusBtnActive : ""}`}
                         onClick={() => handleStatus(habit, s)}
                       >
-                        {STATUS_LABEL[s]}
+                        {HABIT_STATUS_LABEL[s]}
                       </button>
                     ))}
                   </div>
