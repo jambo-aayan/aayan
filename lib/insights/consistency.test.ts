@@ -96,4 +96,93 @@ describe("computeConsistencyGrid", () => {
     expect(grid.weakestWeekday).toBeNull();
     expect(grid.habitsAbove60).toBe(0);
   });
+
+  it("WEEKLY: due-day count uses doneEarlierThisWeek (strict-before) — a Monday's own check-in doesn't retroactively make the Monday itself non-scheduled", () => {
+    // 2026-08-17 is a Monday. Checked in on Monday only, within a one-week
+    // window: Monday itself is still due as of Monday (nothing logged
+    // earlier that week), so it's scheduled+logged; the rest of the week is
+    // satisfied and not due.
+    const habits: ConsistencyHabitFixture[] = [
+      {
+        id: "h1",
+        name: "Weekly review",
+        schedule: { scheduleType: "WEEKLY", scheduleWeekdays: [], scheduleIntervalN: null, scheduleAnchorDate: null },
+        checkIns: [{ date: d("2026-08-17"), level: "FULL" }],
+      },
+    ];
+    const grid = computeConsistencyGrid(habits, d("2026-08-17"), d("2026-08-23"));
+    expect(grid.rows[0].pct).toBe(100);
+    expect(grid.rows[0].cells[0]).toBe("full"); // Monday itself
+  });
+
+  it("PER_WEEK: pct reflects doneCount/expectedCount, not logged/calendar-days-in-window", () => {
+    // Target 4x/week over a 7-day window: expectedCount = round(7/7*4) = 4.
+    // Logging exactly 4 days should read 100%, not 4/7 ≈ 57%.
+    const habits: ConsistencyHabitFixture[] = [
+      {
+        id: "h1",
+        name: "Strength training",
+        schedule: {
+          scheduleType: "PER_WEEK",
+          scheduleWeekdays: [],
+          scheduleIntervalN: null,
+          scheduleAnchorDate: null,
+          scheduleTargetCount: 4,
+        },
+        checkIns: [
+          { date: d("2026-08-17"), level: "FULL" },
+          { date: d("2026-08-18"), level: "FULL" },
+          { date: d("2026-08-19"), level: "FULL" },
+          { date: d("2026-08-20"), level: "FULL" },
+        ],
+      },
+    ];
+    const grid = computeConsistencyGrid(habits, d("2026-08-17"), d("2026-08-23"));
+    expect(grid.rows[0].pct).toBe(100);
+  });
+
+  it("PER_WEEK: every day is logged-eligible — none render as a miss purely for not being 'due'", () => {
+    const habits: ConsistencyHabitFixture[] = [
+      {
+        id: "h1",
+        name: "Strength training",
+        schedule: {
+          scheduleType: "PER_WEEK",
+          scheduleWeekdays: [],
+          scheduleIntervalN: null,
+          scheduleAnchorDate: null,
+          scheduleTargetCount: 4,
+        },
+        checkIns: [{ date: d("2026-08-19"), level: "FULL" }],
+      },
+    ];
+    const grid = computeConsistencyGrid(habits, d("2026-08-17"), d("2026-08-19"));
+    expect(grid.rows[0].cells).toEqual(["none", "none", "full"]);
+  });
+
+  it("PER_WEEK: logging beyond target still counts toward pct, uncapped in the underlying math", () => {
+    const habits: ConsistencyHabitFixture[] = [
+      {
+        id: "h1",
+        name: "Strength training",
+        schedule: {
+          scheduleType: "PER_WEEK",
+          scheduleWeekdays: [],
+          scheduleIntervalN: null,
+          scheduleAnchorDate: null,
+          scheduleTargetCount: 4,
+        },
+        checkIns: [
+          { date: d("2026-08-17"), level: "FULL" },
+          { date: d("2026-08-18"), level: "FULL" },
+          { date: d("2026-08-19"), level: "FULL" },
+          { date: d("2026-08-20"), level: "FULL" },
+          { date: d("2026-08-21"), level: "FULL" },
+          { date: d("2026-08-22"), level: "FULL" },
+        ],
+      },
+    ];
+    const grid = computeConsistencyGrid(habits, d("2026-08-17"), d("2026-08-23"));
+    expect(grid.rows[0].pct).toBe(150); // 6 done / 4 expected
+  });
 });

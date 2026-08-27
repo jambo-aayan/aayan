@@ -1,5 +1,4 @@
-import { habitOccursOn, type HabitSchedule } from "../habits/schedule";
-import { mondayOf } from "../habits/streak";
+import { habitOccursOn, doneEarlierThisWeek, expectedCount, type HabitSchedule } from "../habits/schedule";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 export const CONSISTENCY_GRID_MAX_DAYS = 28;
@@ -79,23 +78,26 @@ export function computeConsistencyGrid(habits: ConsistencyHabitFixture[], start:
 
   const rows: ConsistencyRow[] = habits.map((habit) => {
     const checkInByDay = new Map(habit.checkIns.map((c) => [dateKey(c.date), c.level]));
+    const checkInDates = habit.checkIns.map((c) => c.date);
 
-    let scheduled = 0;
+    // scheduled (the pct denominator) comes from expectedCount — the
+    // schedule engine's single source of truth (see
+    // docs/adr/0006-v2-phase2-habits-tasks.md) — rather than a second,
+    // separately-accumulated count. For every non-PER_WEEK type this is
+    // identical to summing isScheduled per day below, since expectedCount's
+    // own non-PER_WEEK branch does exactly that; for PER_WEEK it's the
+    // proportional round(days/7 * target) instead of a raw day count.
+    // logged stays a per-day accumulation (not doneCount) because it needs
+    // to preserve MINIMUM's 0.5 partial-credit weighting, which doneCount
+    // — a plain presence count — doesn't model.
+    const scheduled = expectedCount(habit.schedule, days, checkInDates);
+
     let logged = 0;
     const cells: ConsistencyCellState[] = days.map((day) => {
-      const weekStart = mondayOf(day);
-      // Self-inclusive (<=, not <) — deliberately different from
-      // lib/habits/schedule.ts's doneEarlierThisWeek (strict-before), which
-      // isn't wired in here yet (see #84). Reconcile which semantics is
-      // correct before rewiring this call site onto expectedCount/doneCount.
-      const doneThisWeek = habit.checkIns.some(
-        (c) => mondayOf(c.date).getTime() === weekStart.getTime() && c.date.getTime() <= day.getTime()
-      );
-      const isScheduled = habitOccursOn(habit.schedule, day, doneThisWeek);
+      const isScheduled = habitOccursOn(habit.schedule, day, doneEarlierThisWeek(day, checkInDates));
       const level = checkInByDay.get(dateKey(day));
 
       if (isScheduled) {
-        scheduled += 1;
         weekdayScheduled[day.getUTCDay()] += 1;
         if (level === "FULL") {
           logged += 1;

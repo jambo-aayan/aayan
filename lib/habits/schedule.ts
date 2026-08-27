@@ -124,7 +124,7 @@ export function formatScheduleLabel(schedule: HabitSchedule): string {
  * done once this week, then stops" — stops on subsequent days, not
  * simultaneously with the completion that satisfies it).
  */
-function doneEarlierThisWeek(date: Date, loggedDays: Date[]): boolean {
+export function doneEarlierThisWeek(date: Date, loggedDays: Date[]): boolean {
   const weekStart = mondayOf(date).getTime();
   const dayTime = utcMidnight(date).getTime();
   return loggedDays.some((logged) => mondayOf(logged).getTime() === weekStart && utcMidnight(logged).getTime() < dayTime);
