@@ -11,6 +11,9 @@ import { FinanceNorthStarCard } from "@/components/finance-north-star-card";
 import { TransactionsManager } from "@/components/transactions-manager";
 import { ReceivablesList } from "@/components/receivables-list";
 import { CategoryBreakdownView } from "@/components/category-breakdown-view";
+import { SpendDeviationView } from "@/components/spend-deviation-view";
+import { CategoryTrendView } from "@/components/category-trend-view";
+import { RecurringChargesView } from "@/components/recurring-charges-view";
 import { StatRow } from "@/components/finance-dashboard/stat-row";
 import { TrendChart } from "@/components/finance-dashboard/trend-chart";
 import { NorthStarRingCard } from "@/components/finance-dashboard/north-star-ring-card";
@@ -37,12 +40,23 @@ import { getLinkedBanks } from "@/lib/enable-banking/data";
 import { netWorth } from "@/lib/finance/net-worth";
 import { surplus } from "@/lib/finance/baseline-math";
 import { budgetVsActual, categoryBreakdown } from "@/lib/finance/category-breakdown";
+import { categorySpendDeviation, totalSpendDeviation } from "@/lib/finance/spend-deviation";
+import { categoryTimeSeries, detectRecurringCharges } from "@/lib/finance/statements";
 import { goalProgressPercent } from "@/lib/finance/goal-math";
 import { cashFlowTrend } from "@/lib/finance/cash-flow-trend";
 import { netWorthBreakdown } from "@/lib/finance/net-worth-breakdown";
 import { getSystemsForPillar, getHabitOptionsForPillar } from "@/lib/systems/data";
 import { getGoalOptions as getGoalOptionsForPillar } from "@/lib/goals/data";
 import { FINANCE_PILLAR_ID } from "@/lib/finance/pillar-id";
+
+const TREND_MONTHS = 6;
+
+/** The last `count` calendar months, oldest first, ending with `from`'s own
+ * month — plain date arithmetic, not business logic, so it's inlined here
+ * the same way the Statements page inlines its own copy. */
+function lastMonths(from: Date, count: number): Date[] {
+  return Array.from({ length: count }, (_, i) => new Date(Date.UTC(from.getUTCFullYear(), from.getUTCMonth() - (count - 1 - i), 1)));
+}
 
 export default async function FinancesPage({ searchParams }: { searchParams: Promise<{ focus?: string }> }) {
   const { focus } = await searchParams;
@@ -82,6 +96,11 @@ export default async function FinancesPage({ searchParams }: { searchParams: Pro
   const daysInMonth = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + 1, 0)).getUTCDate();
   const daysElapsed = today.getUTCDate();
   const categorySpending = categoryBreakdown(transactions, currentMonth);
+  const spendDeviationCategories = categorySpendDeviation(transactions, currentMonth);
+  const spendDeviationWhole = totalSpendDeviation(transactions, currentMonth);
+  const trendMonths = lastMonths(currentMonth, TREND_MONTHS);
+  const categoryTrend = categoryTimeSeries(transactions, trendMonths);
+  const recurringCharges = detectRecurringCharges(transactions);
   const budgetStatuses = budgetVsActual(transactions, currentMonth, budgets, daysElapsed, daysInMonth);
   const northStarPercent = financeNorthStar.target !== null ? goalProgressPercent(accessible, financeNorthStar.target) : null;
   const trendPoints = cashFlowTrend(transactions);
@@ -163,6 +182,15 @@ export default async function FinancesPage({ searchParams }: { searchParams: Pro
         </Card>
         <Card title="This month by category">
           <CategoryBreakdownView breakdown={categorySpending} />
+        </Card>
+        <Card title="Spend vs. usual">
+          <SpendDeviationView whole={spendDeviationWhole} categories={spendDeviationCategories} />
+        </Card>
+        <Card title="Category trend">
+          <CategoryTrendView months={trendMonths} rows={categoryTrend} />
+        </Card>
+        <Card title="Recurring charges">
+          <RecurringChargesView charges={recurringCharges} />
         </Card>
         <Card title="Budget vs. actual">
           <BudgetVsActual initialStatuses={budgetStatuses} />

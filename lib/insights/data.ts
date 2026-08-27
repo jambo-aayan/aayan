@@ -21,6 +21,8 @@ import {
   buildGoalVelocityDrillDown,
   buildSurplusRateDrillDown,
   buildSystemsOnTrackDrillDown,
+  isOnTrack,
+  type ExperimentReviewFixture,
   type KpiResult,
   type DrillDownData,
 } from "./kpis";
@@ -455,7 +457,7 @@ export async function getCorrelations(range: InsightsRange, asOf: Date = new Dat
   const [start, end] = current;
   const days = eachDayCorr(start, end);
 
-  const [habits, checkIns, tasks, painLogs, transactions, dailyLogs] = await Promise.all([
+  const [habits, checkIns, tasks, painLogs, transactions, dailyLogs, experiments] = await Promise.all([
     prisma.habit.findMany({
       where: { status: "ACTIVE" },
       select: {
@@ -475,6 +477,10 @@ export async function getCorrelations(range: InsightsRange, asOf: Date = new Dat
       select: { date: true, amount: true, direction: true, receivableId: true, goalContributionId: true },
     }),
     prisma.dailyLog.findMany({ where: { date: { gte: start, lte: end } }, select: { date: true, sleepQuality: true, stiffness: true, mood: true } }),
+    prisma.system.findMany({
+      where: { state: "ACTIVE", type: "EXPERIMENT" },
+      select: { id: true, name: true, review: true, verdict: true },
+    }),
   ]);
 
   const habitFixtures = habits.map((h) => ({
@@ -542,11 +548,29 @@ export async function getCorrelations(range: InsightsRange, asOf: Date = new Dat
   const stiffnessByDay = new Map(dailyLogs.map((l) => [dateKeyCorr(l.date), l.stiffness]));
   const sleepVsStiffness = pairedSeries(sleepByDay, new Set(stiffnessByDay.keys()), stiffnessByDay);
 
+  // "On track" is a live snapshot check (isOnTrack, lib/insights/kpis.ts),
+  // re-evaluated per day the same way computeSystemsOnTrackKpi's own
+  // sparkline does — not a historical record of what verdict/review looked
+  // like on that day (#134, ADR-0012). Zero active Experiments produces a
+  // flat 0% series (zero variance), which pearsonCorrelation and
+  // computeCorrelations already drop rather than showing a fabricated
+  // "0% on track" correlation.
+  const experimentFixtures: ExperimentReviewFixture[] = experiments;
+  const systemsOnTrackByDay = new Map(
+    days.map((day) => {
+      const onTrack = experimentFixtures.filter((e) => isOnTrack(e, day)).length;
+      const pct = experimentFixtures.length === 0 ? 0 : (onTrack / experimentFixtures.length) * 100;
+      return [dateKeyCorr(day), pct];
+    })
+  );
+  const systemsOnTrackVsSurplus = pairedSeries(systemsOnTrackByDay, hasTxByDay, surplusByDay);
+
   const pairs: CorrelationPair[] = [
     { id: "adherence-followthrough", labelA: "Habit adherence", labelB: "Task follow-through", ...adherenceVsFollowThrough },
     { id: "adherence-pain", labelA: "Habit adherence", labelB: "Pain level", ...adherenceVsPain },
     { id: "adherence-surplus", labelA: "Habit adherence", labelB: "Daily surplus", ...adherenceVsSurplus },
     { id: "sleep-stiffness", labelA: "Sleep quality", labelB: "Stiffness", ...sleepVsStiffness },
+    { id: "systemsontrack-surplus", labelA: "Systems on track", labelB: "Daily surplus", ...systemsOnTrackVsSurplus },
   ];
 
   // Trained-vs-mood isn't a Pearson pair — "trained" is a boolean per day

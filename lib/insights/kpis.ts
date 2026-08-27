@@ -195,7 +195,7 @@ export type ExperimentReviewFixture = {
  * this KPI never disagrees with what a System's card is showing (#127,
  * ADR-0011). Experiments only — Processes have no verdict/review cycle to
  * be "on track" against. */
-function isOnTrack(experiment: ExperimentReviewFixture, asOf: Date): boolean {
+export function isOnTrack(experiment: ExperimentReviewFixture, asOf: Date): boolean {
   if (experiment.verdict !== null) return true;
   return !isVerdictDue(experiment.review, asOf);
 }
