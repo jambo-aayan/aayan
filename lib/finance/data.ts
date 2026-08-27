@@ -83,6 +83,32 @@ export async function getTransactions() {
   return transactions.map((t) => ({ ...t, amount: t.amount.toNumber() }));
 }
 
+export type FinanceSetupSteps = { baseline: boolean; accounts: boolean; goals: boolean };
+
+/** The Finance-scoped setup checklist's source data (#122, ADR-0010) — a
+ * smaller, Finance-only echo of the app-wide Day One idiom
+ * (lib/onboarding/data.ts's getDayOneStatus). "Baseline set" means a
+ * real figure has been entered, not just that the singleton row exists
+ * (ensureBaselineExists seeds a zeroed row on first visit, same
+ * reasoning as the North Star's own `target !== null` check) — checking
+ * both income and outgoings rather than income alone, since a real £0
+ * monthly income (between jobs, income tracked elsewhere) is a
+ * plausible baseline someone would intentionally enter. */
+export async function getFinanceSetupStatus(): Promise<{ complete: boolean; steps: FinanceSetupSteps }> {
+  await ensureBaselineExists();
+  const [baseline, accountCount, goalCount] = await Promise.all([
+    prisma.baseline.findUnique({ where: { id: BASELINE_ID }, select: { monthlyIncome: true, fixedOutgoings: true } }),
+    prisma.account.count(),
+    prisma.goal.count(),
+  ]);
+  const steps: FinanceSetupSteps = {
+    baseline: (baseline?.monthlyIncome.toNumber() ?? 0) > 0 || (baseline?.fixedOutgoings.toNumber() ?? 0) > 0,
+    accounts: accountCount > 0,
+    goals: goalCount > 0,
+  };
+  return { complete: steps.baseline && steps.accounts && steps.goals, steps };
+}
+
 export async function getReceivables() {
   const receivables = await prisma.receivable.findMany({ orderBy: { openedAt: "desc" } });
   return receivables.map((r) => ({ ...r, amount: r.amount.toNumber() }));

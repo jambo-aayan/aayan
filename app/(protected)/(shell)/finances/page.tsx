@@ -19,6 +19,7 @@ import { BreakdownRingCard } from "@/components/finance-dashboard/breakdown-ring
 import { ActivityTable } from "@/components/finance-dashboard/activity-table";
 import { SystemsList } from "@/components/systems-list";
 import { GoalProgressRings, SurplusSplitCard } from "@/components/financial-plan-section";
+import { FinanceSetupChecklist } from "@/components/finance-setup-checklist";
 import dashboardStyles from "@/components/finance-dashboard/dashboard.module.css";
 import {
   getAccounts,
@@ -28,6 +29,7 @@ import {
   getTransactions,
   getReceivables,
   getUncategorisedTransactions,
+  getFinanceSetupStatus,
 } from "@/lib/finance/data";
 import { getLinkedBanks } from "@/lib/enable-banking/data";
 import { netWorth } from "@/lib/finance/net-worth";
@@ -54,6 +56,7 @@ export default async function FinancesPage({ searchParams }: { searchParams: Pro
     systems,
     systemHabitOptions,
     systemGoalOptions,
+    setupStatus,
   ] = await Promise.all([
     getAccounts(),
     getBaseline(),
@@ -66,6 +69,7 @@ export default async function FinancesPage({ searchParams }: { searchParams: Pro
     getSystemsForPillar(FINANCE_PILLAR_ID),
     getHabitOptionsForPillar(FINANCE_PILLAR_ID),
     getGoalOptionsForPillar(FINANCE_PILLAR_ID),
+    getFinanceSetupStatus(),
   ]);
   const { accessible, total } = netWorth(accounts);
   const monthlySurplus = surplus(baseline.monthlyIncome, baseline.fixedOutgoings);
@@ -83,6 +87,7 @@ export default async function FinancesPage({ searchParams }: { searchParams: Pro
       <PageHeader />
       <div className={pageStyles.content}>
         <PageTitle eyebrow="Pillar" title="Finances" />
+        {!setupStatus.complete && <FinanceSetupChecklist steps={setupStatus.steps} />}
         <StatRow accessible={accessible} total={total} surplus={monthlySurplus} northStarPercent={northStarPercent} />
 
         <div className={dashboardStyles.dashGrid}>
@@ -93,7 +98,7 @@ export default async function FinancesPage({ searchParams }: { searchParams: Pro
           <ActivityTable transactions={transactions} />
         </div>
 
-        <div className={dashboardStyles.divider}>Financial plan</div>
+        <div id="financial-plan" className={dashboardStyles.divider}>Financial plan</div>
 
         <Card title="Goals progress">
           <GoalProgressRings goals={goals} />
@@ -138,7 +143,7 @@ export default async function FinancesPage({ searchParams }: { searchParams: Pro
             actualMonthlyRate={monthlySurplus}
           />
         </Card>
-        <Card title="Baseline">
+        <Card id="baseline" title="Baseline">
           <BaselineForm
             initialIncome={baseline.monthlyIncome}
             initialOutgoings={baseline.fixedOutgoings}
@@ -156,7 +161,7 @@ export default async function FinancesPage({ searchParams }: { searchParams: Pro
         <Card title="Receivables">
           <ReceivablesList initialReceivables={receivables} repaymentCandidates={repaymentCandidates} />
         </Card>
-        <Card title="Accounts">
+        <Card id="accounts" title="Accounts">
           <AccountsManager initialAccounts={accounts} />
         </Card>
         <Card title="Systems">

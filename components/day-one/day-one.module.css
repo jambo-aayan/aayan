@@ -1,3 +1,8 @@
+/* .cards/.card/.badge/.badgeDone/.title/.body/.stateDone/.stateTodo are
+   also imported directly by components/finance-setup-checklist.tsx
+   (#122) for the same checklist-item visual idiom — check that usage
+   before renaming or restructuring those classes. */
+
 .wrap {
   display: flex;
   flex-direction: column;
