@@ -1,0 +1,96 @@
+.ringGrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+.ringItem {
+  text-align: center;
+  width: 110px;
+}
+
+.ringName {
+  font-size: 12px;
+  font-weight: 600;
+  margin-top: 8px;
+}
+
+.ringMeta {
+  font-size: 10.5px;
+  color: var(--muted);
+  margin-top: 1px;
+}
+
+.muted {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.surplusHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.surplusValue {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-top: 1px solid var(--border);
+  gap: 12px;
+  font-size: 13px;
+}
+
+.row:first-child {
+  border-top: none;
+}
+
+.input {
+  width: 100px;
+  padding: 9px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  font-size: 13px;
+  background: var(--bg);
+  color: var(--ink);
+  text-align: right;
+}
+
+.input:focus-visible {
+  border-color: var(--ink);
+}
+
+.surplusFoot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.over {
+  color: var(--danger);
+  font-size: 12.5px;
+}
+
+.error {
+  color: var(--danger);
+  font-size: 12px;
+  margin-top: 8px;
+}

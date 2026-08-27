@@ -14,6 +14,7 @@ import {
 import { useUndoableCrudList, type ActionResult } from "@/lib/hooks/use-undoable-crud-list";
 import { goalProgressPercent, projectedCompletionDate, totalMonthlyContributions, isOvercommitted } from "@/lib/finance/goal-math";
 import { sortGoalsByPriority } from "@/lib/finance/logic";
+import { VEHICLE_LABEL } from "@/lib/finance/goal-vehicle-label";
 import { withRetry } from "@/lib/with-retry";
 import { PrimaryButton } from "@/components/primary-button";
 import { EmptyState } from "@/components/empty-state";
@@ -22,15 +23,6 @@ import styles from "./goals-manager.module.css";
 type ContributionCandidate = { id: string; date: Date; amount: number; category: string };
 
 type Goal = GoalInput & { id: string };
-
-const VEHICLE_LABEL: Record<GoalInput["vehicle"], string> = {
-  EMERGENCY_FUND: "Emergency Fund",
-  LISA: "LISA",
-  PENSION: "Pension",
-  STOCKS_ISA: "Stocks & Shares ISA",
-  CASH_ISA: "Cash ISA",
-  GENERIC: "Generic",
-};
 
 const EMPTY_FORM: GoalInput = { name: "", target: 0, saved: 0, monthlyContribution: 0, vehicle: "GENERIC", priority: 0 };
 

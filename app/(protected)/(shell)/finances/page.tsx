@@ -18,6 +18,7 @@ import { GoalRingsCard } from "@/components/finance-dashboard/goal-rings-card";
 import { BreakdownRingCard } from "@/components/finance-dashboard/breakdown-ring-card";
 import { ActivityTable } from "@/components/finance-dashboard/activity-table";
 import { SystemsList } from "@/components/systems-list";
+import { GoalProgressRings, SurplusSplitCard } from "@/components/financial-plan-section";
 import dashboardStyles from "@/components/finance-dashboard/dashboard.module.css";
 import {
   getAccounts,
@@ -91,6 +92,15 @@ export default async function FinancesPage({ searchParams }: { searchParams: Pro
           <BreakdownRingCard breakdown={assetBreakdown} accessible={accessible} />
           <ActivityTable transactions={transactions} />
         </div>
+
+        <div className={dashboardStyles.divider}>Financial plan</div>
+
+        <Card title="Goals progress">
+          <GoalProgressRings goals={goals} />
+        </Card>
+        <Card title="Split your surplus">
+          <SurplusSplitCard goals={goals} surplus={monthlySurplus} />
+        </Card>
 
         <div className={dashboardStyles.divider}>Manage</div>
 
