@@ -212,14 +212,20 @@ function systemFromDeleted(
       occurrences: occurrencesByStep.get(step.id) ?? [],
     })),
     decisions: deleted.decisions.map((d) => ({ id: d.id, when: d.when, body: d.body })),
-    evaluations: deleted.evaluations.map((e) => ({
-      id: e.id,
-      date: e.date,
-      effectiveness: e.effectiveness,
-      consistency: e.consistency,
-      sustainability: e.sustainability,
-      note: e.note,
-    })),
+    // Most-recent-first, same contract SYSTEM_INCLUDE's evaluations
+    // include normally guarantees — deleted.evaluations came from
+    // deleteSystem's own capture query, which has no such ordering, and
+    // the staleness badge (evaluations[0]) depends on this holding.
+    evaluations: [...deleted.evaluations]
+      .sort((a, b) => b.date.getTime() - a.date.getTime())
+      .map((e) => ({
+        id: e.id,
+        date: e.date,
+        effectiveness: e.effectiveness,
+        consistency: e.consistency,
+        sustainability: e.sustainability,
+        note: e.note,
+      })),
     children: [],
     parentId: s.parentId,
     parent: null,
