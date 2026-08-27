@@ -60,12 +60,20 @@ describe("validateCreateSystemInput", () => {
 });
 
 describe("canSetParent", () => {
-  it("allows setting a parent when the System has no children", () => {
-    expect(canSetParent(false)).toBe(true);
+  it("allows setting a parent when neither System is already nested", () => {
+    expect(canSetParent(false, false)).toBe(true);
   });
 
   it("rejects setting a parent when the System already has children", () => {
-    expect(canSetParent(true)).toBe(false);
+    expect(canSetParent(true, false)).toBe(false);
+  });
+
+  it("rejects nesting under a candidate parent that is itself already a child", () => {
+    expect(canSetParent(false, true)).toBe(false);
+  });
+
+  it("rejects when both conditions hold", () => {
+    expect(canSetParent(true, true)).toBe(false);
   });
 });
 

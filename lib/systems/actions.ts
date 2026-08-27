@@ -140,9 +140,31 @@ export async function duplicateSystem(systemId: string): Promise<DuplicateSystem
 export async function setSystemParent(systemId: string, parentId: string | null): Promise<ActionResult> {
   try {
     if (parentId) {
-      const childCount = await prisma.system.count({ where: { parentId: systemId } });
-      if (!canSetParent(childCount > 0)) {
-        return { ok: false, error: "This System already has children — nesting is capped at one level." };
+      if (parentId === systemId) {
+        return { ok: false, error: "A System can't be its own parent." };
+      }
+      const [child, childCount, candidateParent] = await Promise.all([
+        prisma.system.findUniqueOrThrow({ where: { id: systemId } }),
+        prisma.system.count({ where: { parentId: systemId } }),
+        prisma.system.findUniqueOrThrow({ where: { id: parentId } }),
+      ]);
+      // Nesting is scoped like the System list itself (per Area, or per
+      // Pillar for pillar-level Systems) — otherwise a cross-scope parent
+      // never appears alongside its child in any one list, and the child
+      // silently vanishes from grouped views (groupByParent treats an
+      // out-of-scope parentId as unparented rather than dropping the row,
+      // but the "Inside this"/"Part of" pairing itself would still never
+      // render together anywhere).
+      if (candidateParent.pillarId !== child.pillarId || candidateParent.areaId !== child.areaId) {
+        return { ok: false, error: "A System can only nest under another System in the same Area/Pillar." };
+      }
+      if (!canSetParent(childCount > 0, candidateParent.parentId !== null)) {
+        return {
+          ok: false,
+          error: candidateParent.parentId !== null
+            ? "That System is already nested under another — nesting is capped at one level."
+            : "This System already has children — nesting is capped at one level.",
+        };
       }
     }
     const system = await prisma.system.update({ where: { id: systemId }, data: { parentId } });

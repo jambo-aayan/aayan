@@ -7,6 +7,7 @@ const SYSTEM_INCLUDE = {
     include: { occurrences: { orderBy: { occurredOn: "asc" as const } } },
   },
   children: { select: { id: true, name: true, state: true } },
+  parent: { select: { id: true, name: true } },
   decisions: { orderBy: { when: "desc" as const } },
   habits: {
     include: {
@@ -39,13 +40,35 @@ function mapSystem(row: RawSystem) {
 
 export type SystemWithSteps = ReturnType<typeof mapSystem>;
 
+/** Children sort immediately after their parent rather than wherever
+ * createdAt puts them — a parent's "Inside this" list and a child's own
+ * card should read together, not scattered through the list by age. */
+function groupByParent<T extends { id: string; parentId: string | null }>(systems: T[]): T[] {
+  const ids = new Set(systems.map((s) => s.id));
+  const byParent = new Map<string | null, T[]>();
+  for (const system of systems) {
+    // A parentId pointing outside this result set (nesting is meant to be
+    // same-scope, but nothing in the schema enforces that) is treated as
+    // unparented here rather than silently dropped — every system in the
+    // input always appears somewhere in the output.
+    const key = system.parentId !== null && ids.has(system.parentId) ? system.parentId : null;
+    if (!byParent.has(key)) byParent.set(key, []);
+    byParent.get(key)!.push(system);
+  }
+  const ordered: T[] = [];
+  for (const system of byParent.get(null) ?? []) {
+    ordered.push(system, ...(byParent.get(system.id) ?? []));
+  }
+  return ordered;
+}
+
 export async function getSystemsForArea(areaId: string) {
   const systems = await prisma.system.findMany({
     where: { areaId, templateId: null },
     include: SYSTEM_INCLUDE,
     orderBy: { createdAt: "asc" },
   });
-  return systems.map(mapSystem);
+  return groupByParent(systems.map(mapSystem));
 }
 
 export async function getSystemsForPillar(pillarId: string) {
@@ -54,7 +77,7 @@ export async function getSystemsForPillar(pillarId: string) {
     include: SYSTEM_INCLUDE,
     orderBy: { createdAt: "asc" },
   });
-  return systems.map(mapSystem);
+  return groupByParent(systems.map(mapSystem));
 }
 
 export async function getSystem(id: string) {

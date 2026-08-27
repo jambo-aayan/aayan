@@ -8,6 +8,7 @@ import {
   createSystem,
   setSystemState,
   setSystemSequential,
+  setSystemParent,
   updateSystemReference,
   duplicateSystem,
   addChecklistStep,
@@ -87,6 +88,8 @@ export type AreaSystem = {
   steps: SystemStepRow[];
   decisions: SystemDecisionRow[];
   children: { id: string; name: string; state: SystemState }[];
+  parentId: string | null;
+  parent: { id: string; name: string } | null;
   linkedHabits: LinkedHabit[];
   linkedGoals: LinkedGoal[];
 };
@@ -159,6 +162,8 @@ export function SystemsList({
         steps: [],
         decisions: [],
         children: [],
+        parentId: null,
+        parent: null,
         linkedHabits: [],
         linkedGoals: [],
       },
@@ -176,6 +181,7 @@ export function SystemsList({
           system={system}
           habitOptions={habitOptions}
           goalOptions={goalOptions}
+          parentOptions={systems.filter((s) => s.id !== system.id && s.parentId === null)}
           onChange={(next) => setSystems((prev) => prev.map((s) => (s.id === system.id ? next : s)))}
         />
       ))}
@@ -237,11 +243,13 @@ function SystemCard({
   onChange,
   habitOptions,
   goalOptions,
+  parentOptions,
 }: {
   system: AreaSystem;
   onChange: (next: AreaSystem) => void;
   habitOptions: { id: string; name: string }[];
   goalOptions: { id: string; name: string }[];
+  parentOptions: { id: string; name: string }[];
 }) {
   const [stepText, setStepText] = useState("");
   const [stepType, setStepType] = useState<"CHECKLIST" | "CHECKPOINT" | "MILESTONE" | "MEASURE" | "REPEATING">(
@@ -271,6 +279,17 @@ function SystemCard({
   const [scatterHabitId, setScatterHabitId] = useState<string | null>(null);
   const [now] = useState(() => new Date());
   const { notifyError } = useToast();
+
+  async function handleSetParent(parentId: string) {
+    const prev = { parentId: system.parentId, parent: system.parent };
+    const option = parentId ? parentOptions.find((p) => p.id === parentId) ?? null : null;
+    onChange({ ...system, parentId: parentId || null, parent: option ? { id: option.id, name: option.name } : null });
+    const result = await withRetry(() => setSystemParent(system.id, parentId || null));
+    if (!result.ok) {
+      onChange({ ...system, ...prev });
+      notifyError(result.error, { onRetry: () => handleSetParent(parentId) });
+    }
+  }
 
   async function handleToggleSequential() {
     const next = !system.sequential;
@@ -648,10 +667,23 @@ function SystemCard({
   const scatter = scatterHabit ? ratingVsAdherence(system.steps, scatterHabit.checkInDates) : null;
 
   return (
-    <div className={styles.systemCard}>
+    <div className={styles.systemCard} id={`system-${system.id}`}>
+      {system.parent && (
+        <a href={`#system-${system.parent.id}`} className={styles.insideThis}>
+          Part of {system.parent.name}
+        </a>
+      )}
       {system.children.length > 0 && (
         <div className={styles.insideThis}>
-          Inside this: {system.children.map((c) => `${c.name} (${c.state})`).join(", ")}
+          Inside this:{" "}
+          {system.children.map((c, i) => (
+            <span key={c.id}>
+              {i > 0 && ", "}
+              <a href={`#system-${c.id}`}>
+                {c.name} ({c.state})
+              </a>
+            </span>
+          ))}
         </div>
       )}
       <div className={styles.header}>
@@ -672,6 +704,20 @@ function SystemCard({
         <button type="button" className={styles.link} onClick={handleToggleSequential}>
           {system.sequential ? "Sequential ✓" : "Make sequential"}
         </button>
+        {system.children.length === 0 && parentOptions.length > 0 && (
+          <select
+            className={styles.statePill}
+            value={system.parentId ?? ""}
+            onChange={(e) => handleSetParent(e.target.value)}
+          >
+            <option value="">Not nested</option>
+            {parentOptions.map((p) => (
+              <option key={p.id} value={p.id}>
+                Part of {p.name}
+              </option>
+            ))}
+          </select>
+        )}
       </div>
       <div className={styles.name}>{system.name}</div>
       {system.body && <p className={styles.body}>{system.body}</p>}

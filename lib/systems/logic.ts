@@ -24,9 +24,14 @@ export function validateCreateSystemInput(input: CreateSystemInput): ValidationR
 }
 
 /** Nesting is capped at one level (ADR-0008): a System that already has
- * children cannot itself be given a parentId. */
-export function canSetParent(hasChildren: boolean): boolean {
-  return !hasChildren;
+ * children cannot itself be given a parentId (it would become both a
+ * parent and a child), and a System cannot be nested under a candidate
+ * parent that is itself already a child (that would create a
+ * grandparent -> parent -> child chain, two levels deep). Both checks
+ * are needed — checking only the first still lets a child-of-A become a
+ * parent-of-B, silently building the second level from the other end. */
+export function canSetParent(hasChildren: boolean, candidateParentHasParent: boolean): boolean {
+  return !hasChildren && !candidateParentHasParent;
 }
 
 /** Any completed step supports backdating: ticking stamps today, a
