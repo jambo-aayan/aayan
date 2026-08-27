@@ -14,6 +14,7 @@ const SYSTEM_INCLUDE = {
     include: { steps: { select: { rating: true, done: true } } },
   },
   decisions: { orderBy: { when: "desc" as const } },
+  evaluations: { orderBy: { date: "desc" as const } },
   habits: {
     include: {
       habit: { select: { id: true, name: true, status: true, checkIns: { select: { date: true } } } },
@@ -88,6 +89,13 @@ export async function getSystemsForPillar(pillarId: string) {
 export async function getSystem(id: string) {
   const system = await prisma.system.findUnique({ where: { id }, include: SYSTEM_INCLUDE });
   return system ? mapSystem(system) : null;
+}
+
+/** A System's full evaluation history, most recent first — the System
+ * card's trend view and the "last entry" staleness check both read off
+ * this same ordering. */
+export async function getSystemEvaluations(systemId: string) {
+  return prisma.systemEvaluation.findMany({ where: { systemId }, orderBy: { date: "desc" } });
 }
 
 /** Habits within the System's own Pillar — a System only serves Habits it

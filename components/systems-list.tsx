@@ -35,7 +35,9 @@ import {
   backdateSystemStep,
   deleteSystemStep,
   addSystemDecision,
+  logSystemEvaluation,
 } from "@/lib/systems/actions";
+import { evaluationScore } from "@/lib/systems/evaluation";
 import {
   ratingTrend,
   ratingHistogram,
@@ -81,6 +83,14 @@ export type SystemStepRow = {
   occurrences: { id: string; occurredOn: Date }[];
 };
 export type SystemDecisionRow = { id: string; when: Date; body: string };
+export type SystemEvaluationRow = {
+  id: string;
+  date: Date;
+  effectiveness: number;
+  consistency: number;
+  sustainability: number;
+  note: string | null;
+};
 export type LinkedHabit = { id: string; name: string; status: string; checkInDates: Date[] };
 export type LinkedGoal = { id: string; name: string; status: string };
 export type RunRow = {
@@ -115,6 +125,7 @@ export type AreaSystem = {
   verdict: "CONTINUE" | "ESCALATE" | "STOP" | null;
   steps: SystemStepRow[];
   decisions: SystemDecisionRow[];
+  evaluations: SystemEvaluationRow[];
   children: { id: string; name: string; state: SystemState }[];
   parentId: string | null;
   parent: { id: string; name: string } | null;
@@ -207,6 +218,7 @@ export function SystemsList({
         verdict: null,
         steps: [],
         decisions: [],
+        evaluations: [],
         children: [],
         parentId: null,
         parent: null,
@@ -326,6 +338,12 @@ function SystemCard({
   const [stepEndValue, setStepEndValue] = useState("4");
   const [occurrenceDates, setOccurrenceDates] = useState<Record<string, string>>({});
   const [decisionText, setDecisionText] = useState("");
+  const [evalEffectiveness, setEvalEffectiveness] = useState("3");
+  const [evalConsistency, setEvalConsistency] = useState("3");
+  const [evalSustainability, setEvalSustainability] = useState("3");
+  const [evalNote, setEvalNote] = useState("");
+  const [loggingEval, setLoggingEval] = useState(false);
+  const [evalError, setEvalError] = useState<string | null>(null);
   const [referenceDraft, setReferenceDraft] = useState(system.reference ?? "");
   const [editingReference, setEditingReference] = useState(false);
   const [editingStepId, setEditingStepId] = useState<string | null>(null);
@@ -787,6 +805,29 @@ function SystemCard({
     setDecisionText("");
   }
 
+  async function handleLogEvaluation() {
+    const effectiveness = Number(evalEffectiveness);
+    const consistency = Number(evalConsistency);
+    const sustainability = Number(evalSustainability);
+    const date = new Date();
+    const note = evalNote.trim() || null;
+
+    setLoggingEval(true);
+    setEvalError(null);
+    const result = await withRetry(() => logSystemEvaluation(system.id, { date, effectiveness, consistency, sustainability, note }));
+    setLoggingEval(false);
+    if (!result.ok) {
+      setEvalError(result.error);
+      notifyError(result.error, { onRetry: handleLogEvaluation });
+      return;
+    }
+    onChange({
+      ...system,
+      evaluations: [{ id: result.id, date, effectiveness, consistency, sustainability, note }, ...system.evaluations],
+    });
+    setEvalNote("");
+  }
+
   const note = STATE_NOTE[system.state];
   const ratingTrendData = ratingTrend(system.steps);
   const histogram = ratingHistogram(system.steps);
@@ -1185,6 +1226,65 @@ function SystemCard({
             + Log a decision
           </button>
         </div>
+      </div>
+
+      <div className={styles.section}>
+        <div className={styles.sectionLabel}>Evaluation</div>
+        {system.evaluations.length > 0 && (
+          <ul className={styles.stepList}>
+            {system.evaluations.map((e) => (
+              <li key={e.id} className={styles.stepRow}>
+                <span>{e.date.toISOString().slice(0, 10)}</span>
+                <span>
+                  {evaluationScore(e).toFixed(1)} overall (E {e.effectiveness} · C {e.consistency} · S {e.sustainability})
+                  {e.note ? ` — ${e.note}` : ""}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+        <div className={styles.addForm}>
+          <label>
+            Effectiveness
+            <select value={evalEffectiveness} onChange={(e) => setEvalEffectiveness(e.target.value)}>
+              {[1, 2, 3, 4, 5].map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Consistency
+            <select value={evalConsistency} onChange={(e) => setEvalConsistency(e.target.value)}>
+              {[1, 2, 3, 4, 5].map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Sustainability
+            <select value={evalSustainability} onChange={(e) => setEvalSustainability(e.target.value)}>
+              {[1, 2, 3, 4, 5].map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </select>
+          </label>
+          <input
+            className={styles.input}
+            placeholder="Note (optional)"
+            value={evalNote}
+            onChange={(e) => setEvalNote(e.target.value)}
+          />
+          <button type="button" className={styles.link} onClick={handleLogEvaluation} disabled={loggingEval}>
+            + Log evaluation
+          </button>
+        </div>
+        {evalError && <p className={styles.error}>{evalError}</p>}
       </div>
 
       {ratingTrendData && (

@@ -429,15 +429,40 @@ model System {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  steps     SystemStep[]
-  decisions SystemDecision[]
-  habits    SystemHabit[]
-  goals     SystemGoal[]
+  steps       SystemStep[]
+  decisions   SystemDecision[]
+  habits      SystemHabit[]
+  goals       SystemGoal[]
+  evaluations SystemEvaluation[]
 
   @@index([pillarId])
   @@index([areaId])
   @@index([templateId])
   @@index([parentId])
+}
+
+/// A dated "how is this actually going, right now" log entry, independent
+/// of a Process's runOutcome/runEnd or an Experiment's verdict — both of
+/// those are end-of-run judgments, this is an ongoing signal loggable at
+/// any time on a System in any state (docs/adr/0011-v2-phase6-insights.md
+/// §"System evaluation"). Three required 1-5 ratings, never blended into
+/// one stored score — the overall score is always computed at read time
+/// (lib/systems/evaluation.ts) from the three, so a UI change to how the
+/// average is presented never requires a backfill.
+model SystemEvaluation {
+  id       String   @id @default(cuid())
+  systemId String
+  system   System   @relation(fields: [systemId], references: [id], onDelete: Cascade)
+  date     DateTime @db.Date
+
+  effectiveness  Int
+  consistency    Int
+  sustainability Int
+  note           String?
+
+  createdAt DateTime @default(now())
+
+  @@index([systemId])
 }
 
 /// One polymorphic table for all five step types (DATA_MODEL.md §5) —

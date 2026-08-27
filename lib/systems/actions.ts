@@ -736,3 +736,45 @@ export async function backdateSystemStep(stepId: string, doneOn: Date): Promise<
   }
   return { ok: true };
 }
+
+export type LogSystemEvaluationInput = {
+  date: Date;
+  effectiveness: number;
+  consistency: number;
+  sustainability: number;
+  note: string | null;
+};
+
+export type LogSystemEvaluationResult = { ok: true; id: string } | { ok: false; error: string };
+
+/** Loggable on a System in any state (standalone, template, or run;
+ * Process or Experiment) — entirely independent of a Process's
+ * runOutcome/runEnd or an Experiment's verdict, so this never touches
+ * either (docs/adr/0011-v2-phase6-insights.md). */
+export async function logSystemEvaluation(systemId: string, input: LogSystemEvaluationInput): Promise<LogSystemEvaluationResult> {
+  for (const [label, value] of [
+    ["Effectiveness", input.effectiveness],
+    ["Consistency", input.consistency],
+    ["Sustainability", input.sustainability],
+  ] as const) {
+    if (!isValidRating(value)) return { ok: false, error: `${label} must be 1-5.` };
+  }
+
+  try {
+    const system = await prisma.system.findUniqueOrThrow({ where: { id: systemId } });
+    const entry = await prisma.systemEvaluation.create({
+      data: {
+        systemId,
+        date: input.date,
+        effectiveness: input.effectiveness,
+        consistency: input.consistency,
+        sustainability: input.sustainability,
+        note: input.note?.trim() || null,
+      },
+    });
+    revalidateSystemPaths(system.areaId);
+    return { ok: true, id: entry.id };
+  } catch {
+    return { ok: false, error: SAVE_ERROR };
+  }
+}
