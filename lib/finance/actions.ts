@@ -166,7 +166,12 @@ export async function uploadStatement(accountId: string, file: File): Promise<Up
       importedCount: parsed.length,
       heldCount: parsed.filter((t) => isHeldForReview(t.confidence)).length,
     };
-  } catch {
+  } catch (error) {
+    // Logged (not just swallowed) so a real failure — a missing Blob token,
+    // a Gemini/API error, a DB write error — shows up in Vercel's runtime
+    // logs instead of leaving every cause indistinguishable behind the
+    // same generic message shown to the user.
+    console.error("uploadStatement failed", error);
     return { ok: false, error: "Couldn't upload or parse the statement — try again." };
   }
 }
@@ -216,7 +221,8 @@ export async function uploadValuationStatement(
 
     revalidatePath("/finances");
     return { ok: true, balance: parsed.balance, held: isHeldForReview(parsed.confidence) };
-  } catch {
+  } catch (error) {
+    console.error("uploadValuationStatement failed", error);
     return { ok: false, error: "Couldn't upload or parse the statement — try again." };
   }
 }
