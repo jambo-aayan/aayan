@@ -16,6 +16,18 @@ export type ParsedValuation = {
   confidence: number;
 };
 
+/** A statement's own stated closing balance, alongside its transaction
+ * lines — the ground truth uploadStatement anchors the new Snapshot's
+ * balance to, instead of a computed running total that has no way to
+ * recover from a wrong starting point (the account's balance before its
+ * very first statement upload). Null when the statement doesn't state one
+ * (e.g. some CSV exports), so callers can fall back to the computed delta
+ * the same way they always have. */
+export type ParsedStatement = {
+  transactions: ParsedTransaction[];
+  closingBalance: number | null;
+};
+
 const TRANSACTIONS_SCHEMA = {
   type: Type.OBJECT,
   properties: {
@@ -37,6 +49,11 @@ const TRANSACTIONS_SCHEMA = {
         required: ["date", "amount", "direction", "description", "category", "confidence"],
       },
     },
+    closingBalance: {
+      type: Type.NUMBER,
+      description: "The statement's own stated closing/ending balance, if shown. Omit entirely if the statement doesn't state one.",
+      nullable: true,
+    },
   },
   required: ["transactions"],
 };
@@ -47,7 +64,9 @@ const TRANSACTIONS_PROMPT =
   "use direction to encode whether money came in or went out. Give each transaction its own " +
   "confidence score reflecting how sure you are the date, amount, direction, and category are " +
   "all correct — lower it for handwritten-looking, smudged, ambiguous, or unclear entries rather " +
-  "than guessing high.";
+  "than guessing high. Separately, if the statement states its own closing/ending balance, extract " +
+  "that too — this is the account's real balance and takes priority over summing transactions. " +
+  "Leave it out if the statement doesn't state a balance.";
 
 const VALUATION_SCHEMA = {
   type: Type.OBJECT,
@@ -80,12 +99,13 @@ function buildContents(fileBuffer: Buffer, mimeType: string, prompt: string) {
   ];
 }
 
-/** Parses a bank statement (PDF or CSV) into dated transactions via Gemini
- * 2.5 Flash, sent as direct file input against a structured schema — no
+/** Parses a bank statement (PDF or CSV) into dated transactions plus, when
+ * the statement states one, its own closing balance — via Gemini 2.5
+ * Flash, sent as direct file input against a structured schema — no
  * hand-written per-bank heuristics, no mocked parsing (#115, ADR-0010).
  * Integration-level: not unit tested directly, per ADR-0010 and #112's
  * Testing Decisions — verified via typecheck and manual review. */
-export async function parseStatement(fileBuffer: Buffer, mimeType: string): Promise<ParsedTransaction[]> {
+export async function parseStatement(fileBuffer: Buffer, mimeType: string): Promise<ParsedStatement> {
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
   const response = await ai.models.generateContent({
     model: "gemini-2.5-flash",
@@ -93,8 +113,11 @@ export async function parseStatement(fileBuffer: Buffer, mimeType: string): Prom
     config: { responseMimeType: "application/json", responseSchema: TRANSACTIONS_SCHEMA },
   });
 
-  const parsed = JSON.parse(response.text ?? "{}") as { transactions?: ParsedTransaction[] };
-  return parsed.transactions ?? [];
+  const parsed = JSON.parse(response.text ?? "{}") as Partial<ParsedStatement>;
+  return {
+    transactions: parsed.transactions ?? [],
+    closingBalance: parsed.closingBalance ?? null,
+  };
 }
 
 /** Parses a Valuation account's statement (PDF or CSV) for its single

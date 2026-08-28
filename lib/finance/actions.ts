@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { put } from "@vercel/blob";
 import { prisma } from "@/lib/prisma";
 import { BASELINE_ID } from "./baseline-id";
-import { canReclassifyTransaction, isHeldForReview, netTransactionAmount, validateStatementUpload } from "./logic";
+import { canReclassifyTransaction, isHeldForReview, resolveStatementBalance, validateStatementUpload } from "./logic";
 import { FINANCE_NORTH_STAR_ID } from "./north-star-id";
 import { parseStatement, parseValuation } from "./statement-parser";
 
@@ -108,9 +108,10 @@ export type UploadStatementResult =
  * the file in Vercel Blob (referenced from the new Snapshot, not
  * discarded), and parses it via Gemini 2.5 Flash into dated Transactions
  * linked to the account (#115, ADR-0010). The new Snapshot's balance
- * carries the account's prior balance forward plus the net of the newly
- * parsed transactions — the statement doesn't separately state a closing
- * balance in this ticket's scope. */
+ * prefers the statement's own stated closing balance when it has one —
+ * carrying the account's prior balance forward plus the net of the newly
+ * parsed transactions is only a fallback for a statement that doesn't
+ * state a balance at all (resolveStatementBalance, lib/finance/logic.ts). */
 export async function uploadStatement(accountId: string, file: File): Promise<UploadStatementResult> {
   const validation = validateStatementUpload(file.type, file.size);
   if (!validation.ok) return validation;
@@ -131,24 +132,24 @@ export async function uploadStatement(accountId: string, file: File): Promise<Up
     });
 
     const fileBuffer = Buffer.from(await file.arrayBuffer());
-    const parsed = await parseStatement(fileBuffer, file.type);
+    const { transactions, closingBalance } = await parseStatement(fileBuffer, file.type);
     // Distinguish "nothing to import" from a successful zero-transaction
     // parse — an empty Gemini response (blocked, safety-filtered, no
     // candidate) shouldn't silently write a same-balance Snapshot and
     // report a misleading "Imported 0 transactions" success.
-    if (parsed.length === 0) {
+    if (transactions.length === 0) {
       return { ok: false, error: "Couldn't find any transactions in that statement — try again." };
     }
 
     const previousBalance = account.snapshots[0]?.balance.toNumber() ?? 0;
-    const newBalance = previousBalance + netTransactionAmount(parsed);
+    const newBalance = resolveStatementBalance(previousBalance, transactions, closingBalance);
 
     await prisma.$transaction([
       prisma.snapshot.create({
         data: { accountId, date: new Date(), balance: newBalance, sourceFileUrl: blob.url },
       }),
       prisma.transaction.createMany({
-        data: parsed.map((t) => ({
+        data: transactions.map((t) => ({
           date: new Date(t.date),
           amount: t.amount,
           direction: t.direction,
@@ -163,8 +164,8 @@ export async function uploadStatement(accountId: string, file: File): Promise<Up
     revalidatePath("/finances");
     return {
       ok: true,
-      importedCount: parsed.length,
-      heldCount: parsed.filter((t) => isHeldForReview(t.confidence)).length,
+      importedCount: transactions.length,
+      heldCount: transactions.filter((t) => isHeldForReview(t.confidence)).length,
     };
   } catch (error) {
     // Logged (not just swallowed) so a real failure — a missing Blob token,

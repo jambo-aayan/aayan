@@ -65,9 +65,25 @@ export function validateStatementUpload(mimeType: string, sizeBytes: number): Va
 export type SignedAmount = { amount: number; direction: "IN" | "OUT" };
 
 /** The net effect of a batch of parsed transactions on an account's
- * balance — IN adds, OUT subtracts. Used to derive the Snapshot balance a
- * statement upload creates, carrying the account's prior balance forward
- * plus whatever the newly parsed transactions moved (#115, ADR-0010). */
+ * balance — IN adds, OUT subtracts (#115, ADR-0010). Only a fallback input
+ * to resolveStatementBalance below, for a statement that doesn't state its
+ * own closing balance — not itself the source of truth for a Snapshot's
+ * balance. */
 export function netTransactionAmount(transactions: SignedAmount[]): number {
   return transactions.reduce((sum, t) => sum + (t.direction === "IN" ? t.amount : -t.amount), 0);
+}
+
+/** The Snapshot balance a statement upload creates. Prefers the statement's
+ * own stated closing balance (ground truth) over the computed running
+ * total — a computed total can never recover from a wrong starting point
+ * (e.g. the account's balance before its very first statement upload), so
+ * every subsequent upload would otherwise carry that error forward
+ * indefinitely. Falls back to the computed delta only when the statement
+ * doesn't state a balance at all (e.g. some CSV exports). */
+export function resolveStatementBalance(
+  previousBalance: number,
+  transactions: SignedAmount[],
+  closingBalance: number | null
+): number {
+  return closingBalance ?? previousBalance + netTransactionAmount(transactions);
 }
