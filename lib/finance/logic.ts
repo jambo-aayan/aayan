@@ -78,7 +78,7 @@ export type RankableTransaction = { id: string; accountId: string | null; direct
  * closest absolute amount difference first and capped at
  * TRANSFER_CANDIDATE_MAX — the user still picks, this just surfaces the
  * likeliest options first. */
-export function rankTransferCandidates(target: RankableTransaction, candidates: RankableTransaction[]): RankableTransaction[] {
+export function rankTransferCandidates<T extends RankableTransaction>(target: RankableTransaction, candidates: T[]): T[] {
   const windowMs = TRANSFER_CANDIDATE_WINDOW_DAYS * 24 * 60 * 60 * 1000;
   return candidates
     .filter((c) => c.id !== target.id && canLinkTransfer(target, c))

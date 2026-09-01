@@ -4,6 +4,7 @@ import { useState } from "react";
 import { linkTransfer } from "@/lib/finance/actions";
 import { rankTransferCandidates, canLinkTransfer, type RankableTransaction } from "@/lib/finance/logic";
 import { withRetry } from "@/lib/with-retry";
+import { PrimaryButton } from "@/components/primary-button";
 import styles from "./link-transfer-form.module.css";
 
 function formatGBP(value: number): string {
@@ -67,7 +68,7 @@ export function LinkTransferForm({
         <ul className={styles.suggestions}>
           {suggested.map((c) => (
             <li key={c.id} className={styles.suggestion}>
-              <span>{candidateLabel(c as Candidate)}</span>
+              <span>{candidateLabel(c)}</span>
               <button type="button" className={styles.link} disabled={saving} onClick={() => handleLink(c.id)}>
                 Link
               </button>
@@ -92,9 +93,9 @@ export function LinkTransferForm({
             </option>
           ))}
         </select>
-        <button type="button" className={styles.link} disabled={saving || !selectedId} onClick={() => handleLink(selectedId)}>
-          Link
-        </button>
+        <PrimaryButton onClick={() => handleLink(selectedId)} disabled={saving || !selectedId}>
+          {saving ? "Linking…" : "Link"}
+        </PrimaryButton>
         <button type="button" className={styles.link} onClick={onCancel}>
           Cancel
         </button>

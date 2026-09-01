@@ -366,7 +366,7 @@ export async function logGoalContribution(
     }
 
     const contribution = await prisma.goalContribution.create({ data: { goalId, date, amount, note } });
-    if (transactionId !== null && !(await claimTransaction(transactionId, { goalContributionId: contribution.id }))) {
+    if (transactionId !== null && !(await claimTransaction(prisma, transactionId, { goalContributionId: contribution.id }))) {
       await prisma.goalContribution.delete({ where: { id: contribution.id } });
       return { ok: false, error: ALREADY_LINKED_ERROR };
     }
@@ -396,7 +396,7 @@ export async function flagAsGoalContribution(
     const contribution = await prisma.goalContribution.create({
       data: { goalId, date: transaction.date, amount, note },
     });
-    if (!(await claimTransaction(transactionId, { goalContributionId: contribution.id }))) {
+    if (!(await claimTransaction(prisma, transactionId, { goalContributionId: contribution.id }))) {
       await prisma.goalContribution.delete({ where: { id: contribution.id } });
       return { ok: false, error: ALREADY_LINKED_ERROR };
     }
@@ -511,12 +511,19 @@ const ALREADY_LINKED_ERROR = "Already linked to a reclassification.";
  * UPDATE can match receivableId, goalContributionId, AND transferId all
  * still null, so the loser's count is 0. Shared by the receivable, goal-
  * contribution, and transfer flows (#114/#120, ADR-0010; #138, ADR-0013)
- * since a transaction can only ever carry one of the three. */
+ * since a transaction can only ever carry one of the three. Takes the
+ * Prisma client as a parameter (rather than closing over the module-level
+ * `prisma`) so linkTransfer can run both of its claims inside one
+ * interactive transaction — a plain client for the single-claim callers
+ * (flagAsReceivable, settleReceivable), the transaction's own `tx` client
+ * when a caller needs its claim to roll back atomically with other
+ * writes. */
 async function claimTransaction(
+  client: Pick<typeof prisma, "transaction">,
   transactionId: string,
   data: { receivableId: string } | { goalContributionId: string } | { transferId: string }
 ): Promise<boolean> {
-  const claimed = await prisma.transaction.updateMany({
+  const claimed = await client.transaction.updateMany({
     where: { id: transactionId, receivableId: null, goalContributionId: null, transferId: null },
     data,
   });
@@ -540,7 +547,7 @@ export async function flagAsReceivable(
       return { ok: false, error: ALREADY_LINKED_ERROR };
     }
     const receivable = await prisma.receivable.create({ data: { amount, note } });
-    if (!(await claimTransaction(transactionId, { receivableId: receivable.id }))) {
+    if (!(await claimTransaction(prisma, transactionId, { receivableId: receivable.id }))) {
       await prisma.receivable.delete({ where: { id: receivable.id } });
       return { ok: false, error: ALREADY_LINKED_ERROR };
     }
@@ -569,7 +576,7 @@ export async function settleReceivable(
       if (!canReclassifyTransaction(repayment)) {
         return { ok: false, error: ALREADY_LINKED_ERROR };
       }
-      if (!(await claimTransaction(repaymentTransactionId, { receivableId }))) {
+      if (!(await claimTransaction(prisma, repaymentTransactionId, { receivableId }))) {
         return { ok: false, error: ALREADY_LINKED_ERROR };
       }
     }
@@ -595,10 +602,11 @@ const INVALID_TRANSFER_ERROR = "Transfers need two transactions on different acc
  * bank account (#138, ADR-0013). No amount-equality check, mirroring
  * settleReceivable's optional repayment link. Refuses a transaction
  * already linked to any reclassification, and refuses a same-account or
- * same-direction pairing (canLinkTransfer). If claiming the second
- * transaction loses the race, the first claim and the new Transfer are
- * both rolled back rather than leaving one side silently excluded from
- * spend totals with no visible Transfer to explain why. */
+ * same-direction pairing (canLinkTransfer). The Transfer create and both
+ * claims run inside one interactive transaction — thrown on either claim
+ * losing a race, so Postgres rolls back the whole thing atomically rather
+ * than leaving a one-sided claim or an orphaned Transfer row for a crash
+ * between separate compensating writes to land in the middle of. */
 export async function linkTransfer(
   transactionIdA: string,
   transactionIdB: string,
@@ -618,21 +626,22 @@ export async function linkTransfer(
       return { ok: false, error: INVALID_TRANSFER_ERROR };
     }
 
-    const transfer = await prisma.transfer.create({ data: { note } });
-    if (!(await claimTransaction(transactionIdA, { transferId: transfer.id }))) {
-      await prisma.transfer.delete({ where: { id: transfer.id } });
-      return { ok: false, error: ALREADY_LINKED_ERROR };
-    }
-    if (!(await claimTransaction(transactionIdB, { transferId: transfer.id }))) {
-      await prisma.transaction.update({ where: { id: transactionIdA }, data: { transferId: null } });
-      await prisma.transfer.delete({ where: { id: transfer.id } });
-      return { ok: false, error: ALREADY_LINKED_ERROR };
-    }
+    const transferId = await prisma.$transaction(async (tx) => {
+      const transfer = await tx.transfer.create({ data: { note } });
+      if (!(await claimTransaction(tx, transactionIdA, { transferId: transfer.id }))) {
+        throw new Error(ALREADY_LINKED_ERROR);
+      }
+      if (!(await claimTransaction(tx, transactionIdB, { transferId: transfer.id }))) {
+        throw new Error(ALREADY_LINKED_ERROR);
+      }
+      return transfer.id;
+    });
 
     revalidatePath("/finances");
-    return { ok: true, transferId: transfer.id };
-  } catch {
-    return { ok: false, error: SAVE_ERROR };
+    return { ok: true, transferId };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : SAVE_ERROR;
+    return { ok: false, error: message === ALREADY_LINKED_ERROR ? ALREADY_LINKED_ERROR : SAVE_ERROR };
   }
 }
 

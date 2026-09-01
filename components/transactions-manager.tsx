@@ -11,7 +11,7 @@ import {
   type TransactionInput,
 } from "@/lib/finance/actions";
 import { useUndoableCrudList, type ActionResult } from "@/lib/hooks/use-undoable-crud-list";
-import { isHeldForReview } from "@/lib/finance/logic";
+import { canReclassifyTransaction, isHeldForReview } from "@/lib/finance/logic";
 import { DEFAULT_CATEGORIES } from "@/lib/finance/categories";
 import { PrimaryButton } from "@/components/primary-button";
 import { EmptyState } from "@/components/empty-state";
@@ -188,9 +188,7 @@ export function TransactionsManager({
                 <LinkTransferForm
                   transaction={t}
                   accountNames={accountNames}
-                  candidates={sorted.filter(
-                    (c) => c.id !== t.id && !c.receivableId && !c.goalContributionId && !c.transferId
-                  )}
+                  candidates={sorted.filter((c) => c.id !== t.id && canReclassifyTransaction(c))}
                   onCancel={() => setFlaggingRowId(null)}
                   onConfirmed={(transferId) => {
                     // linkTransfer claims both sides server-side in one call, but
@@ -234,7 +232,7 @@ export function TransactionsManager({
                   {t.direction === "IN" ? "+" : "−"}
                   {formatGBP(t.amount)}
                 </span>
-                {t.direction === "OUT" && !t.receivableId && !t.goalContributionId && (
+                {t.direction === "OUT" && canReclassifyTransaction(t) && (
                   <>
                     <button
                       type="button"
@@ -260,7 +258,7 @@ export function TransactionsManager({
                     )}
                   </>
                 )}
-                {t.accountId !== null && !t.receivableId && !t.goalContributionId && !t.transferId && (
+                {t.accountId !== null && canReclassifyTransaction(t) && (
                   <button
                     type="button"
                     className={styles.link}
