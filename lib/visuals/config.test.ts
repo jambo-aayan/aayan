@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseChartBinding, parseProgressBarConfig, parseScatterBinding } from "./config";
+import { parseChartBinding, parseProgressBarConfig, parseScatterBinding, parseTableBinding } from "./config";
 
 describe("parseProgressBarConfig", () => {
   it("returns the target when config is a valid shape", () => {
@@ -78,5 +78,27 @@ describe("parseScatterBinding", () => {
   it("returns null for null/non-object config or an ad-hoc chart's config", () => {
     expect(parseScatterBinding(null)).toBeNull();
     expect(parseScatterBinding({})).toBeNull();
+  });
+});
+
+describe("parseTableBinding", () => {
+  it("returns the adapter for a valid table binding", () => {
+    expect(parseTableBinding({ tableBinding: { adapter: "goals" } })).toEqual({ adapter: "goals" });
+    expect(parseTableBinding({ tableBinding: { adapter: "habits" } })).toEqual({ adapter: "habits" });
+    expect(parseTableBinding({ tableBinding: { adapter: "tasks" } })).toEqual({ adapter: "tasks" });
+    expect(parseTableBinding({ tableBinding: { adapter: "systems" } })).toEqual({ adapter: "systems" });
+  });
+
+  it("returns null for a freeform table's config (no tableBinding key)", () => {
+    expect(parseTableBinding({})).toBeNull();
+  });
+
+  it("returns null for null/non-object config", () => {
+    expect(parseTableBinding(null)).toBeNull();
+    expect(parseTableBinding("not an object")).toBeNull();
+  });
+
+  it("returns null for an unrecognized adapter name", () => {
+    expect(parseTableBinding({ tableBinding: { adapter: "made-up" } })).toBeNull();
   });
 });

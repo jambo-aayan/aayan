@@ -7,6 +7,8 @@ import { VisualCard } from "./visual-card";
 import { AddTableColumnForm } from "./add-table-column-form";
 import { TableCell } from "./table-cell";
 import { readCells, stripCell, withCell } from "@/lib/visuals/table-data";
+import { isBuiltInColumnId } from "@/lib/visuals/table-binding";
+import { parseTableBinding } from "@/lib/visuals/config";
 import {
   createTableColumn,
   createTableRow,
@@ -34,14 +36,42 @@ function toRowState(row: TableRow): TableRowState {
   return { ...row, data: readCells(row.data) };
 }
 
-/** Renders one freeform Table Visual (#168, ADR-0017) — its own
- * columns/rows CRUD, kept as plain local state rather than two separate
- * useUndoableCrudList instances, since deleting/restoring a column also
- * mutates every row's `data` (lib/visuals/table-data.ts's stripCell/
- * withCell) and the shared hook has no way to carry that extra
+/** Read-only display for a built-in column's value — plain text, no
+ * input, since these are never user-editable (lib/visuals/
+ * table-binding.ts resolves them fresh from the live entity on every
+ * render). */
+function formatBuiltInValue(type: TableColumnType, value: unknown): string {
+  if (value === null || value === undefined) return "—";
+  if (type === "CHECKBOX") return value === true ? "Yes" : "No";
+  return String(value);
+}
+
+/** Renders one Table Visual — freeform (#168) or bound to a live entity
+ * list (#169, ADR-0017). Columns/rows are plain local state rather than
+ * two separate useUndoableCrudList instances, since deleting/restoring a
+ * column also mutates every row's `data` (lib/visuals/table-data.ts's
+ * stripCell/withCell) and the shared hook has no way to carry that extra
  * per-row-value payload through its own generic remove/restore shape.
  * Columns and rows each get their own 5s undo toast, same window as
- * useUndoableCrudList's. */
+ * useUndoableCrudList's.
+ *
+ * A bound table's `columns`/`rows` are resolve-table-binding.ts's live
+ * view — built-in columns (lib/visuals/table-binding.ts's
+ * isBuiltInColumnId, a colon in the id) render read-only and can't be
+ * removed or added to via "+ Row" (there's no such trigger at all for a
+ * bound table); only "+ Column" for custom columns still applies, same
+ * create/remove/undo path as freeform. Since the row set itself is
+ * server-computed from live entities, a fresh `visual` (an entity added/
+ * removed elsewhere) needs to actually reach this already-mounted
+ * component's local state rather than staying pinned to its mount-time
+ * snapshot — table-zone.tsx keys a bound TableVisual by a fingerprint of
+ * its rows/columns instead of just `visual.id`, so React remounts this
+ * component fresh (and its useState below re-reads the new `visual`)
+ * exactly when the live data actually changed, without an effect
+ * fighting React's own "don't setState from a prop in an effect"
+ * guidance. A freeform table doesn't need this — a stale prop can't
+ * happen for it, its only data source *is* this component's own
+ * actions. */
 export function TableVisual({
   visual,
   pillarId,
@@ -54,6 +84,7 @@ export function TableVisual({
   onRemove: () => void;
 }) {
   const { notifyError } = useToast();
+  const bound = parseTableBinding(visual.config) !== null;
   const [columns, setColumns] = useState<TableColumn[]>(visual.columns);
   const [rows, setRows] = useState<TableRowState[]>(() => visual.rows.map(toRowState));
   const [columnUndo, setColumnUndo] = useState<{ column: TableColumn; removed: RemovedCell[] } | null>(null);
@@ -154,14 +185,29 @@ export function TableVisual({
     setRows((prev) => [...prev, row].sort((a, b) => a.sortOrder - b.sortOrder));
   }
 
+  // A bound row's id can start as resolve-table-binding.ts's synthetic
+  // `bound-row-*` placeholder and become a real cuid the first time
+  // updateTableCell lazily creates its backing TableRow — boundEntityId
+  // stays stable across that swap (a freeform row has none, so its own
+  // real id is the stable key instead), so matching by it here means the
+  // id swap doesn't need special-casing.
+  function rowKey(row: TableRowState) {
+    return row.boundEntityId ?? row.id;
+  }
+
   async function handleCellChange(row: TableRowState, columnId: string, value: unknown) {
+    const key = rowKey(row);
     const prevData = row.data;
-    setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, data: withCell(r.data, columnId, value) } : r)));
-    const result = await withRetry(() => updateTableCell(row.id, pillarId, areaId, columnId, value));
+    setRows((prev) => prev.map((r) => (rowKey(r) === key ? { ...r, data: withCell(r.data, columnId, value) } : r)));
+    const result = await withRetry(() =>
+      updateTableCell(row.id, row.boundEntityId, visual.id, pillarId, areaId, columnId, value)
+    );
     if (!result.ok) {
-      setRows((prev) => (prev.some((r) => r.id === row.id) ? prev.map((r) => (r.id === row.id ? { ...r, data: prevData } : r)) : prev));
+      setRows((prev) => (prev.some((r) => rowKey(r) === key) ? prev.map((r) => (rowKey(r) === key ? { ...r, data: prevData } : r)) : prev));
       notifyError(result.error);
+      return;
     }
+    setRows((prev) => prev.map((r) => (rowKey(r) === key ? { ...r, id: result.row.id } : r)));
   }
 
   return (
@@ -176,23 +222,25 @@ export function TableVisual({
                 {columns.map((column) => (
                   <th key={column.id} className={styles.th}>
                     <span>{column.name}</span>
-                    <button
-                      type="button"
-                      className={styles.removeColumnBtn}
-                      onClick={() => handleRemoveColumn(column)}
-                      aria-label={`Remove column ${column.name}`}
-                    >
-                      ×
-                    </button>
+                    {!isBuiltInColumnId(column.id) && (
+                      <button
+                        type="button"
+                        className={styles.removeColumnBtn}
+                        onClick={() => handleRemoveColumn(column)}
+                        aria-label={`Remove column ${column.name}`}
+                      >
+                        ×
+                      </button>
+                    )}
                   </th>
                 ))}
-                <th className={styles.th} />
+                {!bound && <th className={styles.th} />}
               </tr>
             </thead>
             <tbody>
               {rows.length === 0 ? (
                 <tr>
-                  <td className={styles.emptyRowsCell} colSpan={columns.length + 1}>
+                  <td className={styles.emptyRowsCell} colSpan={columns.length + (bound ? 0 : 1)}>
                     No rows yet.
                   </td>
                 </tr>
@@ -200,37 +248,45 @@ export function TableVisual({
                 rows.map((row) => {
                   const cells = readCells(row.data);
                   return (
-                    <tr key={row.id}>
-                      {columns.map((column) => (
-                        <td
-                          key={
-                            // CHECKBOX has no draft-buffer state to keep in
-                            // sync with an outside value change (it commits
-                            // immediately, see table-cell.tsx) — no need to
-                            // force a remount on every toggle for it.
-                            column.type === "CHECKBOX"
-                              ? `${row.id}:${column.id}`
-                              : `${row.id}:${column.id}:${String(cells[column.id])}`
-                          }
-                          className={styles.td}
-                        >
-                          <TableCell
-                            type={column.type}
-                            value={cells[column.id]}
-                            onChange={(value) => handleCellChange(row, column.id, value)}
-                          />
+                    <tr key={rowKey(row)}>
+                      {columns.map((column) =>
+                        isBuiltInColumnId(column.id) ? (
+                          <td key={`${rowKey(row)}:${column.id}`} className={styles.td}>
+                            <span className={styles.builtInCell}>{formatBuiltInValue(column.type, cells[column.id])}</span>
+                          </td>
+                        ) : (
+                          <td
+                            key={
+                              // CHECKBOX has no draft-buffer state to keep in
+                              // sync with an outside value change (it commits
+                              // immediately, see table-cell.tsx) — no need to
+                              // force a remount on every toggle for it.
+                              column.type === "CHECKBOX"
+                                ? `${rowKey(row)}:${column.id}`
+                                : `${rowKey(row)}:${column.id}:${String(cells[column.id])}`
+                            }
+                            className={styles.td}
+                          >
+                            <TableCell
+                              type={column.type}
+                              value={cells[column.id]}
+                              onChange={(value) => handleCellChange(row, column.id, value)}
+                            />
+                          </td>
+                        )
+                      )}
+                      {!bound && (
+                        <td className={styles.td}>
+                          <button
+                            type="button"
+                            className={styles.removeColumnBtn}
+                            onClick={() => handleRemoveRow(row)}
+                            aria-label="Remove row"
+                          >
+                            ×
+                          </button>
                         </td>
-                      ))}
-                      <td className={styles.td}>
-                        <button
-                          type="button"
-                          className={styles.removeColumnBtn}
-                          onClick={() => handleRemoveRow(row)}
-                          aria-label="Remove row"
-                        >
-                          ×
-                        </button>
-                      </td>
+                      )}
                     </tr>
                   );
                 })
@@ -242,7 +298,7 @@ export function TableVisual({
 
       <div className={styles.tableActions}>
         <AddTableColumnForm onAdd={handleAddColumn} />
-        {columns.length > 0 && (
+        {!bound && columns.length > 0 && (
           <button type="button" className={styles.trigger} onClick={handleAddRow}>
             + Row
           </button>

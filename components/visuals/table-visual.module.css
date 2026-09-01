@@ -71,6 +71,13 @@
   height: 16px;
 }
 
+.builtInCell {
+  display: inline-block;
+  padding: 6px 7px;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+
 .tableActions {
   display: flex;
   align-items: center;

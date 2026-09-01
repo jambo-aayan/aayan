@@ -47,3 +47,22 @@ export function parseScatterBinding(config: unknown): ScatterBinding | null {
   const y = parseBindingValue((config as Record<string, unknown>).yBinding);
   return x || y ? { x, y } : null;
 }
+
+/** A Table's own binding (#169) — unlike a chart's `binding`/`xBinding`/
+ * `yBinding`, which each point at one specific entity (`refId`), a bound
+ * table's rows are an entire live entity list, so there's nothing to
+ * pick beyond which source. */
+export type TableAdapterKind = "goals" | "habits" | "tasks" | "systems";
+
+const TABLE_ADAPTER_KINDS: TableAdapterKind[] = ["goals", "habits", "tasks", "systems"];
+
+export type TableBinding = { adapter: TableAdapterKind };
+
+export function parseTableBinding(config: unknown): TableBinding | null {
+  if (typeof config !== "object" || config === null) return null;
+  const binding = (config as Record<string, unknown>).tableBinding;
+  if (typeof binding !== "object" || binding === null) return null;
+  const adapter = (binding as Record<string, unknown>).adapter;
+  if (typeof adapter !== "string" || !TABLE_ADAPTER_KINDS.includes(adapter as TableAdapterKind)) return null;
+  return { adapter: adapter as TableAdapterKind };
+}

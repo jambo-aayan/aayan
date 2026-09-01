@@ -1,6 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { resolveVisualBindings } from "./resolve-binding";
+import { resolveTableBindings } from "./resolve-table-binding";
 
 const VISUAL_INCLUDE = {
   records: { orderBy: { date: "asc" as const } },
@@ -16,15 +17,17 @@ const VISUAL_INCLUDE = {
  * deleted Visual's records are on hand client-side for undo (see
  * restoreVisual); `columns`/`rows` (#168) do the same for a freeform
  * Table, empty arrays for every chart type. resolveVisualBindings (#166)
- * then replaces a bound chart's records with its live source data — a
- * no-op for every ad-hoc Visual, which is most of them. */
+ * then replaces a bound chart's records with its live source data, and
+ * resolveTableBindings (#169) replaces a bound table's rows with the
+ * adapter's live entity list — both are no-ops for every ad-hoc/freeform
+ * Visual, which is most of them. */
 export async function getVisualsForPillar(pillarId: string) {
   const visuals = await prisma.visual.findMany({
     where: { pillarId, areaId: null },
     orderBy: { sortOrder: "asc" },
     include: VISUAL_INCLUDE,
   });
-  return resolveVisualBindings(visuals);
+  return resolveTableBindings(await resolveVisualBindings(visuals));
 }
 
 export async function getVisualsForArea(areaId: string) {
@@ -33,5 +36,5 @@ export async function getVisualsForArea(areaId: string) {
     orderBy: { sortOrder: "asc" },
     include: VISUAL_INCLUDE,
   });
-  return resolveVisualBindings(visuals);
+  return resolveTableBindings(await resolveVisualBindings(visuals));
 }

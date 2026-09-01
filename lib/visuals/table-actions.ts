@@ -179,19 +179,39 @@ export type UpdateCellResult = { ok: true; row: TableRow } | { ok: false; error:
  * string per the column's type); this layer doesn't re-validate it
  * against the column's declared type, same "the UI only offers the right
  * input for the type" trust the rest of this app places in its own
- * forms. */
+ * forms.
+ *
+ * `boundEntityId` is only ever non-null for a bound table's row (#169) —
+ * such a row often has no real TableRow yet (built-in columns render
+ * straight off the live entity, nothing to persist for those), so `rowId`
+ * may be resolve-table-binding.ts's synthetic `bound-row-*` placeholder
+ * rather than a real id. The first time a custom-column value is entered
+ * for that entity, this creates the backing TableRow lazily via `upsert`
+ * keyed on the schema's `@@unique([visualId, boundEntityId])` — atomic,
+ * so two concurrent first-edits for the same entity can't each create a
+ * duplicate row (a plain find-then-create here would race). */
 export async function updateTableCell(
   rowId: string,
+  boundEntityId: string | null,
+  visualId: string,
   pillarId: string,
   areaId: string | null,
   columnId: string,
   value: unknown
 ): Promise<UpdateCellResult> {
   try {
-    const existing = await prisma.tableRow.findUnique({ where: { id: rowId }, select: { data: true } });
+    let existing = await prisma.tableRow.findUnique({ where: { id: rowId }, select: { id: true, data: true } });
+    if (!existing && boundEntityId) {
+      existing = await prisma.tableRow.upsert({
+        where: { visualId_boundEntityId: { visualId, boundEntityId } },
+        update: {},
+        create: { visualId, boundEntityId, data: {} },
+        select: { id: true, data: true },
+      });
+    }
     if (!existing) return { ok: false, error: "Couldn't save — try again." };
     const row = await prisma.tableRow.update({
-      where: { id: rowId },
+      where: { id: existing.id },
       data: { data: withCell(existing.data, columnId, value) as Prisma.InputJsonValue },
     });
     revalidateVisualPaths(pillarId, areaId);

@@ -1228,5 +1228,11 @@ model TableRow {
   updatedAt     DateTime @updatedAt
 
   @@index([visualId])
-  @@index([visualId, boundEntityId])
+  /// Postgres treats multiple NULLs as distinct under a unique index, so
+  /// this only actually constrains bound rows (boundEntityId non-null) —
+  /// any number of freeform rows (boundEntityId null) coexist fine. Closes
+  /// a race in updateTableCell's lazy-create-on-first-edit path (#169):
+  /// two concurrent first edits for the same bound entity could otherwise
+  /// each pass a pre-check and create a duplicate TableRow.
+  @@unique([visualId, boundEntityId])
 }
