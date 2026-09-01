@@ -31,12 +31,14 @@ export async function updatePillarColor(pillarId: string, color: ColorKey | null
 export type CreatePillarResult = { ok: true; id: string } | { ok: false; error: string };
 
 /** Per #58's scope (and #49's Out of Scope note): a new Pillar is just its
- * row + a name, no Area-template picker or guided setup. */
-export async function createPillar(name: string): Promise<CreatePillarResult> {
+ * row + a name — plus, as of #156/ADR-0016, a color, so it doesn't sit grey
+ * in the nav bar until edited later. Every other field (description, North
+ * Star, intended time-share) stays fill-in-later, unchanged. */
+export async function createPillar(name: string, color: ColorKey | null = null): Promise<CreatePillarResult> {
   const trimmed = name.trim();
   if (!trimmed) return { ok: false, error: "Give the pillar a name first." };
   try {
-    const pillar = await prisma.pillar.create({ data: { id: crypto.randomUUID(), name: trimmed } });
+    const pillar = await prisma.pillar.create({ data: { id: crypto.randomUUID(), name: trimmed, color } });
     revalidatePillarPaths();
     return { ok: true, id: pillar.id };
   } catch {

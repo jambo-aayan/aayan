@@ -6,38 +6,54 @@ import { Plus } from "lucide-react";
 import { createPillar } from "@/lib/pillars/actions";
 import { withRetry } from "@/lib/with-retry";
 import { useToast } from "@/components/toast/toast-provider";
+import { ColorSwatchPicker } from "@/components/color-swatch-picker";
+import { PrimaryButton } from "@/components/primary-button";
+import type { ColorKey } from "@/lib/colors";
 import styles from "./new-pillar-tile.module.css";
 
-/** Per #49's Out of Scope: a new Pillar is just its row + name, no
- * Area-template picker or guided setup — so this is a single inline
- * name field, not a full composer. */
+/** Per #49's Out of Scope: a new Pillar is just its row + a name, no
+ * Area-template picker or guided setup. As of #156/ADR-0016, creation also
+ * asks for a color up front (via the same picker used everywhere else a
+ * Pillar's color is set) — every other field stays fill-in-later. A color
+ * picker needs an explicit submit rather than the old single-field
+ * onBlur-submits pattern, since clicking a swatch blurs the name input. */
 export function NewPillarTile() {
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState("");
+  const [color, setColor] = useState<ColorKey | null>(null);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const router = useRouter();
   const { notifyError } = useToast();
 
+  function reset() {
+    setEditing(false);
+    setName("");
+    setColor(null);
+    setError(null);
+  }
+
   async function handleCreate() {
     if (!name.trim()) {
-      setEditing(false);
+      setError("Give the pillar a name first.");
       return;
     }
     setSaving(true);
-    const result = await withRetry(() => createPillar(name));
+    setError(null);
+    const result = await withRetry(() => createPillar(name, color));
     setSaving(false);
     if (!result.ok) {
+      setError(result.error);
       notifyError(result.error, { onRetry: handleCreate });
       return;
     }
-    setName("");
-    setEditing(false);
+    reset();
     router.refresh();
   }
 
   if (editing) {
     return (
-      <div className={styles.tile}>
+      <div className={styles.form}>
         <input
           type="text"
           className={styles.input}
@@ -51,13 +67,17 @@ export function NewPillarTile() {
               e.preventDefault();
               handleCreate();
             }
-            if (e.key === "Escape") {
-              setEditing(false);
-              setName("");
-            }
+            if (e.key === "Escape") reset();
           }}
-          onBlur={handleCreate}
         />
+        <div className={styles.colorRow}>
+          <span className={styles.label}>Color</span>
+          <ColorSwatchPicker value={color} onChange={(key) => !saving && setColor(key as ColorKey | null)} />
+        </div>
+        {error && <p className={styles.error}>{error}</p>}
+        <PrimaryButton onClick={handleCreate} disabled={saving}>
+          {saving ? "Adding…" : "Add pillar"}
+        </PrimaryButton>
       </div>
     );
   }
