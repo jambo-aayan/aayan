@@ -56,6 +56,18 @@ export async function getGoalsForArea(areaId: string): Promise<LifeGoalWithRelat
   return getAllGoals({ areaId });
 }
 
+/** For the generic Pillar page's Goals section (#158/ADR-0016). Unlike
+ * getThoughtsForPillar, this deliberately does NOT also include Goals
+ * scoped to an Area under this Pillar — a Pillar-scoped Goal (areaId null)
+ * and an Area-scoped one are already shown in two different places (this
+ * Pillar's page vs. that Area's own page), matching how Habits/Tasks/
+ * Systems already split by exact scope rather than pooling everything
+ * under the Pillar. */
+export async function getGoalsForPillar(pillarId: string): Promise<LifeGoalWithRelations[]> {
+  const goals = await getAllGoals({ pillarId });
+  return goals.filter((g) => g.areaId === null);
+}
+
 export async function getGoalOptions(
   pillarId?: string
 ): Promise<{ id: string; name: string; areaId: string | null; pillarId: string }[]> {

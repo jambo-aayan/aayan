@@ -2,17 +2,24 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
+import { pillarHref } from "@/lib/pillars/nav";
 import type { LifeGoalStatus } from "./data";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
 const SAVE_ERROR = "Couldn't save — try again.";
 
+/** `/pillars/${pillarId}` was always a no-op — that route never existed,
+ * `/pillars` is a flat index — and `/health/${areaId}` stopped existing at
+ * all once #157 replaced it with the generic /[pillarId]/[areaId] route.
+ * Fixed to the real paths as part of #158, which is the first thing to
+ * actually surface Goals on those pages. */
 function revalidateGoalPaths(pillarId: string, areaId: string | null) {
   revalidatePath("/goals");
   revalidatePath("/today");
-  revalidatePath(`/pillars/${pillarId}`);
-  if (areaId) revalidatePath(`/health/${areaId}`);
+  const base = pillarHref(pillarId);
+  revalidatePath(base);
+  if (areaId) revalidatePath(`${base}/${areaId}`);
 }
 
 export type GoalInput = { name: string; pillarId: string; areaId: string | null };

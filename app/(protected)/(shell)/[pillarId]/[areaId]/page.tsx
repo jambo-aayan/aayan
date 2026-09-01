@@ -16,7 +16,10 @@ import { getSystemsForArea, getHabitOptionsForPillar } from "@/lib/systems/data"
 import { updateAreaCurrentState, updateAreaNorthStar } from "@/lib/areas/actions";
 import { getHabitsForArea } from "@/lib/habits/data";
 import { getTasksForArea, getTaskLists, getPillarOptions, getAreaOptions, getTaskTags } from "@/lib/tasks/data";
-import { getGoalOptions } from "@/lib/goals/data";
+import { getGoalOptions, getGoalsForArea } from "@/lib/goals/data";
+import { getThoughtsForArea } from "@/lib/thoughts/data";
+import { PillarAreaGoals } from "@/components/goals/pillar-area-goals";
+import { PillarAreaThoughts } from "@/components/thoughts/pillar-area-thoughts";
 import { getPainMobilityLogs } from "@/lib/pain-mobility/data";
 import { PAIN_MOBILITY_AREA_ID } from "@/lib/pain-mobility/scope";
 import { getDailyLogs } from "@/lib/daily-log/data";
@@ -53,17 +56,20 @@ export default async function AreaPage({
   const area = await getArea(areaId);
   if (!area || area.pillarId !== pillarId) notFound();
 
-  const [habits, tasks, lists, pillars, areas, goals, tags, systems, systemHabitOptions] = await Promise.all([
-    getHabitsForArea(areaId),
-    getTasksForArea(areaId),
-    getTaskLists(),
-    getPillarOptions(),
-    getAreaOptions(),
-    getGoalOptions(area.pillarId),
-    getTaskTags(),
-    getSystemsForArea(areaId),
-    getHabitOptionsForPillar(area.pillarId),
-  ]);
+  const [habits, tasks, lists, pillars, areas, goals, tags, systems, systemHabitOptions, areaGoals, thoughts] =
+    await Promise.all([
+      getHabitsForArea(areaId),
+      getTasksForArea(areaId),
+      getTaskLists(),
+      getPillarOptions(),
+      getAreaOptions(),
+      getGoalOptions(area.pillarId),
+      getTaskTags(),
+      getSystemsForArea(areaId),
+      getHabitOptionsForPillar(area.pillarId),
+      getGoalsForArea(areaId),
+      getThoughtsForArea(areaId),
+    ]);
   const isPainMobilityArea = areaId === PAIN_MOBILITY_AREA_ID;
   const isSleepArea = areaId === SLEEP_AREA_ID;
   const isCareArea = areaId === CARE_AREA_ID;
@@ -81,8 +87,7 @@ export default async function AreaPage({
   // a two-column grid with the North Star section for the existing visual
   // layout. The bespoke Health-only cards below (Pain & Mobility, Sleep
   // quality, Blood pressure) are fixed content too, not sections — see
-  // ADR-0016's "no generic score-tracking primitive". Goals/Thoughts
-  // sections land in #158.
+  // ADR-0016's "no generic score-tracking primitive".
   const sections: PageSection[] = [
     {
       type: "northStar",
@@ -95,6 +100,14 @@ export default async function AreaPage({
             fraunces={16}
             onSave={updateAreaNorthStar.bind(null, area.pillarId, area.id)}
           />
+        </Card>
+      ),
+    },
+    {
+      type: "goals",
+      node: (
+        <Card key="goals" title="Goals">
+          <PillarAreaGoals pillarId={area.pillarId} areaId={area.id} initialGoals={areaGoals} />
         </Card>
       ),
     },
@@ -135,6 +148,14 @@ export default async function AreaPage({
             goalOptions={goals}
             focusId={focus ?? null}
           />
+        </Card>
+      ),
+    },
+    {
+      type: "thoughts",
+      node: (
+        <Card key="thoughts" title="Thoughts">
+          <PillarAreaThoughts pillarId={area.pillarId} areaId={area.id} initialThoughts={thoughts} />
         </Card>
       ),
     },

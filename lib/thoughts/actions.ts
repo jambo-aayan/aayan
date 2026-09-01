@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
+import { pillarHref } from "@/lib/pillars/nav";
 
 export type ThoughtInput = { text: string; date: Date; pillarId: string | null; areaId: string | null };
 
@@ -30,6 +31,11 @@ export async function createThought(input: ThoughtInput): Promise<ThoughtResult>
   }
   revalidatePath("/pillars");
   revalidatePath("/thoughts");
+  // Only the direct-pillar case is revalidated here, not an area-tagged
+  // Thought's own Area page — that would need an extra query to resolve
+  // the Area's pillarId, not worth it just for Router Cache freshness (see
+  // lib/systems/actions.ts's revalidateSystemPaths for the same tradeoff).
+  if (data.pillarId) revalidatePath(pillarHref(data.pillarId));
   return { ok: true, item: { ...data, id: thought.id } };
 }
 
@@ -51,5 +57,6 @@ export async function restoreThought(thought: ThoughtInput & { id: string }): Pr
     return { ok: false, error: "Couldn't undo — the thought may already be back." };
   }
   revalidatePath("/thoughts");
+  if (thought.pillarId) revalidatePath(pillarHref(thought.pillarId));
   return { ok: true };
 }

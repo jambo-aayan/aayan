@@ -9,7 +9,10 @@ import { SystemsList } from "@/components/systems-list";
 import { getPillarWithAreas } from "@/lib/pillars/data";
 import { updatePillarNorthStar } from "@/lib/pillars/actions";
 import { getSystemsForPillar, getHabitOptionsForPillar } from "@/lib/systems/data";
-import { getGoalOptions } from "@/lib/goals/data";
+import { getGoalOptions, getGoalsForPillar } from "@/lib/goals/data";
+import { getThoughtsForPillar } from "@/lib/thoughts/data";
+import { PillarAreaGoals } from "@/components/goals/pillar-area-goals";
+import { PillarAreaThoughts } from "@/components/thoughts/pillar-area-thoughts";
 import { FINANCE_PILLAR_ID } from "@/lib/finance/pillar-id";
 import { resolveColorHex, type ColorKey } from "@/lib/colors";
 import type { PageSection } from "@/lib/pillar-page/sections";
@@ -35,10 +38,12 @@ export default async function PillarPage({
   const pillar = await getPillarWithAreas(pillarId);
   if (!pillar) notFound();
 
-  const [systems, habitOptions, goalOptions] = await Promise.all([
+  const [systems, habitOptions, goalOptions, pillarGoals, thoughts] = await Promise.all([
     getSystemsForPillar(pillarId),
     getHabitOptionsForPillar(pillarId),
     getGoalOptions(pillarId),
+    getGoalsForPillar(pillarId),
+    getThoughtsForPillar(pillarId),
   ]);
   const accentColor = resolveColorHex(pillar.color as ColorKey | null);
 
@@ -46,7 +51,7 @@ export default async function PillarPage({
   // though visibility/ordering isn't user-configurable until #160 — the
   // mindmap overview isn't in this list, it's fixed content shown above it
   // whenever the Pillar has Areas, per ADR-0016's "a page can carry fixed,
-  // non-section content" note. Goals/Thoughts sections land in #158.
+  // non-section content" note.
   const sections: PageSection[] = [
     {
       type: "northStar",
@@ -64,6 +69,14 @@ export default async function PillarPage({
       ),
     },
     {
+      type: "goals",
+      node: (
+        <Card key="goals" title="Goals">
+          <PillarAreaGoals pillarId={pillar.id} areaId={null} initialGoals={pillarGoals} />
+        </Card>
+      ),
+    },
+    {
       type: "systems",
       node: (
         <Card key="systems" title="Systems">
@@ -75,6 +88,14 @@ export default async function PillarPage({
             goalOptions={goalOptions}
             focusId={focus ?? null}
           />
+        </Card>
+      ),
+    },
+    {
+      type: "thoughts",
+      node: (
+        <Card key="thoughts" title="Thoughts">
+          <PillarAreaThoughts pillarId={pillar.id} areaId={null} initialThoughts={thoughts} />
         </Card>
       ),
     },
