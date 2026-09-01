@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { pillarHref } from "@/lib/pillars/nav";
+import { isValidIsoDateString } from "./date-validation";
 import type { Prisma, VisualType } from "@/lib/generated/prisma/client";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
@@ -113,15 +114,52 @@ export async function createVisualRecord(
   value: number,
   note?: string
 ): Promise<CreateVisualRecordResult> {
-  const parsedDate = new Date(`${date}T00:00:00.000Z`);
-  if (Number.isNaN(parsedDate.getTime())) return { ok: false, error: "Enter a valid date." };
+  if (!isValidIsoDateString(date)) return { ok: false, error: "Enter a valid date." };
   if (!Number.isFinite(value)) return { ok: false, error: "Enter a valid number." };
   try {
     const record = await prisma.visualRecord.create({
-      data: { visualId, date: parsedDate, yValue: value, note: note?.trim() || null },
+      data: { visualId, date: new Date(`${date}T00:00:00.000Z`), yValue: value, note: note?.trim() || null },
     });
     revalidateVisualPaths(pillarId, areaId);
     return { ok: true, record };
+  } catch {
+    return { ok: false, error: "Couldn't save — try again." };
+  }
+}
+
+export type CreateVisualRecordsBulkResult =
+  | { ok: true; records: Awaited<ReturnType<typeof prisma.visualRecord.createManyAndReturn>> }
+  | { ok: false; error: string };
+
+/** Inserts an already-parsed batch of ad-hoc data points in one go (#165)
+ * — the paste and CSV-upload entry paths both parse client-side via
+ * lib/visuals/parse-records.ts, then call this once with only the rows
+ * that parsed cleanly (a malformed row is never sent here at all, it's
+ * shown as a skipped-row summary before the user confirms). Still
+ * re-validates every row server-side, the same boundary-validation stance
+ * as createVisualRecord above — this is a server action, so a caller
+ * bypassing the client parser entirely can't slip an invalid date/number
+ * past it. */
+export async function createVisualRecordsBulk(
+  visualId: string,
+  pillarId: string,
+  areaId: string | null,
+  rows: { date: string; value: number; note?: string }[]
+): Promise<CreateVisualRecordsBulkResult> {
+  if (rows.length === 0) return { ok: false, error: "Nothing to add." };
+  const invalid = rows.find((r) => !isValidIsoDateString(r.date) || !Number.isFinite(r.value));
+  if (invalid) return { ok: false, error: "One or more rows has an invalid date or number." };
+  try {
+    const records = await prisma.visualRecord.createManyAndReturn({
+      data: rows.map((r) => ({
+        visualId,
+        date: new Date(`${r.date}T00:00:00.000Z`),
+        yValue: r.value,
+        note: r.note?.trim() || null,
+      })),
+    });
+    revalidateVisualPaths(pillarId, areaId);
+    return { ok: true, records };
   } catch {
     return { ok: false, error: "Couldn't save — try again." };
   }

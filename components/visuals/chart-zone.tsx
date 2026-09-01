@@ -52,13 +52,15 @@ export function ChartZone({
     return { ok };
   }
 
-  function handleRecordAdded(visualId: string, record: VisualWithRecords["records"][number]) {
+  function handleRecordsAdded(visualId: string, newRecords: VisualWithRecords["records"]) {
     setItems((prev) =>
       prev.map((v) =>
         v.id === visualId
           ? {
               ...v,
-              records: [...v.records, record].sort((a, b) => (a.date && b.date ? a.date.getTime() - b.date.getTime() : 0)),
+              records: [...v.records, ...newRecords].sort((a, b) =>
+                a.date && b.date ? a.date.getTime() - b.date.getTime() : 0
+              ),
             }
           : v
       )
@@ -70,17 +72,33 @@ export function ChartZone({
       {items.length === 0 && <EmptyState icon={LineChartIcon} message="No charts yet." />}
       {items.map((visual) => {
         const onRemove = () => remove(visual);
-        const onRecordAdded = (record: VisualWithRecords["records"][number]) => handleRecordAdded(visual.id, record);
+        const onRecordAdded = (record: VisualWithRecords["records"][number]) => handleRecordsAdded(visual.id, [record]);
         switch (visual.type) {
           case "LINE":
           case "BAR":
-            return <DateSeriesChartVisual key={visual.id} visual={visual} onRemove={onRemove} onRecordAdded={onRecordAdded} />;
+            return (
+              <DateSeriesChartVisual
+                key={visual.id}
+                visual={visual}
+                onRemove={onRemove}
+                onRecordAdded={onRecordAdded}
+                onRecordsAdded={(records) => handleRecordsAdded(visual.id, records)}
+              />
+            );
           case "PROGRESS_BAR":
             return <ProgressBarVisual key={visual.id} visual={visual} onRemove={onRemove} onRecordAdded={onRecordAdded} />;
           case "SCATTER":
             return <ScatterVisual key={visual.id} visual={visual} onRemove={onRemove} onRecordAdded={onRecordAdded} />;
           case "STREAK_HEATMAP":
-            return <StreakHeatmapVisual key={visual.id} visual={visual} onRemove={onRemove} onRecordAdded={onRecordAdded} />;
+            return (
+              <StreakHeatmapVisual
+                key={visual.id}
+                visual={visual}
+                onRemove={onRemove}
+                onRecordAdded={onRecordAdded}
+                onRecordsAdded={(records) => handleRecordsAdded(visual.id, records)}
+              />
+            );
           default:
             return null;
         }

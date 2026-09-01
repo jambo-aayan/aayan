@@ -1,9 +1,10 @@
 "use client";
 
-import { createVisualRecord } from "@/lib/visuals/actions";
+import { createVisualRecord, createVisualRecordsBulk } from "@/lib/visuals/actions";
 import { withRetry } from "@/lib/with-retry";
 import { useToast } from "@/components/toast/toast-provider";
 import { AddRecordForm } from "./add-record-form";
+import { BulkAddForm } from "./bulk-add-form";
 import { VisualCard } from "./visual-card";
 import { heatmapIntensities } from "@/lib/visuals/records";
 import { formatDateShort } from "@/lib/visuals/format";
@@ -14,15 +15,17 @@ import styles from "./streak-heatmap-visual.module.css";
 /** Renders a Streak heatmap Visual (#164, ADR-0017) — a calendar-style
  * grid of shaded cells, one per record, min-max normalized by value
  * (lib/visuals/records.ts's heatmapIntensities) rather than a fixed
- * absolute scale. Same date+value AddRecordForm as Line/Bar. */
+ * absolute scale. Same date+value AddRecordForm/BulkAddForm as Line/Bar. */
 export function StreakHeatmapVisual({
   visual,
   onRemove,
   onRecordAdded,
+  onRecordsAdded,
 }: {
   visual: VisualWithRecords;
   onRemove: () => void;
   onRecordAdded: (record: VisualWithRecords["records"][number]) => void;
+  onRecordsAdded: (records: VisualWithRecords["records"]) => void;
 }) {
   const { notifyError } = useToast();
 
@@ -33,6 +36,16 @@ export function StreakHeatmapVisual({
       return result;
     }
     onRecordAdded(result.record);
+    return { ok: true };
+  }
+
+  async function handleBulkAdd(rows: { date: string; value: number; note?: string }[]) {
+    const result = await withRetry(() => createVisualRecordsBulk(visual.id, visual.pillarId, visual.areaId, rows));
+    if (!result.ok) {
+      notifyError(result.error);
+      return result;
+    }
+    onRecordsAdded(result.records);
     return { ok: true };
   }
 
@@ -56,6 +69,7 @@ export function StreakHeatmapVisual({
       )}
 
       <AddRecordForm onAdd={handleAdd} />
+      <BulkAddForm onAdd={handleBulkAdd} />
     </VisualCard>
   );
 }

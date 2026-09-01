@@ -1,0 +1,71 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+}
+
+.textarea {
+  width: 100%;
+  min-height: 90px;
+  padding: 8px 9px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  font-size: 12.5px;
+  font-family: var(--font-mono, monospace);
+  background: var(--bg);
+  color: var(--ink);
+  resize: vertical;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.fileLabel {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--muted-2);
+}
+
+.hint {
+  font-size: 11.5px;
+  color: var(--muted);
+  margin: 0;
+}
+
+.summary {
+  font-size: 12.5px;
+  color: var(--ink-2);
+}
+
+.skipped {
+  font-size: 11.5px;
+  color: var(--danger);
+  margin: 0;
+  max-height: 80px;
+  overflow-y: auto;
+}
+
+.trigger {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--muted-2);
+  padding: 6px 0;
+}
+
+.trigger:hover {
+  color: var(--ink);
+}
+
+.error {
+  font-size: 12px;
+  color: var(--danger);
+  margin: 0;
+}

@@ -1,10 +1,11 @@
 "use client";
 
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
-import { createVisualRecord } from "@/lib/visuals/actions";
+import { createVisualRecord, createVisualRecordsBulk } from "@/lib/visuals/actions";
 import { withRetry } from "@/lib/with-retry";
 import { useToast } from "@/components/toast/toast-provider";
 import { AddRecordForm } from "./add-record-form";
+import { BulkAddForm } from "./bulk-add-form";
 import { VisualCard } from "./visual-card";
 import { formatDateShort } from "@/lib/visuals/format";
 import { dateValuePoints } from "@/lib/visuals/records";
@@ -25,10 +26,12 @@ export function DateSeriesChartVisual({
   visual,
   onRemove,
   onRecordAdded,
+  onRecordsAdded,
 }: {
   visual: VisualWithRecords;
   onRemove: () => void;
   onRecordAdded: (record: VisualWithRecords["records"][number]) => void;
+  onRecordsAdded: (records: VisualWithRecords["records"]) => void;
 }) {
   const { notifyError } = useToast();
 
@@ -39,6 +42,16 @@ export function DateSeriesChartVisual({
       return result;
     }
     onRecordAdded(result.record);
+    return { ok: true };
+  }
+
+  async function handleBulkAdd(rows: { date: string; value: number; note?: string }[]) {
+    const result = await withRetry(() => createVisualRecordsBulk(visual.id, visual.pillarId, visual.areaId, rows));
+    if (!result.ok) {
+      notifyError(result.error);
+      return result;
+    }
+    onRecordsAdded(result.records);
     return { ok: true };
   }
 
@@ -69,6 +82,7 @@ export function DateSeriesChartVisual({
       )}
 
       <AddRecordForm onAdd={handleAdd} />
+      <BulkAddForm onAdd={handleBulkAdd} />
     </VisualCard>
   );
 }
