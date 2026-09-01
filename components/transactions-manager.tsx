@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { Receipt } from "lucide-react";
 import {
   createTransaction,
@@ -62,11 +63,17 @@ export function TransactionsManager({
   goals,
   accounts,
   categories,
+  limit,
 }: {
   initialTransactions: Transaction[];
   goals: GoalOption[];
   accounts: AccountOption[];
   categories: CategoryOption[];
+  /** Caps how many rows render — the finances page's own quick-add/edit
+   * list only shows the most recent `limit`, linking to the full
+   * paginated/filterable browser (#150, ADR-0015) for everything else.
+   * Omit for the unbounded list (e.g. a future dedicated view). */
+  limit?: number;
 }) {
   const { items: transactions, error, undo, add, update, remove, undoDelete } = useUndoableCrudList<
     Transaction,
@@ -123,6 +130,7 @@ export function TransactionsManager({
       transferId: t.id in transferOverrides ? transferOverrides[t.id] : t.transferId,
     }))
     .sort((a, b) => b.date.getTime() - a.date.getTime());
+  const visible = limit ? sorted.slice(0, limit) : sorted;
 
   async function handleAdd() {
     if (!form.categoryId) {
@@ -157,7 +165,7 @@ export function TransactionsManager({
   return (
     <div>
       <ul className={styles.list}>
-        {sorted.map((t) =>
+        {visible.map((t) =>
           editingId === t.id ? (
             <TransactionEditRow
               key={t.id}
@@ -303,6 +311,11 @@ export function TransactionsManager({
         )}
       </ul>
       {transactions.length === 0 && <EmptyState icon={Receipt} message="No transactions yet." />}
+      {limit && sorted.length > limit && (
+        <Link href="/finances/transactions" className={styles.seeAll}>
+          See all {sorted.length} transactions →
+        </Link>
+      )}
       {error && <p className={styles.error}>{error}</p>}
       {unlinkError && <p className={styles.error}>{unlinkError}</p>}
 

@@ -53,6 +53,10 @@ import { FINANCE_PILLAR_ID } from "@/lib/finance/pillar-id";
 import { canReclassifyTransaction, findTransferSuggestions } from "@/lib/finance/logic";
 
 const TREND_MONTHS = 6;
+// The finances page's own quick-add/edit list shows only the most recent
+// N — the full paginated/filterable browser (#150, ADR-0015) is the
+// place for everything else, reached via the "See all" link below it.
+const RECENT_TRANSACTIONS_LIMIT = 10;
 
 /** The last `count` calendar months, oldest first, ending with `from`'s own
  * month — plain date arithmetic, not business logic, so it's inlined here
@@ -203,7 +207,13 @@ export default async function FinancesPage({ searchParams }: { searchParams: Pro
           <BudgetVsActual initialStatuses={budgetStatuses} categories={categories} />
         </Card>
         <Card title="Transactions">
-          <TransactionsManager initialTransactions={transactions} goals={goals} accounts={accounts} categories={categories} />
+          <TransactionsManager
+            initialTransactions={transactions}
+            goals={goals}
+            accounts={accounts}
+            categories={categories}
+            limit={RECENT_TRANSACTIONS_LIMIT}
+          />
         </Card>
         <Card title="Receivables">
           <ReceivablesList initialReceivables={receivables} repaymentCandidates={repaymentCandidates} />

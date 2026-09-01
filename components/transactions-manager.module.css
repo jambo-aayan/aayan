@@ -59,6 +59,21 @@
   color: var(--ink);
 }
 
+.seeAll {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--ink);
+  text-decoration: none;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.seeAll:hover {
+  text-decoration: underline;
+}
+
 .addForm {
   display: flex;
   flex-wrap: wrap;

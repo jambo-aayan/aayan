@@ -5,6 +5,7 @@ import { BASELINE_ID } from "./baseline-id";
 import { ensureFinanceNorthStarExists } from "./ensure-north-star";
 import { FINANCE_NORTH_STAR_ID } from "./north-star-id";
 import { CONFIDENCE_THRESHOLD, sortGoalsByPriority } from "./logic";
+import { buildTransactionQuery, type TransactionFilters } from "./transaction-query";
 
 // Prisma's Decimal isn't a plain serializable value — Client Components
 // need a plain number, so every read converts here at the DB boundary.
@@ -97,6 +98,78 @@ export async function getTransactions() {
  * management screen, and every category `<select>` in the app. */
 export async function getCategories() {
   return prisma.category.findMany({ orderBy: { name: "asc" } });
+}
+
+function mapTransactionListItem<
+  T extends {
+    id: string;
+    date: Date;
+    amount: { toNumber(): number };
+    direction: "IN" | "OUT";
+    source: string | null;
+    category: { name: string };
+    account: { name: string } | null;
+    statementId: string | null;
+  },
+>(t: T) {
+  return {
+    id: t.id,
+    date: t.date,
+    amount: t.amount.toNumber(),
+    direction: t.direction,
+    source: t.source,
+    category: t.category.name,
+    accountName: t.account?.name ?? null,
+    statementId: t.statementId,
+  };
+}
+
+// "Group by statement" mode has no per-transaction pagination — bounded
+// instead by capping how many Statements it fetches (#150, ADR-0015).
+// Each Statement's own transaction count is naturally small (however many
+// lines a real bank statement has), so this is the one dimension that
+// actually needed an explicit cap to stay bounded, the same reasoning
+// that made #149's dedup query need a date-range bound instead of
+// fetching a whole account's history.
+const MAX_GROUPED_STATEMENTS = 100;
+
+/** The full transaction browser's source data (#150, ADR-0015) — either a
+ * flat, paginated page of Transactions, or every Transaction matching the
+ * current filters grouped by the Statement it came from, per
+ * `buildTransactionQuery`'s two modes. */
+export async function getTransactionsPage(filters: TransactionFilters) {
+  const query = buildTransactionQuery(filters);
+  const include = { category: true, account: { select: { name: true } } } as const;
+
+  if (query.mode === "byStatement") {
+    const statements = await prisma.statement.findMany({
+      where: { transactions: { some: query.where } },
+      orderBy: { uploadedAt: "desc" },
+      take: MAX_GROUPED_STATEMENTS,
+      include: { account: { select: { name: true } }, transactions: { where: query.where, orderBy: query.orderBy, include } },
+    });
+    return {
+      mode: "byStatement" as const,
+      statements: statements.map((s) => ({
+        id: s.id,
+        name: s.name,
+        accountName: s.account.name,
+        transactions: s.transactions.map(mapTransactionListItem),
+      })),
+    };
+  }
+
+  const [rows, total] = await Promise.all([
+    prisma.transaction.findMany({ where: query.where, orderBy: query.orderBy, skip: query.skip, take: query.take, include }),
+    prisma.transaction.count({ where: query.where }),
+  ]);
+  return {
+    mode: "flat" as const,
+    transactions: rows.map(mapTransactionListItem),
+    total,
+    page: Math.floor(query.skip / query.take) + 1,
+    pageSize: query.take,
+  };
 }
 
 /** Every uploaded statement, most recent first (#148, ADR-0015) — the

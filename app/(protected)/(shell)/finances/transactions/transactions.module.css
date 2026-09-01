@@ -1,0 +1,164 @@
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 0;
+  border-top: 1px solid var(--border);
+  gap: 12px;
+}
+
+.row:first-child {
+  border-top: none;
+}
+
+.info {
+  min-width: 0;
+  flex: 1;
+}
+
+.category {
+  font-size: 14px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.source {
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.date {
+  font-size: 11.5px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.amtPos {
+  color: var(--health);
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.amtNeutral {
+  color: var(--ink);
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.muted {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.statementGroups {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.statementGroup + .statementGroup {
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.statementHead {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 4px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.statementHead::-webkit-details-marker {
+  display: none;
+}
+
+.statementHead::before {
+  content: "▾";
+  display: inline-block;
+  margin-right: 6px;
+  color: var(--muted);
+  transition: transform var(--duration-fast) var(--ease);
+}
+
+details:not([open]) > .statementHead::before {
+  transform: rotate(-90deg);
+}
+
+.statementMeta {
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.pageLink {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.pageLink:hover {
+  text-decoration: underline;
+}
+
+.pageNumbers {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.pageNumber {
+  min-width: 28px;
+  min-height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  font-size: 12.5px;
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.pageNumber:hover {
+  color: var(--ink);
+  background: var(--bg2);
+}
+
+.pageCurrent {
+  min-width: 28px;
+  min-height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--bg);
+  background: var(--ink);
+}
+
+.pageEllipsis {
+  color: var(--muted);
+  font-size: 12.5px;
+  padding: 0 2px;
+}
