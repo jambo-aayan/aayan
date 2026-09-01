@@ -22,51 +22,90 @@ export type ParsedValuation = {
  * recover from a wrong starting point (the account's balance before its
  * very first statement upload). Null when the statement doesn't state one
  * (e.g. some CSV exports), so callers can fall back to the computed delta
- * the same way they always have. */
+ * the same way they always have. institutionName/periodStart/periodEnd
+ * feed the generated Statement name (#148, ADR-0015) — all null when the
+ * statement doesn't state them clearly enough to extract with confidence,
+ * same "omit rather than guess" rule as closingBalance. */
 export type ParsedStatement = {
   transactions: ParsedTransaction[];
   closingBalance: number | null;
+  institutionName: string | null;
+  periodStart: string | null;
+  periodEnd: string | null;
 };
 
-const TRANSACTIONS_SCHEMA = {
-  type: Type.OBJECT,
-  properties: {
-    transactions: {
-      type: Type.ARRAY,
-      items: {
-        type: Type.OBJECT,
-        properties: {
-          date: { type: Type.STRING, description: "The transaction date, as YYYY-MM-DD." },
-          amount: { type: Type.NUMBER, description: "The absolute transaction amount, always positive." },
-          direction: { type: Type.STRING, enum: ["IN", "OUT"], description: "IN for money received, OUT for money spent." },
-          description: { type: Type.STRING, description: "The statement's own description/payee text for this line." },
-          category: { type: Type.STRING, description: "A best-guess spending category (e.g. Food, Housing, Transport)." },
-          confidence: {
-            type: Type.NUMBER,
-            description: "0 to 1 — how confident the extraction is that date/amount/direction/category are all correct for this line.",
+/** category is constrained to the user's real Category names (#148,
+ * building on #147, ADR-0015) — an enum, not a free-text guess, so
+ * statement extraction can't reintroduce the near-duplicate-category
+ * fragmentation the taxonomy exists to fix. `categoryNames` must include
+ * "Other" (or whatever the caller's own fallback category is named) so
+ * there's always a valid choice for a line that doesn't clearly fit. */
+function buildTransactionsSchema(categoryNames: string[]) {
+  return {
+    type: Type.OBJECT,
+    properties: {
+      transactions: {
+        type: Type.ARRAY,
+        items: {
+          type: Type.OBJECT,
+          properties: {
+            date: { type: Type.STRING, description: "The transaction date, as YYYY-MM-DD." },
+            amount: { type: Type.NUMBER, description: "The absolute transaction amount, always positive." },
+            direction: { type: Type.STRING, enum: ["IN", "OUT"], description: "IN for money received, OUT for money spent." },
+            description: { type: Type.STRING, description: "The statement's own description/payee text for this line." },
+            category: {
+              type: Type.STRING,
+              enum: categoryNames,
+              description: "The closest matching category from the given list for this line's spending.",
+            },
+            confidence: {
+              type: Type.NUMBER,
+              description: "0 to 1 — how confident the extraction is that date/amount/direction/category are all correct for this line.",
+            },
           },
+          required: ["date", "amount", "direction", "description", "category", "confidence"],
         },
-        required: ["date", "amount", "direction", "description", "category", "confidence"],
+      },
+      closingBalance: {
+        type: Type.NUMBER,
+        description: "The statement's own stated closing/ending balance, if shown. Omit entirely if the statement doesn't state one.",
+        nullable: true,
+      },
+      institutionName: {
+        type: Type.STRING,
+        description: "The bank/card issuer's name, e.g. 'Barclays' or 'Yonder'. Omit if not clearly stated.",
+        nullable: true,
+      },
+      periodStart: {
+        type: Type.STRING,
+        description: "The statement period's start date, as YYYY-MM-DD. Omit if not clearly stated.",
+        nullable: true,
+      },
+      periodEnd: {
+        type: Type.STRING,
+        description: "The statement period's end date, as YYYY-MM-DD. Omit if not clearly stated.",
+        nullable: true,
       },
     },
-    closingBalance: {
-      type: Type.NUMBER,
-      description: "The statement's own stated closing/ending balance, if shown. Omit entirely if the statement doesn't state one.",
-      nullable: true,
-    },
-  },
-  required: ["transactions"],
-};
+    required: ["transactions"],
+  };
+}
 
-const TRANSACTIONS_PROMPT =
-  "Extract every individual transaction line from this bank statement. Ignore running balance " +
-  "columns, headers, and summary rows — only real transaction lines. Amounts are always positive; " +
-  "use direction to encode whether money came in or went out. Give each transaction its own " +
-  "confidence score reflecting how sure you are the date, amount, direction, and category are " +
-  "all correct — lower it for handwritten-looking, smudged, ambiguous, or unclear entries rather " +
-  "than guessing high. Separately, if the statement states its own closing/ending balance, extract " +
-  "that too — this is the account's real balance and takes priority over summing transactions. " +
-  "Leave it out if the statement doesn't state a balance.";
+function buildTransactionsPrompt(categoryNames: string[]): string {
+  return (
+    "Extract every individual transaction line from this bank statement. Ignore running balance " +
+    "columns, headers, and summary rows — only real transaction lines. Amounts are always positive; " +
+    `use direction to encode whether money came in or went out. Categorize each line using only ` +
+    `one of these categories: ${categoryNames.map((c) => `"${c}"`).join(", ")} — pick the closest match, never invent a ` +
+    "new category name. Give each transaction its own confidence score reflecting how sure you are " +
+    "the date, amount, direction, and category are all correct — lower it for handwritten-looking, " +
+    "smudged, ambiguous, or unclear entries rather than guessing high. Separately, if the statement " +
+    "states its own closing/ending balance, extract that too — this is the account's real balance " +
+    "and takes priority over summing transactions. Also extract the issuing institution's name and " +
+    "the statement's period start/end dates, if clearly stated. Leave any of these out rather than " +
+    "guessing if the statement doesn't state them."
+  );
+}
 
 const VALUATION_SCHEMA = {
   type: Type.OBJECT,
@@ -99,24 +138,30 @@ function buildContents(fileBuffer: Buffer, mimeType: string, prompt: string) {
   ];
 }
 
-/** Parses a bank statement (PDF or CSV) into dated transactions plus, when
- * the statement states one, its own closing balance — via Gemini 2.5
- * Flash, sent as direct file input against a structured schema — no
- * hand-written per-bank heuristics, no mocked parsing (#115, ADR-0010).
+/** Parses a bank statement (PDF or CSV) into dated transactions plus,
+ * when the statement states them, its own closing balance and
+ * institution/period metadata — via Gemini 2.5 Flash, sent as direct
+ * file input against a structured schema — no hand-written per-bank
+ * heuristics, no mocked parsing (#115, ADR-0010). `categoryNames` is the
+ * user's real Category list (#147), constraining each line's category to
+ * one of those names rather than a free-text guess (#148, ADR-0015).
  * Integration-level: not unit tested directly, per ADR-0010 and #112's
  * Testing Decisions — verified via typecheck and manual review. */
-export async function parseStatement(fileBuffer: Buffer, mimeType: string): Promise<ParsedStatement> {
+export async function parseStatement(fileBuffer: Buffer, mimeType: string, categoryNames: string[]): Promise<ParsedStatement> {
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
   const response = await ai.models.generateContent({
     model: "gemini-2.5-flash",
-    contents: buildContents(fileBuffer, mimeType, TRANSACTIONS_PROMPT),
-    config: { responseMimeType: "application/json", responseSchema: TRANSACTIONS_SCHEMA },
+    contents: buildContents(fileBuffer, mimeType, buildTransactionsPrompt(categoryNames)),
+    config: { responseMimeType: "application/json", responseSchema: buildTransactionsSchema(categoryNames) },
   });
 
   const parsed = JSON.parse(response.text ?? "{}") as Partial<ParsedStatement>;
   return {
     transactions: parsed.transactions ?? [],
     closingBalance: parsed.closingBalance ?? null,
+    institutionName: parsed.institutionName ?? null,
+    periodStart: parsed.periodStart ?? null,
+    periodEnd: parsed.periodEnd ?? null,
   };
 }
 

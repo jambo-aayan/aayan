@@ -8,6 +8,7 @@ import { canLinkTransfer, canReclassifyTransaction, isHeldForReview, resolveStat
 import { FINANCE_NORTH_STAR_ID } from "./north-star-id";
 import { parseStatement, parseValuation } from "./statement-parser";
 import { resolveCategoryId } from "./categories";
+import { generateStatementName } from "./statement-naming";
 
 export type AccountInput = {
   name: string;
@@ -106,13 +107,15 @@ export type UploadStatementResult =
   | { ok: false; error: string };
 
 /** Uploads a bank statement (PDF/CSV) for a Transactional Account, keeps
- * the file in Vercel Blob (referenced from the new Snapshot, not
+ * the file in Vercel Blob (referenced from the new Statement, not
  * discarded), and parses it via Gemini 2.5 Flash into dated Transactions
  * linked to the account (#115, ADR-0010). The new Snapshot's balance
  * prefers the statement's own stated closing balance when it has one —
  * carrying the account's prior balance forward plus the net of the newly
  * parsed transactions is only a fallback for a statement that doesn't
- * state a balance at all (resolveStatementBalance, lib/finance/logic.ts). */
+ * state a balance at all (resolveStatementBalance, lib/finance/logic.ts).
+ * A Statement row records the upload event itself; the new Snapshot and
+ * every parsed Transaction link back to it (#148, ADR-0015). */
 export async function uploadStatement(accountId: string, file: File): Promise<UploadStatementResult> {
   const validation = validateStatementUpload(file.type, file.size);
   if (!validation.ok) return validation;
@@ -132,34 +135,55 @@ export async function uploadStatement(accountId: string, file: File): Promise<Up
       addRandomSuffix: true,
     });
 
-    const fileBuffer = Buffer.from(await file.arrayBuffer());
-    const { transactions, closingBalance } = await parseStatement(fileBuffer, file.type);
-    // Distinguish "nothing to import" from a successful zero-transaction
-    // parse — an empty Gemini response (blocked, safety-filtered, no
-    // candidate) shouldn't silently write a same-balance Snapshot and
-    // report a misleading "Imported 0 transactions" success.
-    if (transactions.length === 0) {
-      return { ok: false, error: "Couldn't find any transactions in that statement — try again." };
-    }
-
-    const previousBalance = account.snapshots[0]?.balance.toNumber() ?? 0;
-    const newBalance = resolveStatementBalance(previousBalance, transactions, closingBalance, account.type);
-
-    // Gemini's per-transaction category is still a free-text guess at this
-    // point (constrained to the real taxonomy as of #148) — resolved to a
-    // real categoryId here regardless, since the schema has no free-text
-    // column to fall back to (ADR-0015).
+    // Gemini's per-transaction category is constrained to the user's real
+    // taxonomy (#147/#148, ADR-0015) rather than free-generated — still
+    // resolved defensively via resolveCategoryId below, since an LLM can
+    // occasionally return something outside the given enum despite the
+    // constraint.
     const categories = await prisma.category.findMany({ select: { id: true, name: true } });
     // At least one Category always exists — the migration seeds a default
     // set and merge (the only removal path) always keeps its target.
     const fallbackCategoryId = (categories.find((c) => c.name.toLowerCase() === "other") ?? categories[0]).id;
 
-    await prisma.$transaction([
-      prisma.snapshot.create({
-        data: { accountId, date: new Date(), balance: newBalance, sourceFileUrl: blob.url },
-      }),
-      prisma.transaction.createMany({
-        data: transactions.map((t) => ({
+    const fileBuffer = Buffer.from(await file.arrayBuffer());
+    const parsed = await parseStatement(fileBuffer, file.type, categories.map((c) => c.name));
+    // Distinguish "nothing to import" from a successful zero-transaction
+    // parse — an empty Gemini response (blocked, safety-filtered, no
+    // candidate) shouldn't silently write a same-balance Snapshot and
+    // report a misleading "Imported 0 transactions" success.
+    if (parsed.transactions.length === 0) {
+      return { ok: false, error: "Couldn't find any transactions in that statement — try again." };
+    }
+
+    const previousBalance = account.snapshots[0]?.balance.toNumber() ?? 0;
+    const newBalance = resolveStatementBalance(previousBalance, parsed.transactions, parsed.closingBalance, account.type);
+    const uploadedAt = new Date();
+    const periodEnd = parsed.periodEnd ? new Date(parsed.periodEnd) : null;
+    const statementName = generateStatementName({
+      institutionName: parsed.institutionName,
+      periodEnd,
+      accountName: account.name,
+      uploadedAt,
+    });
+
+    await prisma.$transaction(async (tx) => {
+      const statement = await tx.statement.create({
+        data: {
+          accountId,
+          name: statementName,
+          institutionName: parsed.institutionName,
+          periodStart: parsed.periodStart ? new Date(parsed.periodStart) : null,
+          periodEnd,
+          sourceFileUrl: blob.url,
+          originalFilename: file.name || null,
+          uploadedAt,
+        },
+      });
+      await tx.snapshot.create({
+        data: { accountId, date: uploadedAt, balance: newBalance, statementId: statement.id },
+      });
+      await tx.transaction.createMany({
+        data: parsed.transactions.map((t) => ({
           date: new Date(t.date),
           amount: t.amount,
           direction: t.direction,
@@ -167,15 +191,16 @@ export async function uploadStatement(accountId: string, file: File): Promise<Up
           source: t.description,
           accountId,
           confidence: t.confidence,
+          statementId: statement.id,
         })),
-      }),
-    ]);
+      });
+    });
 
     revalidatePath("/finances");
     return {
       ok: true,
-      importedCount: transactions.length,
-      heldCount: transactions.filter((t) => isHeldForReview(t.confidence)).length,
+      importedCount: parsed.transactions.length,
+      heldCount: parsed.transactions.filter((t) => isHeldForReview(t.confidence)).length,
     };
   } catch (error) {
     // Logged (not just swallowed) so a real failure — a missing Blob token,
@@ -220,14 +245,28 @@ export async function uploadValuationStatement(
       return { ok: false, error: "Couldn't find a balance in that statement — try again." };
     }
 
-    await prisma.snapshot.create({
-      data: {
-        accountId,
-        date: new Date(parsed.asOfDate),
-        balance: parsed.balance,
-        sourceFileUrl: blob.url,
-        confidence: parsed.confidence,
-      },
+    const uploadedAt = new Date();
+    await prisma.$transaction(async (tx) => {
+      const statement = await tx.statement.create({
+        data: {
+          accountId,
+          // parseValuation extracts only a balance + as-of date, no
+          // institution/period — always the fallback naming path here.
+          name: generateStatementName({ institutionName: null, periodEnd: null, accountName: account.name, uploadedAt }),
+          sourceFileUrl: blob.url,
+          originalFilename: file.name || null,
+          uploadedAt,
+        },
+      });
+      await tx.snapshot.create({
+        data: {
+          accountId,
+          date: new Date(parsed.asOfDate),
+          balance: parsed.balance,
+          confidence: parsed.confidence,
+          statementId: statement.id,
+        },
+      });
     });
 
     revalidatePath("/finances");
@@ -236,6 +275,22 @@ export async function uploadValuationStatement(
     console.error("uploadValuationStatement failed", error);
     return { ok: false, error: "Couldn't upload or parse the statement — try again." };
   }
+}
+
+/** Overrides a Statement's generated name (#148, ADR-0015) — for when
+ * extraction's name guess is wrong. Doesn't touch anything it produced
+ * (Snapshot/Transaction rows keep their statementId regardless). */
+export async function renameStatement(id: string, name: string): Promise<ActionResult> {
+  const trimmed = name.trim();
+  if (!trimmed) return { ok: false, error: "Enter a name." };
+  try {
+    await prisma.statement.update({ where: { id }, data: { name: trimmed } });
+  } catch {
+    return { ok: false, error: SAVE_ERROR };
+  }
+  revalidatePath("/finances");
+  revalidatePath("/finances/statements");
+  return { ok: true };
 }
 
 export async function updateBaseline(

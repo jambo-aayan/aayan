@@ -99,6 +99,16 @@ export async function getCategories() {
   return prisma.category.findMany({ orderBy: { name: "asc" } });
 }
 
+/** Every uploaded statement, most recent first (#148, ADR-0015) — the
+ * Statements page's own list, with each one's generated (or renamed)
+ * name and which account it's for. */
+export async function getStatements() {
+  return prisma.statement.findMany({
+    orderBy: { uploadedAt: "desc" },
+    include: { account: { select: { name: true } } },
+  });
+}
+
 export type FinanceSetupSteps = { baseline: boolean; accounts: boolean; goals: boolean };
 
 /** The Finance-scoped setup checklist's source data (#122, ADR-0010) — a

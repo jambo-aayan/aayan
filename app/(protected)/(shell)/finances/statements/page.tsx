@@ -2,8 +2,9 @@ import { PageHeader } from "@/components/page-header";
 import pageStyles from "@/components/page-header.module.css";
 import { Card } from "@/components/card";
 import { CompareView } from "@/components/statements/compare-view";
+import { StatementList } from "@/components/statement-list";
 import styles from "./statements.module.css";
-import { getAccounts, getBaseline, getReceivables, getTransactions } from "@/lib/finance/data";
+import { getAccounts, getBaseline, getReceivables, getStatements, getTransactions } from "@/lib/finance/data";
 import { categoryBreakdown } from "@/lib/finance/category-breakdown";
 import {
   accountFreshness,
@@ -48,12 +49,19 @@ export default async function StatementsPage() {
   const thisMonth = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1));
   const lastMonth = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() - 1, 1));
 
-  const [accounts, baseline, transactions, receivables] = await Promise.all([
+  const [accounts, baseline, transactions, receivables, statements] = await Promise.all([
     getAccounts(),
     getBaseline(),
     getTransactions(),
     getReceivables(),
+    getStatements(),
   ]);
+  const statementItems = statements.map((s) => ({
+    id: s.id,
+    name: s.name,
+    accountName: s.account.name,
+    uploadedAt: s.uploadedAt,
+  }));
 
   // Overview
   const diff = monthOverMonthDiff(transactions, thisMonth, lastMonth);
@@ -211,6 +219,10 @@ export default async function StatementsPage() {
             ))}
             {freshness.length === 0 && <li className={styles.muted}>No accounts yet.</li>}
           </ul>
+        </Card>
+
+        <Card title="Statements">
+          <StatementList initialStatements={statementItems} />
         </Card>
 
         <Card title="Receivables">

@@ -603,28 +603,58 @@ model Account {
   updatedAt    DateTime      @updatedAt
   snapshots    Snapshot[]
   transactions Transaction[]
+  statements   Statement[]
 }
 
 /// A dated balance record for an Account — replaces v1's single
 /// Item.value column, so an account's value comes from its own history,
-/// not one number overwritten in place. sourceFileUrl (Vercel Blob, same
-/// pattern as Phase 4's Checkpoint photos) is nullable: a manually
-/// entered Snapshot (no statement upload) has no original file to keep.
+/// not one number overwritten in place. statementId (nullable) links back
+/// to the upload event that produced this Snapshot, when there was one —
+/// a manually entered Snapshot has none (#148, ADR-0015; sourceFileUrl
+/// lived here before that ticket, see Statement below for where it moved).
 /// confidence is set only by Valuation statement-upload parsing (#116,
 /// ADR-0010) — null for a manually entered or Transactional-derived
 /// Snapshot, which are never held for review (lib/finance/logic.ts's
 /// isHeldForReview treats null as "not held").
 model Snapshot {
-  id            String   @id @default(cuid())
-  accountId     String
-  account       Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  date          DateTime @db.Date
-  balance       Decimal  @db.Decimal(12, 2)
-  sourceFileUrl String?
-  confidence    Float?
-  createdAt     DateTime @default(now())
+  id          String     @id @default(cuid())
+  accountId   String
+  account     Account    @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  date        DateTime   @db.Date
+  balance     Decimal    @db.Decimal(12, 2)
+  confidence  Float?
+  createdAt   DateTime   @default(now())
+  statementId String?
+  statement   Statement? @relation(fields: [statementId], references: [id])
 
   @@index([accountId, date])
+  @@index([statementId])
+}
+
+/// One uploaded bank/card statement — the record of the upload event
+/// itself, distinct from the Snapshot (balance) and Transactions (line
+/// items) it produces (#148, ADR-0015). `name` is generated
+/// (`{institutionName} — {account name} — {month YYYY}`, falling back to
+/// `{account name} — Statement {uploadedAt}` when extraction can't
+/// determine institution/period confidently) and user-editable afterward.
+/// sourceFileUrl lived on Snapshot before this — moved here since it's a
+/// property of the upload/document, not of the balance point it produced
+/// (a manual balance edit has no source file at all).
+model Statement {
+  id               String        @id @default(cuid())
+  accountId        String
+  account          Account       @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  name             String
+  institutionName  String?
+  periodStart      DateTime?     @db.Date
+  periodEnd        DateTime?     @db.Date
+  sourceFileUrl    String
+  originalFilename String?
+  uploadedAt       DateTime      @default(now())
+  snapshots        Snapshot[]
+  transactions     Transaction[]
+
+  @@index([accountId])
 }
 
 enum ReceivableStatus {
@@ -809,6 +839,8 @@ model Transaction {
   confidence         Float?
   createdAt          DateTime             @default(now())
   updatedAt          DateTime             @updatedAt
+  statementId        String?
+  statement          Statement?           @relation(fields: [statementId], references: [id])
 
   @@index([date])
   @@index([categoryId])
@@ -816,6 +848,7 @@ model Transaction {
   @@index([receivableId])
   @@index([goalContributionId])
   @@index([transferId])
+  @@index([statementId])
 }
 
 /// A live Enable Banking authorization — the result of one `POST /sessions`
