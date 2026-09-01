@@ -1,0 +1,63 @@
+.zone {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.warning {
+  font-size: 13px;
+  color: var(--ink);
+  margin: 0;
+}
+
+.confirmLabel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.confirmInput {
+  padding: 9px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  font-size: 13px;
+  background: var(--bg);
+  color: var(--ink);
+  min-height: 38px;
+  max-width: 200px;
+}
+
+.confirmInput:focus-visible {
+  border-color: var(--danger);
+}
+
+.resetButton {
+  align-self: flex-start;
+  border: none;
+  background: var(--danger);
+  color: white;
+  padding: 9px 16px;
+  border-radius: var(--radius-pill);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.resetButton:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.done {
+  font-size: 12.5px;
+  color: var(--health);
+  margin: 0;
+}
+
+.error {
+  color: var(--danger);
+  font-size: 12px;
+  margin: 0;
+}

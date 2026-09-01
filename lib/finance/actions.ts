@@ -953,3 +953,42 @@ export async function unlinkTransfer(transferId: string): Promise<ActionResult> 
   revalidatePath("/finances");
   return { ok: true };
 }
+
+/** Wipes all transaction data and everything that hangs off it, so the
+ * user can re-upload statements onto the fixed Category/Statement/dedup
+ * foundation instead of data affected by the bugs those fixes exist for
+ * (#154, ADR-0015). Deletes Transaction, Snapshot, Transfer, Receivable,
+ * GoalContribution, and Statement, in that order — every FK among these
+ * six is nullable with ON DELETE SET NULL (see prisma/schema.prisma), so
+ * no ordering is actually load-bearing against today's schema; kept in
+ * this order anyway since it's the natural "leaves first" reading and
+ * matches the spec's own listing, not because reordering it would break.
+ * Account, Goal, Habit, and Category are all left untouched — this
+ * clears the ledger, not the structure it's re-uploaded into. Requires
+ * the caller to have already confirmed via
+ * RESET_FINANCE_DATA_CONFIRMATION; this function itself doesn't re-check
+ * the phrase, since that's a UI-level gate, not a data-integrity one. */
+export async function resetFinanceData(): Promise<ActionResult> {
+  try {
+    await prisma.$transaction([
+      prisma.transaction.deleteMany({}),
+      prisma.snapshot.deleteMany({}),
+      prisma.transfer.deleteMany({}),
+      prisma.receivable.deleteMany({}),
+      prisma.goalContribution.deleteMany({}),
+      prisma.statement.deleteMany({}),
+    ]);
+  } catch {
+    return { ok: false, error: "Couldn't reset — try again." };
+  }
+  revalidatePath("/finances");
+  revalidatePath("/finances/transactions");
+  revalidatePath("/finances/statements");
+  revalidatePath("/finances/uncategorised");
+  // Both read finance transaction data too (Insights' surplus-rate KPI
+  // and net-worth trajectory; Nudges' eligibility evaluation) — stale
+  // otherwise until each page's own next natural revalidation.
+  revalidatePath("/insights");
+  revalidatePath("/nudges");
+  return { ok: true };
+}

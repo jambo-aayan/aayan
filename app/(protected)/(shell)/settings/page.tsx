@@ -6,6 +6,7 @@ import { Card } from "@/components/card";
 import { LogoutButton } from "@/components/logout-button";
 import { SettingsToggles } from "@/components/settings-toggles";
 import { CategoryManager } from "@/components/category-manager";
+import { FinanceReset } from "@/components/finance-reset";
 import { getAppSettings } from "@/lib/settings/data";
 import { getCategories } from "@/lib/finance/data";
 import styles from "./settings.module.css";
@@ -26,6 +27,9 @@ export default async function SettingsPage() {
         </Card>
         <Card title="Categories">
           <CategoryManager initialCategories={categories} />
+        </Card>
+        <Card title="Danger zone">
+          <FinanceReset />
         </Card>
         <Link href="/weekly-review" className={styles.reviewLink}>
           <div>
