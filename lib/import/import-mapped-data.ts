@@ -1,6 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { BASELINE_ID } from "@/lib/finance/baseline-id";
+import { resolveCategoryId } from "@/lib/finance/categories";
 import type { MappedImport } from "./map-legacy-export";
 
 function toUtcDate(dateStr: string): Date {
@@ -103,23 +104,31 @@ export async function importMappedData(mapped: MappedImport): Promise<ImportSumm
     });
   }
 
-  for (const tx of mapped.transactions) {
-    await prisma.transaction.upsert({
-      where: { id: tx.id },
-      update: {
-        date: toUtcDate(tx.date),
-        amount: tx.amount,
-        direction: tx.direction,
-        category: tx.category,
-      },
-      create: {
-        id: tx.id,
-        date: toUtcDate(tx.date),
-        amount: tx.amount,
-        direction: tx.direction,
-        category: tx.category,
-      },
-    });
+  if (mapped.transactions.length > 0) {
+    const categories = await prisma.category.findMany({ select: { id: true, name: true } });
+    // At least one Category always exists — see uploadStatement's identical
+    // invariant note (lib/finance/actions.ts).
+    const fallbackCategoryId = (categories.find((c) => c.name.toLowerCase() === "other") ?? categories[0]).id;
+
+    for (const tx of mapped.transactions) {
+      const categoryId = resolveCategoryId(categories, tx.category, fallbackCategoryId);
+      await prisma.transaction.upsert({
+        where: { id: tx.id },
+        update: {
+          date: toUtcDate(tx.date),
+          amount: tx.amount,
+          direction: tx.direction,
+          categoryId,
+        },
+        create: {
+          id: tx.id,
+          date: toUtcDate(tx.date),
+          amount: tx.amount,
+          direction: tx.direction,
+          categoryId,
+        },
+      });
+    }
   }
 
   let baselineImported = false;

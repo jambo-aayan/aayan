@@ -78,9 +78,25 @@ export async function getFinanceNorthStar() {
   };
 }
 
+/** Resolves each Transaction's categoryId to its Category name (ADR-0015)
+ * — every pure finance module (categoryBreakdown, categoryTimeSeries,
+ * spend-deviation, ...) keeps consuming `category: string`, unchanged. */
 export async function getTransactions() {
-  const transactions = await prisma.transaction.findMany({ orderBy: { date: "desc" } });
-  return transactions.map((t) => ({ ...t, amount: t.amount.toNumber() }));
+  const transactions = await prisma.transaction.findMany({
+    orderBy: { date: "desc" },
+    include: { category: true },
+  });
+  return transactions.map(({ category, amount, ...t }) => ({
+    ...t,
+    amount: amount.toNumber(),
+    category: category.name,
+  }));
+}
+
+/** The full user-editable Category list (ADR-0015) — Settings' category
+ * management screen, and every category `<select>` in the app. */
+export async function getCategories() {
+  return prisma.category.findMany({ orderBy: { name: "asc" } });
 }
 
 export type FinanceSetupSteps = { baseline: boolean; accounts: boolean; goals: boolean };
@@ -134,7 +150,11 @@ export async function getUncategorisedTransactions() {
   const transactions = await prisma.transaction.findMany({
     where: { confidence: { not: null, lt: CONFIDENCE_THRESHOLD }, receivableId: null, goalContributionId: null },
     orderBy: { date: "desc" },
-    include: { account: { select: { name: true } } },
+    include: { account: { select: { name: true } }, category: true },
   });
-  return transactions.map((t) => ({ ...t, amount: t.amount.toNumber() }));
+  return transactions.map(({ category, amount, ...t }) => ({
+    ...t,
+    amount: amount.toNumber(),
+    category: category.name,
+  }));
 }

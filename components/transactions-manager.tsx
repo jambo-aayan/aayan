@@ -12,7 +12,7 @@ import {
 } from "@/lib/finance/actions";
 import { useUndoableCrudList, type ActionResult } from "@/lib/hooks/use-undoable-crud-list";
 import { canReclassifyTransaction, isHeldForReview } from "@/lib/finance/logic";
-import { DEFAULT_CATEGORIES } from "@/lib/finance/categories";
+import type { CategoryOption } from "@/lib/finance/categories";
 import { PrimaryButton } from "@/components/primary-button";
 import { EmptyState } from "@/components/empty-state";
 import { FlagReceivableForm } from "@/components/flag-receivable-form";
@@ -22,8 +22,12 @@ import { RowActions } from "@/components/row-actions";
 import { withRetry } from "@/lib/with-retry";
 import styles from "./transactions-manager.module.css";
 
+// getTransactions() (lib/finance/data.ts) resolves categoryId to its
+// Category name too, alongside the raw id — LinkTransferForm's candidate
+// list displays the name, while the id is what forms/edits submit.
 type Transaction = TransactionInput & {
   id: string;
+  category: string;
   accountId: string | null;
   receivableId: string | null;
   goalContributionId: string | null;
@@ -37,7 +41,7 @@ const EMPTY_FORM: TransactionInput = {
   date: new Date(),
   amount: 0,
   direction: "OUT",
-  category: "",
+  categoryId: "",
   source: null,
 };
 
@@ -57,10 +61,12 @@ export function TransactionsManager({
   initialTransactions,
   goals,
   accounts,
+  categories,
 }: {
   initialTransactions: Transaction[];
   goals: GoalOption[];
   accounts: AccountOption[];
+  categories: CategoryOption[];
 }) {
   const { items: transactions, error, undo, add, update, remove, undoDelete } = useUndoableCrudList<
     Transaction,
@@ -71,7 +77,15 @@ export function TransactionsManager({
       return result.ok
         ? {
             ok: true,
-            item: { ...result.item, accountId: null, receivableId: null, goalContributionId: null, transferId: null, confidence: null },
+            item: {
+              ...result.item,
+              category: categories.find((c) => c.id === result.item.categoryId)?.name ?? "",
+              accountId: null,
+              receivableId: null,
+              goalContributionId: null,
+              transferId: null,
+              confidence: null,
+            },
           }
         : result;
     },
@@ -99,6 +113,7 @@ export function TransactionsManager({
   const [goalContributionOverrides, setGoalContributionOverrides] = useState<Record<string, string>>({});
   const [transferOverrides, setTransferOverrides] = useState<Record<string, string | null>>({});
   const accountNames = Object.fromEntries(accounts.map((a) => [a.id, a.name]));
+  const categoryNames = Object.fromEntries(categories.map((c) => [c.id, c.name]));
 
   const sorted = [...transactions]
     .map((t) => ({
@@ -110,7 +125,7 @@ export function TransactionsManager({
     .sort((a, b) => b.date.getTime() - a.date.getTime());
 
   async function handleAdd() {
-    if (!form.category.trim()) {
+    if (!form.categoryId) {
       setAddError("Category is required.");
       return;
     }
@@ -147,11 +162,13 @@ export function TransactionsManager({
             <TransactionEditRow
               key={t.id}
               transaction={t}
+              categories={categories}
               onCancel={() => setEditingId(null)}
               onSaved={async (input) => {
                 const result = await update(t.id, input, {
                   ...input,
                   id: t.id,
+                  category: categoryNames[input.categoryId] ?? "",
                   accountId: t.accountId,
                   receivableId: t.receivableId,
                   goalContributionId: t.goalContributionId,
@@ -207,7 +224,7 @@ export function TransactionsManager({
             <li key={t.id} className={styles.row}>
               <div>
                 <div className={styles.category}>
-                  {t.category}
+                  {categoryNames[t.categoryId] ?? "—"}
                   {t.source && <span className={styles.source}> · {t.source}</span>}
                   {t.receivableId && <span className={styles.badge}>Receivable</span>}
                   {t.goalContributionId && <span className={styles.badge}>Goal contribution</span>}
@@ -290,7 +307,7 @@ export function TransactionsManager({
       {unlinkError && <p className={styles.error}>{unlinkError}</p>}
 
       <div className={styles.addForm}>
-        <TransactionFields form={form} onChange={setForm} />
+        <TransactionFields form={form} onChange={setForm} categories={categories} />
         <PrimaryButton onClick={handleAdd} disabled={adding}>
           {adding ? "Adding…" : "Add transaction"}
         </PrimaryButton>
@@ -299,7 +316,7 @@ export function TransactionsManager({
 
       {undo && (
         <div className={styles.toast}>
-          <span>Deleted &ldquo;{undo.category}&rdquo; transaction.</span>
+          <span>Deleted &ldquo;{categoryNames[undo.categoryId] ?? "—"}&rdquo; transaction.</span>
           <button type="button" className={styles.undoBtn} onClick={undoDelete}>
             Undo
           </button>
@@ -312,9 +329,11 @@ export function TransactionsManager({
 function TransactionFields({
   form,
   onChange,
+  categories,
 }: {
   form: TransactionInput;
   onChange: (update: TransactionInput) => void;
+  categories: CategoryOption[];
 }) {
   return (
     <>
@@ -343,19 +362,19 @@ function TransactionFields({
         value={form.amount}
         onChange={(e) => onChange({ ...form, amount: Number(e.target.value) })}
       />
-      <input
+      <select
         className={styles.input}
-        list="finance-categories"
-        placeholder="Category"
         aria-label="Category"
-        value={form.category}
-        onChange={(e) => onChange({ ...form, category: e.target.value })}
-      />
-      <datalist id="finance-categories">
-        {DEFAULT_CATEGORIES.map((c) => (
-          <option key={c} value={c} />
+        value={form.categoryId}
+        onChange={(e) => onChange({ ...form, categoryId: e.target.value })}
+      >
+        <option value="">Select a category</option>
+        {categories.map((c) => (
+          <option key={c.id} value={c.id}>
+            {c.name}
+          </option>
         ))}
-      </datalist>
+      </select>
       <input
         className={styles.input}
         placeholder="Source (optional)"
@@ -369,10 +388,12 @@ function TransactionFields({
 
 function TransactionEditRow({
   transaction,
+  categories,
   onCancel,
   onSaved,
 }: {
   transaction: Transaction;
+  categories: CategoryOption[];
   onCancel: () => void;
   onSaved: (input: TransactionInput) => Promise<ActionResult>;
 }) {
@@ -390,7 +411,7 @@ function TransactionEditRow({
 
   return (
     <li className={styles.addForm}>
-      <TransactionFields form={form} onChange={setForm} />
+      <TransactionFields form={form} onChange={setForm} categories={categories} />
       <PrimaryButton onClick={handleSave} disabled={saving}>
         {saving ? "Saving…" : "Save"}
       </PrimaryButton>

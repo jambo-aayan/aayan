@@ -756,6 +756,20 @@ enum TransactionDirection {
   OUT
 }
 
+/// A Transaction's spending category (ADR-0015) — a real, user-editable
+/// entity (add/rename/merge from Settings), not free text. Unrelated to
+/// Pillar despite the shared word "Category" — see CONTEXT.md's Pillar
+/// entry. Pre-seeded with a default set on migration; name is unique so
+/// the category trend view can't silently fragment into near-duplicate
+/// rows again.
+model Category {
+  id           String        @id @default(cuid())
+  name         String        @unique
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  transactions Transaction[]
+}
+
 /// A dated, categorized ledger entry — distinct from Baseline's fixed
 /// monthly summary. accountId replaces v1's linkedItemId placeholder
 /// (nothing ever populated it) with a real FK, per ADR-0010. receivableId
@@ -774,13 +788,15 @@ enum TransactionDirection {
 /// reclassification-unaware since real cash still moved. confidence is
 /// set only by statement-upload parsing (#115, ADR-0010) — null for
 /// manually entered transactions, which are never held for review (see
-/// lib/finance/logic.ts's isHeldForReview).
+/// lib/finance/logic.ts's isHeldForReview). categoryId replaced the
+/// original free-text `category` column (ADR-0015) — see Category above.
 model Transaction {
   id                 String               @id @default(cuid())
   date               DateTime             @db.Date
   amount             Decimal              @db.Decimal(12, 2)
   direction          TransactionDirection
-  category           String
+  categoryId         String
+  category           Category             @relation(fields: [categoryId], references: [id])
   source             String?
   accountId          String?
   account            Account?             @relation(fields: [accountId], references: [id])
@@ -795,6 +811,7 @@ model Transaction {
   updatedAt          DateTime             @updatedAt
 
   @@index([date])
+  @@index([categoryId])
   @@index([accountId])
   @@index([receivableId])
   @@index([goalContributionId])

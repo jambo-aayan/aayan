@@ -7,6 +7,7 @@ import { BASELINE_ID } from "./baseline-id";
 import { canLinkTransfer, canReclassifyTransaction, isHeldForReview, resolveStatementBalance, validateStatementUpload } from "./logic";
 import { FINANCE_NORTH_STAR_ID } from "./north-star-id";
 import { parseStatement, parseValuation } from "./statement-parser";
+import { resolveCategoryId } from "./categories";
 
 export type AccountInput = {
   name: string;
@@ -144,6 +145,15 @@ export async function uploadStatement(accountId: string, file: File): Promise<Up
     const previousBalance = account.snapshots[0]?.balance.toNumber() ?? 0;
     const newBalance = resolveStatementBalance(previousBalance, transactions, closingBalance, account.type);
 
+    // Gemini's per-transaction category is still a free-text guess at this
+    // point (constrained to the real taxonomy as of #148) — resolved to a
+    // real categoryId here regardless, since the schema has no free-text
+    // column to fall back to (ADR-0015).
+    const categories = await prisma.category.findMany({ select: { id: true, name: true } });
+    // At least one Category always exists — the migration seeds a default
+    // set and merge (the only removal path) always keeps its target.
+    const fallbackCategoryId = (categories.find((c) => c.name.toLowerCase() === "other") ?? categories[0]).id;
+
     await prisma.$transaction([
       prisma.snapshot.create({
         data: { accountId, date: new Date(), balance: newBalance, sourceFileUrl: blob.url },
@@ -153,7 +163,7 @@ export async function uploadStatement(accountId: string, file: File): Promise<Up
           date: new Date(t.date),
           amount: t.amount,
           direction: t.direction,
-          category: t.category,
+          categoryId: resolveCategoryId(categories, t.category, fallbackCategoryId),
           source: t.description,
           accountId,
           confidence: t.confidence,
@@ -269,6 +279,83 @@ export async function deleteBudget(category: string): Promise<ActionResult> {
     return { ok: false, error: "Couldn't delete — try again." };
   }
   revalidatePath("/finances");
+  return { ok: true };
+}
+
+export type CategoryResult =
+  | { ok: true; item: { id: string; name: string } }
+  | { ok: false; error: string };
+
+/** Category taxonomy's own name uniqueness is enforced case-insensitively
+ * — `Category.name`'s DB unique index is case-sensitive, so without this
+ * check a user could re-introduce the exact "Food"/"food" fragmentation
+ * this taxonomy exists to eliminate, just through the real table instead
+ * of free text (ADR-0015). Excludes `excludeId` so renaming a category to
+ * its own current name (different casing included) isn't rejected. */
+async function findCaseInsensitiveDuplicate(name: string, excludeId?: string) {
+  return prisma.category.findFirst({
+    where: { name: { equals: name, mode: "insensitive" }, ...(excludeId ? { id: { not: excludeId } } : {}) },
+  });
+}
+
+function revalidateCategoryPaths() {
+  revalidatePath("/settings");
+  revalidatePath("/finances");
+  revalidatePath("/finances/uncategorised");
+}
+
+export async function createCategory(name: string): Promise<CategoryResult> {
+  const trimmed = name.trim();
+  if (!trimmed) return { ok: false, error: "Enter a category name." };
+  if (await findCaseInsensitiveDuplicate(trimmed)) return { ok: false, error: "That category already exists." };
+  try {
+    const category = await prisma.category.create({ data: { name: trimmed } });
+    revalidateCategoryPaths();
+    return { ok: true, item: { id: category.id, name: category.name } };
+  } catch {
+    return { ok: false, error: SAVE_ERROR };
+  }
+}
+
+/** Renames a Category — also renames any standing Budget on its old name,
+ * since Budget.category is still a free-text string keyed to the
+ * category's name (ADR-0015 left Budget's own schema unchanged). */
+export async function renameCategory(id: string, name: string): Promise<ActionResult> {
+  const trimmed = name.trim();
+  if (!trimmed) return { ok: false, error: "Enter a category name." };
+  if (await findCaseInsensitiveDuplicate(trimmed, id)) return { ok: false, error: "That category already exists." };
+  try {
+    const existing = await prisma.category.findUniqueOrThrow({ where: { id } });
+    await prisma.$transaction([
+      prisma.category.update({ where: { id }, data: { name: trimmed } }),
+      prisma.budget.updateMany({ where: { category: existing.name }, data: { category: trimmed } }),
+    ]);
+  } catch {
+    return { ok: false, error: SAVE_ERROR };
+  }
+  revalidateCategoryPaths();
+  return { ok: true };
+}
+
+/** Merges one category into another: every Transaction on `fromId` is
+ * reassigned to `intoId`, then `fromId` is deleted (ADR-0015) — the one
+ * operation that actually cleans up an existing near-duplicate mess, not
+ * just prevents new ones. Any standing Budget on the merged-away category
+ * is dropped too, rather than guessing how to combine its limit with the
+ * target's. */
+export async function mergeCategory(fromId: string, intoId: string): Promise<ActionResult> {
+  if (fromId === intoId) return { ok: false, error: "Choose two different categories to merge." };
+  try {
+    const from = await prisma.category.findUniqueOrThrow({ where: { id: fromId } });
+    await prisma.$transaction([
+      prisma.transaction.updateMany({ where: { categoryId: fromId }, data: { categoryId: intoId } }),
+      prisma.budget.deleteMany({ where: { category: from.name } }),
+      prisma.category.delete({ where: { id: fromId } }),
+    ]);
+  } catch {
+    return { ok: false, error: "Couldn't merge — try again." };
+  }
+  revalidateCategoryPaths();
   return { ok: true };
 }
 
@@ -430,7 +517,7 @@ export type TransactionInput = {
   date: Date;
   amount: number;
   direction: "IN" | "OUT";
-  category: string;
+  categoryId: string;
   source: string | null;
 };
 

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { setBudget, deleteBudget } from "@/lib/finance/actions";
 import { withRetry } from "@/lib/with-retry";
-import { DEFAULT_CATEGORIES } from "@/lib/finance/categories";
+import type { CategoryOption } from "@/lib/finance/categories";
 import { formatGBP } from "@/lib/finance/format";
 import { PrimaryButton } from "@/components/primary-button";
 import { EmptyState } from "@/components/empty-state";
@@ -25,7 +25,13 @@ type BudgetStatus = {
  * Passive — no Nudge, no cron. No rollover: a category's `limit` is set
  * once and read fresh each month, never carrying an under-spent
  * leftover forward. */
-export function BudgetVsActual({ initialStatuses }: { initialStatuses: BudgetStatus[] }) {
+export function BudgetVsActual({
+  initialStatuses,
+  categories,
+}: {
+  initialStatuses: BudgetStatus[];
+  categories: CategoryOption[];
+}) {
   const router = useRouter();
   const [adding, setAdding] = useState(false);
   const [category, setCategory] = useState("");
@@ -101,19 +107,14 @@ export function BudgetVsActual({ initialStatuses }: { initialStatuses: BudgetSta
 
       {adding ? (
         <div className={styles.addForm}>
-          <input
-            className={styles.input}
-            list="budget-categories"
-            placeholder="Category"
-            aria-label="Category"
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-          />
-          <datalist id="budget-categories">
-            {DEFAULT_CATEGORIES.map((c) => (
-              <option key={c} value={c} />
+          <select className={styles.input} aria-label="Category" value={category} onChange={(e) => setCategory(e.target.value)}>
+            <option value="">Select a category</option>
+            {categories.map((c) => (
+              <option key={c.id} value={c.name}>
+                {c.name}
+              </option>
             ))}
-          </datalist>
+          </select>
           <input
             className={styles.input}
             type="number"

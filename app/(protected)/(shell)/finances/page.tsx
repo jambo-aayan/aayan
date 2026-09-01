@@ -35,6 +35,7 @@ import {
   getUncategorisedTransactions,
   getFinanceSetupStatus,
   getBudgets,
+  getCategories,
 } from "@/lib/finance/data";
 import { getLinkedBanks } from "@/lib/enable-banking/data";
 import { netWorth } from "@/lib/finance/net-worth";
@@ -74,6 +75,7 @@ export default async function FinancesPage({ searchParams }: { searchParams: Pro
     systemGoalOptions,
     setupStatus,
     budgets,
+    categories,
   ] = await Promise.all([
     getAccounts(),
     getBaseline(),
@@ -88,6 +90,7 @@ export default async function FinancesPage({ searchParams }: { searchParams: Pro
     getGoalOptionsForPillar(FINANCE_PILLAR_ID),
     getFinanceSetupStatus(),
     getBudgets(),
+    getCategories(),
   ]);
   const { accessible, total } = netWorth(accounts);
   const monthlySurplus = surplus(baseline.monthlyIncome, baseline.fixedOutgoings);
@@ -193,10 +196,10 @@ export default async function FinancesPage({ searchParams }: { searchParams: Pro
           <RecurringChargesView charges={recurringCharges} />
         </Card>
         <Card title="Budget vs. actual">
-          <BudgetVsActual initialStatuses={budgetStatuses} />
+          <BudgetVsActual initialStatuses={budgetStatuses} categories={categories} />
         </Card>
         <Card title="Transactions">
-          <TransactionsManager initialTransactions={transactions} goals={goals} accounts={accounts} />
+          <TransactionsManager initialTransactions={transactions} goals={goals} accounts={accounts} categories={categories} />
         </Card>
         <Card title="Receivables">
           <ReceivablesList initialReceivables={receivables} repaymentCandidates={repaymentCandidates} />

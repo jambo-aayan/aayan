@@ -4,7 +4,7 @@ import { useState } from "react";
 import { CheckCircle2 } from "lucide-react";
 import { resolveHeldTransaction, type TransactionInput } from "@/lib/finance/actions";
 import { withRetry } from "@/lib/with-retry";
-import { DEFAULT_CATEGORIES } from "@/lib/finance/categories";
+import type { CategoryOption } from "@/lib/finance/categories";
 import { PrimaryButton } from "@/components/primary-button";
 import { EmptyState } from "@/components/empty-state";
 import { FlagReceivableForm } from "@/components/flag-receivable-form";
@@ -24,9 +24,11 @@ function toDateInputValue(date: Date): string {
 export function UncategorisedQueue({
   initialTransactions,
   goals,
+  categories,
 }: {
   initialTransactions: HeldTransaction[];
   goals: GoalOption[];
+  categories: CategoryOption[];
 }) {
   const [transactions, setTransactions] = useState(initialTransactions);
 
@@ -38,7 +40,7 @@ export function UncategorisedQueue({
     <div>
       <ul className={styles.list}>
         {transactions.map((t) => (
-          <QueueRow key={t.id} transaction={t} goals={goals} onResolved={() => handleResolved(t.id)} />
+          <QueueRow key={t.id} transaction={t} goals={goals} categories={categories} onResolved={() => handleResolved(t.id)} />
         ))}
       </ul>
       {transactions.length === 0 && (
@@ -51,10 +53,12 @@ export function UncategorisedQueue({
 function QueueRow({
   transaction,
   goals,
+  categories,
   onResolved,
 }: {
   transaction: HeldTransaction;
   goals: GoalOption[];
+  categories: CategoryOption[];
   onResolved: () => void;
 }) {
   const [form, setForm] = useState<TransactionInput>(transaction);
@@ -92,19 +96,19 @@ function QueueRow({
           value={form.amount}
           onChange={(e) => setForm({ ...form, amount: Number(e.target.value) })}
         />
-        <input
+        <select
           className={styles.input}
-          list="finance-categories"
-          placeholder="Category"
           aria-label="Category"
-          value={form.category}
-          onChange={(e) => setForm({ ...form, category: e.target.value })}
-        />
-        <datalist id="finance-categories">
-          {DEFAULT_CATEGORIES.map((c) => (
-            <option key={c} value={c} />
+          value={form.categoryId}
+          onChange={(e) => setForm({ ...form, categoryId: e.target.value })}
+        >
+          <option value="">Select a category</option>
+          {categories.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
           ))}
-        </datalist>
+        </select>
         <span className={styles.meta}>
           {transaction.accountName ?? "No account"}
           {transaction.source && ` · ${transaction.source}`}

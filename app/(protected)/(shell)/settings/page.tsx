@@ -5,11 +5,13 @@ import { PageTitle } from "@/components/page-title";
 import { Card } from "@/components/card";
 import { LogoutButton } from "@/components/logout-button";
 import { SettingsToggles } from "@/components/settings-toggles";
+import { CategoryManager } from "@/components/category-manager";
 import { getAppSettings } from "@/lib/settings/data";
+import { getCategories } from "@/lib/finance/data";
 import styles from "./settings.module.css";
 
 export default async function SettingsPage() {
-  const settings = await getAppSettings();
+  const [settings, categories] = await Promise.all([getAppSettings(), getCategories()]);
 
   return (
     <>
@@ -21,6 +23,9 @@ export default async function SettingsPage() {
         </Card>
         <Card title="Behavior">
           <SettingsToggles initialSettings={settings} />
+        </Card>
+        <Card title="Categories">
+          <CategoryManager initialCategories={categories} />
         </Card>
         <Link href="/weekly-review" className={styles.reviewLink}>
           <div>
