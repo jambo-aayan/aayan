@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { pillarHref } from "@/lib/pillars/nav";
 import { isValidIsoDateString } from "./date-validation";
-import { parseChartBinding, type ChartAdapterKind } from "./config";
+import type { ChartAdapterKind } from "./config";
 import type { Prisma, VisualType } from "@/lib/generated/prisma/client";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
@@ -59,14 +59,19 @@ export async function deleteVisual(pillarId: string, areaId: string | null, id: 
 /** Undo for deleteVisual — VisualRecord cascade-deletes with its Visual,
  * so restoring means recreating both with their original ids in one
  * transaction, same "recreate with original ids" approach as Finance's
- * restoreDeletedTransactions (#151, ADR-0015). A bound Visual's
- * `visual.records` here are resolve-binding.ts's synthetic, never-persisted
- * rows (its `config` still carries the real `binding` pointer, so undo
- * just needs the Visual row back) — recreating those synthetic rows as
- * real VisualRecords would permanently defeat the point of binding, so
- * they're skipped rather than replayed. */
+ * restoreDeletedTransactions (#151, ADR-0015). resolve-binding.ts's
+ * synthetic, never-persisted rows (a fully-bound chart's #166 single
+ * binding, or Scatter's #167 fully- or mixed-bound axes) all carry a
+ * `bound-${visualId}-${i}` id rather than a real cuid — replaying one of
+ * those as a real VisualRecord would permanently defeat the point of
+ * binding, so they're filtered out here by id shape rather than
+ * replayed. A mixed-binding Scatter's real, still-persisted manual-axis
+ * rows (kept alongside the synthetic ones in `visual.records`, see
+ * resolve-binding.ts) have ordinary cuids and pass straight through —
+ * they're genuinely gone once the cascade-delete happens, same as any
+ * other real VisualRecord, so undo needs to recreate them for real. */
 export async function restoreVisual(visual: VisualWithRecords): Promise<ActionResult> {
-  const bound = parseChartBinding(visual.config) !== null;
+  const realRecords = visual.records.filter((r) => !r.id.startsWith("bound-"));
   try {
     await prisma.$transaction([
       prisma.visual.create({
@@ -82,22 +87,20 @@ export async function restoreVisual(visual: VisualWithRecords): Promise<ActionRe
           updatedAt: visual.updatedAt,
         },
       }),
-      ...(bound
-        ? []
-        : visual.records.map((r) =>
-            prisma.visualRecord.create({
-              data: {
-                id: r.id,
-                visualId: r.visualId,
-                date: r.date,
-                xValue: r.xValue,
-                yValue: r.yValue,
-                xLabel: r.xLabel,
-                note: r.note,
-                createdAt: r.createdAt,
-              },
-            })
-          )),
+      ...realRecords.map((r) =>
+        prisma.visualRecord.create({
+          data: {
+            id: r.id,
+            visualId: r.visualId,
+            date: r.date,
+            xValue: r.xValue,
+            yValue: r.yValue,
+            xLabel: r.xLabel,
+            note: r.note,
+            createdAt: r.createdAt,
+          },
+        })
+      ),
     ]);
   } catch {
     return { ok: false, error: "Couldn't restore — try again." };
@@ -217,6 +220,38 @@ export async function createVisualXYRecord(
   try {
     const record = await prisma.visualRecord.create({
       data: { visualId, xValue: x, yValue: y, note: note?.trim() || null },
+    });
+    revalidateVisualPaths(pillarId, areaId);
+    return { ok: true, record };
+  } catch {
+    return { ok: false, error: "Couldn't save — try again." };
+  }
+}
+
+/** A mixed-binding Scatter's manual-axis data point (#167) — only the
+ * un-bound axis's value gets a form at all (the bound axis reads live
+ * data, nothing to type in for it), so this stores just that one field,
+ * unlike createVisualXYRecord's pair. resolve-binding.ts's
+ * manualAxisValues reads these back in createdAt order to pair them by
+ * index against the bound series (lib/visuals/adapters.ts's
+ * joinBoundWithManual — no date on these rows to join by instead). */
+export async function createVisualAxisRecord(
+  visualId: string,
+  pillarId: string,
+  areaId: string | null,
+  axis: "x" | "y",
+  value: number,
+  note?: string
+): Promise<CreateVisualRecordResult> {
+  if (!Number.isFinite(value)) return { ok: false, error: "Enter a valid number." };
+  try {
+    const record = await prisma.visualRecord.create({
+      data: {
+        visualId,
+        xValue: axis === "x" ? value : null,
+        yValue: axis === "y" ? value : null,
+        note: note?.trim() || null,
+      },
     });
     revalidateVisualPaths(pillarId, areaId);
     return { ok: true, record };

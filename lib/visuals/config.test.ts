@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseChartBinding, parseProgressBarConfig } from "./config";
+import { parseChartBinding, parseProgressBarConfig, parseScatterBinding } from "./config";
 
 describe("parseProgressBarConfig", () => {
   it("returns the target when config is a valid shape", () => {
@@ -48,5 +48,35 @@ describe("parseChartBinding", () => {
   it("returns null when refId is missing or empty", () => {
     expect(parseChartBinding({ binding: { adapter: "goal-progress" } })).toBeNull();
     expect(parseChartBinding({ binding: { adapter: "goal-progress", refId: "" } })).toBeNull();
+  });
+});
+
+describe("parseScatterBinding", () => {
+  it("returns both axis bindings when both are valid", () => {
+    expect(
+      parseScatterBinding({
+        xBinding: { adapter: "habit-checkins", refId: "h1" },
+        yBinding: { adapter: "system-evaluations", refId: "s1" },
+      })
+    ).toEqual({
+      x: { adapter: "habit-checkins", refId: "h1" },
+      y: { adapter: "system-evaluations", refId: "s1" },
+    });
+  });
+
+  it("returns a mixed binding (one axis bound, the other left null) when only one axis is bound", () => {
+    expect(parseScatterBinding({ xBinding: { adapter: "habit-checkins", refId: "h1" } })).toEqual({
+      x: { adapter: "habit-checkins", refId: "h1" },
+      y: null,
+    });
+    expect(parseScatterBinding({ yBinding: { adapter: "habit-checkins", refId: "h1" } })).toEqual({
+      x: null,
+      y: { adapter: "habit-checkins", refId: "h1" },
+    });
+  });
+
+  it("returns null for null/non-object config or an ad-hoc chart's config", () => {
+    expect(parseScatterBinding(null)).toBeNull();
+    expect(parseScatterBinding({})).toBeNull();
   });
 });

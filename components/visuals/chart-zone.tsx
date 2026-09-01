@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { LineChart as LineChartIcon } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
 import { PrimaryButton } from "@/components/primary-button";
@@ -46,6 +46,19 @@ export function ChartZone({
       restore: (item) => restoreVisual(item),
     }
   );
+
+  // useUndoableCrudList only seeds `items` from `visuals` once, on mount —
+  // a mixed-binding Scatter's manual-axis add (scatter-visual.tsx) can't
+  // pair its new point client-side (that needs a server re-fetch and
+  // re-join against the bound series), so it calls router.refresh()
+  // instead of the usual optimistic merge. This effect is what actually
+  // lands that refreshed data: once the parent Server Component re-renders
+  // with a new `visuals` array, sync it into `items` so the chart shows
+  // the newly paired point instead of staying on its stale mount-time
+  // snapshot.
+  useEffect(() => {
+    setItems(visuals);
+  }, [visuals, setItems]);
 
   async function handleCreate(type: VisualType, title: string, config?: Prisma.InputJsonValue) {
     const ok = await add({ type, title, config });

@@ -20,12 +20,30 @@ const ADAPTER_KINDS: ChartAdapterKind[] = ["habit-checkins", "system-evaluations
 
 export type ChartBinding = { adapter: ChartAdapterKind; refId: string };
 
-export function parseChartBinding(config: unknown): ChartBinding | null {
-  if (typeof config !== "object" || config === null) return null;
-  const binding = (config as Record<string, unknown>).binding;
+function parseBindingValue(binding: unknown): ChartBinding | null {
   if (typeof binding !== "object" || binding === null) return null;
   const { adapter, refId } = binding as Record<string, unknown>;
   if (typeof adapter !== "string" || !ADAPTER_KINDS.includes(adapter as ChartAdapterKind)) return null;
   if (typeof refId !== "string" || refId.length === 0) return null;
   return { adapter: adapter as ChartAdapterKind, refId };
+}
+
+export function parseChartBinding(config: unknown): ChartBinding | null {
+  if (typeof config !== "object" || config === null) return null;
+  return parseBindingValue((config as Record<string, unknown>).binding);
+}
+
+/** Scatter's own binding shape (#167) — independently bindable X and Y
+ * axes, unlike every other chart type's single `binding`, since a
+ * scatter plot has no natural date axis to hang one series off of. Either
+ * axis alone can be bound while the other stays ad-hoc (a mixed chart) —
+ * only when NEITHER is bound does this return null, meaning "fully
+ * ad-hoc, read VisualRecords the normal way." */
+export type ScatterBinding = { x: ChartBinding | null; y: ChartBinding | null };
+
+export function parseScatterBinding(config: unknown): ScatterBinding | null {
+  if (typeof config !== "object" || config === null) return null;
+  const x = parseBindingValue((config as Record<string, unknown>).xBinding);
+  const y = parseBindingValue((config as Record<string, unknown>).yBinding);
+  return x || y ? { x, y } : null;
 }
