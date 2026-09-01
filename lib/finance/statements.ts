@@ -10,6 +10,7 @@ export type StatementTransaction = {
   source: string | null;
   receivableId: string | null;
   goalContributionId: string | null;
+  transferId: string | null;
 };
 
 function isSameUtcMonth(date: Date, month: Date): boolean {

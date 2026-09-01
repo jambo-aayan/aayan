@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { put } from "@vercel/blob";
 import { prisma } from "@/lib/prisma";
 import { BASELINE_ID } from "./baseline-id";
-import { canReclassifyTransaction, isHeldForReview, resolveStatementBalance, validateStatementUpload } from "./logic";
+import { canLinkTransfer, canReclassifyTransaction, isHeldForReview, resolveStatementBalance, validateStatementUpload } from "./logic";
 import { FINANCE_NORTH_STAR_ID } from "./north-star-id";
 import { parseStatement, parseValuation } from "./statement-parser";
 
@@ -508,16 +508,16 @@ const ALREADY_LINKED_ERROR = "Already linked to a reclassification.";
  * WHERE clause (not just the pure canReclassifyTransaction check, which
  * only catches the common case) is what actually prevents two concurrent
  * flags/settles on the same transaction from both succeeding: only one
- * UPDATE can match both receivableId AND goalContributionId still null,
- * so the loser's count is 0. Shared by the receivable and goal-
- * contribution flows (#114/#120, ADR-0010) since a transaction can only
- * ever carry one or the other. */
+ * UPDATE can match receivableId, goalContributionId, AND transferId all
+ * still null, so the loser's count is 0. Shared by the receivable, goal-
+ * contribution, and transfer flows (#114/#120, ADR-0010; #138, ADR-0013)
+ * since a transaction can only ever carry one of the three. */
 async function claimTransaction(
   transactionId: string,
-  data: { receivableId: string } | { goalContributionId: string }
+  data: { receivableId: string } | { goalContributionId: string } | { transferId: string }
 ): Promise<boolean> {
   const claimed = await prisma.transaction.updateMany({
-    where: { id: transactionId, receivableId: null, goalContributionId: null },
+    where: { id: transactionId, receivableId: null, goalContributionId: null, transferId: null },
     data,
   });
   return claimed.count === 1;
@@ -577,6 +577,76 @@ export async function settleReceivable(
       where: { id: receivableId },
       data: { status: "SETTLED", settledAt: new Date() },
     });
+  } catch {
+    return { ok: false, error: SAVE_ERROR };
+  }
+  revalidatePath("/finances");
+  return { ok: true };
+}
+
+export type TransferResult =
+  | { ok: true; transferId: string }
+  | { ok: false; error: string };
+
+const INVALID_TRANSFER_ERROR = "Transfers need two transactions on different accounts, moving in opposite directions.";
+
+/** Links two transactions as a Transfer — the same money moving between
+ * two of the user's own accounts, e.g. paying a credit card bill from a
+ * bank account (#138, ADR-0013). No amount-equality check, mirroring
+ * settleReceivable's optional repayment link. Refuses a transaction
+ * already linked to any reclassification, and refuses a same-account or
+ * same-direction pairing (canLinkTransfer). If claiming the second
+ * transaction loses the race, the first claim and the new Transfer are
+ * both rolled back rather than leaving one side silently excluded from
+ * spend totals with no visible Transfer to explain why. */
+export async function linkTransfer(
+  transactionIdA: string,
+  transactionIdB: string,
+  note: string | null
+): Promise<TransferResult> {
+  try {
+    if (transactionIdA === transactionIdB) return { ok: false, error: INVALID_TRANSFER_ERROR };
+    const [a, b] = await Promise.all([
+      prisma.transaction.findUnique({ where: { id: transactionIdA } }),
+      prisma.transaction.findUnique({ where: { id: transactionIdB } }),
+    ]);
+    if (!a || !b) return { ok: false, error: SAVE_ERROR };
+    if (!canReclassifyTransaction(a) || !canReclassifyTransaction(b)) {
+      return { ok: false, error: ALREADY_LINKED_ERROR };
+    }
+    if (!canLinkTransfer(a, b)) {
+      return { ok: false, error: INVALID_TRANSFER_ERROR };
+    }
+
+    const transfer = await prisma.transfer.create({ data: { note } });
+    if (!(await claimTransaction(transactionIdA, { transferId: transfer.id }))) {
+      await prisma.transfer.delete({ where: { id: transfer.id } });
+      return { ok: false, error: ALREADY_LINKED_ERROR };
+    }
+    if (!(await claimTransaction(transactionIdB, { transferId: transfer.id }))) {
+      await prisma.transaction.update({ where: { id: transactionIdA }, data: { transferId: null } });
+      await prisma.transfer.delete({ where: { id: transfer.id } });
+      return { ok: false, error: ALREADY_LINKED_ERROR };
+    }
+
+    revalidatePath("/finances");
+    return { ok: true, transferId: transfer.id };
+  } catch {
+    return { ok: false, error: SAVE_ERROR };
+  }
+}
+
+/** Undoes a Transfer link — clears transferId on both linked transactions
+ * (so they count as real spend/income again) and deletes the Transfer row
+ * (#138, ADR-0013). Unlike Receivable/GoalContribution, Transfers support
+ * unlinking from day one: a suggestion-driven UI makes a wrong link more
+ * likely than the fully-manual receivable flow ever was. */
+export async function unlinkTransfer(transferId: string): Promise<ActionResult> {
+  try {
+    await prisma.$transaction([
+      prisma.transaction.updateMany({ where: { transferId }, data: { transferId: null } }),
+      prisma.transfer.delete({ where: { id: transferId } }),
+    ]);
   } catch {
     return { ok: false, error: SAVE_ERROR };
   }

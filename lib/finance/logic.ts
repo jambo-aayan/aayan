@@ -20,27 +20,50 @@ export function sortGoalsByPriority<T extends GoalPriorityRow>(goals: T[]): T[] 
   return [...goals].sort((a, b) => a.priority - b.priority);
 }
 
-export type ReclassifiableTransaction = { receivableId: string | null; goalContributionId: string | null };
+export type ReclassifiableTransaction = {
+  receivableId: string | null;
+  goalContributionId: string | null;
+  transferId: string | null;
+};
 
 /** A transaction can only carry one reclassification at a time — a
- * receivable OR a goal contribution, never both (#114/#120, ADR-0010).
- * A transaction already linked to either can't be linked again without
- * first being unflagged. */
+ * receivable, a goal contribution, or a transfer, never more than one
+ * (#114/#120, ADR-0010; #138, ADR-0013). A transaction already linked to
+ * one can't be linked to another without first being unflagged/unlinked. */
 export function canReclassifyTransaction(transaction: ReclassifiableTransaction): boolean {
-  return transaction.receivableId === null && transaction.goalContributionId === null;
+  return transaction.receivableId === null && transaction.goalContributionId === null && transaction.transferId === null;
 }
 
-export type SpendClassifiedTransaction = { receivableId: string | null; goalContributionId: string | null };
+export type SpendClassifiedTransaction = {
+  receivableId: string | null;
+  goalContributionId: string | null;
+  transferId: string | null;
+};
 
 /** Whether a transaction counts as real spend/income anywhere totals are
- * computed — a receivable- or goal-contribution-flagged transaction is a
- * reclassification, not real money movement (ADR-0010). The single shared
- * predicate for what was previously 5 duplicated inline checks across
- * categoryBreakdown, statements.ts, computeSurplusRate, getCorrelations,
- * and spend-deviation.ts's own reliance on categoryBreakdown (#137,
- * ADR-0013) — kept as one rule so it can never drift between call sites. */
+ * computed — a receivable-, goal-contribution-, or transfer-flagged
+ * transaction is a reclassification, not real money movement (ADR-0010,
+ * ADR-0013). The single shared predicate for what was previously 5
+ * duplicated inline checks across categoryBreakdown, statements.ts,
+ * computeSurplusRate, getCorrelations, and spend-deviation.ts's own
+ * reliance on categoryBreakdown (#137) — kept as one rule so it can never
+ * drift between call sites. */
 export function isRealSpend(transaction: SpendClassifiedTransaction): boolean {
-  return transaction.receivableId === null && transaction.goalContributionId === null;
+  return transaction.receivableId === null && transaction.goalContributionId === null && transaction.transferId === null;
+}
+
+export type TransferCandidateTransaction = { accountId: string | null; direction: "IN" | "OUT" };
+
+/** A Transfer only makes sense between two different Accounts (same-
+ * account linking isn't a transfer) with opposite directions (money has
+ * to actually leave one account and arrive another) — #138, ADR-0013. No
+ * amount-equality check: mirrors settleReceivable's existing repayment
+ * link, which never enforced the repayment matches the original amount
+ * either (a minimum-payment-vs-statement-balance mismatch, or bank
+ * rounding, shouldn't block linking). */
+export function canLinkTransfer(a: TransferCandidateTransaction, b: TransferCandidateTransaction): boolean {
+  if (a.accountId === null || b.accountId === null || a.accountId === b.accountId) return false;
+  return a.direction !== b.direction;
 }
 
 /** Below this, a statement-parsed transaction is held for review rather

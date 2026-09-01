@@ -22,6 +22,7 @@ function tx(overrides: Partial<Parameters<typeof topMerchants>[0][number]> = {})
     source: "Tesco",
     receivableId: null,
     goalContributionId: null,
+    transferId: null,
     ...overrides,
   };
 }

@@ -650,6 +650,21 @@ model Receivable {
   transactions Transaction[]
 }
 
+/// Links two Transactions (one OUT, one IN, on two different Accounts) as
+/// the same money moving between the user's own accounts — a third
+/// reclassification alongside Receivable and GoalContribution, excluded
+/// from spend/income totals the same way (#138, ADR-0013). No amount/date
+/// of its own: both already live on the two linked Transactions, and a
+/// stored copy would just be one more thing that could drift from them.
+/// No OPEN/SETTLED lifecycle either, unlike Receivable — both sides
+/// already exist by the time a user links them.
+model Transfer {
+  id           String        @id @default(cuid())
+  note         String?
+  createdAt    DateTime      @default(now())
+  transactions Transaction[]
+}
+
 /// Singleton: the fixed monthly income/outgoings summary, distinct from the
 /// dated Transactions ledger (a later ticket). id is always BASELINE_ID.
 model Baseline {
@@ -773,6 +788,8 @@ model Transaction {
   receivable         Receivable?          @relation(fields: [receivableId], references: [id])
   goalContributionId String?
   goalContribution   GoalContribution?    @relation(fields: [goalContributionId], references: [id])
+  transferId         String?
+  transfer           Transfer?            @relation(fields: [transferId], references: [id])
   confidence         Float?
   createdAt          DateTime             @default(now())
   updatedAt          DateTime             @updatedAt
@@ -781,6 +798,7 @@ model Transaction {
   @@index([accountId])
   @@index([receivableId])
   @@index([goalContributionId])
+  @@index([transferId])
 }
 
 /// A live Enable Banking authorization — the result of one `POST /sessions`

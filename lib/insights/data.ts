@@ -84,7 +84,7 @@ async function getMomentumInputs(asOf: Date): Promise<MomentumInputs> {
     }),
     prisma.transaction.findMany({
       where: { date: { gte: lookbackStart, lte: asOf } },
-      select: { date: true, amount: true, direction: true, receivableId: true, goalContributionId: true },
+      select: { date: true, amount: true, direction: true, receivableId: true, goalContributionId: true, transferId: true },
     }),
   ]);
 
@@ -107,6 +107,7 @@ async function getMomentumInputs(asOf: Date): Promise<MomentumInputs> {
       direction: t.direction,
       receivableId: t.receivableId,
       goalContributionId: t.goalContributionId,
+      transferId: t.transferId,
     })),
   };
 }
@@ -177,7 +178,15 @@ export async function getKpiSummary(range: InsightsRange, asOf: Date = new Date(
     }),
     prisma.transaction.findMany({
       where: { date: { gte: lookbackStart, lte: current[1] } },
-      select: { date: true, amount: true, direction: true, category: true, receivableId: true, goalContributionId: true },
+      select: {
+        date: true,
+        amount: true,
+        direction: true,
+        category: true,
+        receivableId: true,
+        goalContributionId: true,
+        transferId: true,
+      },
     }),
     prisma.lifeGoal.findMany({
       where: { status: "ACTIVE" },
@@ -217,6 +226,7 @@ export async function getKpiSummary(range: InsightsRange, asOf: Date = new Date(
     category: t.category,
     receivableId: t.receivableId,
     goalContributionId: t.goalContributionId,
+    transferId: t.transferId,
   }));
 
   const goalFixtures = goals.map((g) => {
@@ -475,7 +485,7 @@ export async function getCorrelations(range: InsightsRange, asOf: Date = new Dat
     prisma.painMobilityLog.findMany({ where: { date: { gte: start, lte: end } }, select: { date: true, pain: true } }),
     prisma.transaction.findMany({
       where: { date: { gte: start, lte: end } },
-      select: { date: true, amount: true, direction: true, receivableId: true, goalContributionId: true },
+      select: { date: true, amount: true, direction: true, receivableId: true, goalContributionId: true, transferId: true },
     }),
     prisma.dailyLog.findMany({ where: { date: { gte: start, lte: end } }, select: { date: true, sleepQuality: true, stiffness: true, mood: true } }),
     prisma.system.findMany({

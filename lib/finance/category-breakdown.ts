@@ -12,6 +12,10 @@ export type TransactionForBreakdown = {
    * contribution, not real spending — excluded from spend totals the
    * same way receivableId is (#120, ADR-0010). */
   goalContributionId: string | null;
+  /** A transaction linked as one side of a Transfer (money moving between
+   * the user's own accounts) is neither real spend nor income — excluded
+   * the same way (#138, ADR-0013). */
+  transferId: string | null;
 };
 
 function isSameUtcMonth(date: Date, month: Date): boolean {

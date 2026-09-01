@@ -40,8 +40,8 @@ describe("computeMomentumMetrics", () => {
         { dueDate: d("2026-08-02"), completedAt: null },
       ],
       transactions: [
-        { date: d("2026-08-01"), amount: 100, direction: "IN", receivableId: null, goalContributionId: null },
-        { date: d("2026-08-01"), amount: 60, direction: "OUT", receivableId: null, goalContributionId: null },
+        { date: d("2026-08-01"), amount: 100, direction: "IN", receivableId: null, goalContributionId: null, transferId: null },
+        { date: d("2026-08-01"), amount: 60, direction: "OUT", receivableId: null, goalContributionId: null, transferId: null },
       ],
     };
     const metrics = computeMomentumMetrics(inputs, d("2026-08-01"), d("2026-08-02"));
@@ -75,8 +75,8 @@ describe("computeMomentumMetrics", () => {
       checkIns: [],
       tasks: [],
       transactions: [
-        { date: d("2026-08-01"), amount: 50, direction: "IN", receivableId: null, goalContributionId: null },
-        { date: d("2026-08-01"), amount: 200, direction: "OUT", receivableId: null, goalContributionId: null },
+        { date: d("2026-08-01"), amount: 50, direction: "IN", receivableId: null, goalContributionId: null, transferId: null },
+        { date: d("2026-08-01"), amount: 200, direction: "OUT", receivableId: null, goalContributionId: null, transferId: null },
       ],
     };
     const metrics = computeMomentumMetrics(inputs, d("2026-08-01"), d("2026-08-01"));
@@ -88,9 +88,9 @@ describe("computeSurplusRate — receivable/goal-contribution exclusion", () => 
   it("excludes a receivable-flagged transaction from both income and outgoings", () => {
     const rate = computeSurplusRate(
       [
-        { date: d("2026-08-01"), amount: 1000, direction: "IN", receivableId: null, goalContributionId: null },
-        { date: d("2026-08-01"), amount: 500, direction: "OUT", receivableId: "r1", goalContributionId: null },
-        { date: d("2026-08-01"), amount: 200, direction: "OUT", receivableId: null, goalContributionId: null },
+        { date: d("2026-08-01"), amount: 1000, direction: "IN", receivableId: null, goalContributionId: null, transferId: null },
+        { date: d("2026-08-01"), amount: 500, direction: "OUT", receivableId: "r1", goalContributionId: null, transferId: null },
+        { date: d("2026-08-01"), amount: 200, direction: "OUT", receivableId: null, goalContributionId: null, transferId: null },
       ],
       d("2026-08-01"),
       d("2026-08-01")
@@ -102,8 +102,8 @@ describe("computeSurplusRate — receivable/goal-contribution exclusion", () => 
   it("excludes a goal-contribution-flagged transaction the same way", () => {
     const rate = computeSurplusRate(
       [
-        { date: d("2026-08-01"), amount: 1000, direction: "IN", receivableId: null, goalContributionId: null },
-        { date: d("2026-08-01"), amount: 300, direction: "OUT", receivableId: null, goalContributionId: "gc1" },
+        { date: d("2026-08-01"), amount: 1000, direction: "IN", receivableId: null, goalContributionId: null, transferId: null },
+        { date: d("2026-08-01"), amount: 300, direction: "OUT", receivableId: null, goalContributionId: "gc1", transferId: null },
       ],
       d("2026-08-01"),
       d("2026-08-01")

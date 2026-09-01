@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  canLinkTransfer,
   canReclassifyTransaction,
   isHeldForReview,
   isRealSpend,
@@ -81,29 +82,58 @@ describe("sortGoalsByPriority", () => {
 
 describe("canReclassifyTransaction", () => {
   it("allows reclassifying a transaction with no existing link", () => {
-    expect(canReclassifyTransaction({ receivableId: null, goalContributionId: null })).toBe(true);
+    expect(canReclassifyTransaction({ receivableId: null, goalContributionId: null, transferId: null })).toBe(true);
   });
 
   it("refuses a transaction already linked to a receivable", () => {
-    expect(canReclassifyTransaction({ receivableId: "rec1", goalContributionId: null })).toBe(false);
+    expect(canReclassifyTransaction({ receivableId: "rec1", goalContributionId: null, transferId: null })).toBe(false);
   });
 
   it("refuses a transaction already linked to a goal contribution", () => {
-    expect(canReclassifyTransaction({ receivableId: null, goalContributionId: "gc1" })).toBe(false);
+    expect(canReclassifyTransaction({ receivableId: null, goalContributionId: "gc1", transferId: null })).toBe(false);
+  });
+
+  it("refuses a transaction already linked to a transfer", () => {
+    expect(canReclassifyTransaction({ receivableId: null, goalContributionId: null, transferId: "tr1" })).toBe(false);
   });
 });
 
 describe("isRealSpend", () => {
   it("counts a transaction with no reclassification as real spend", () => {
-    expect(isRealSpend({ receivableId: null, goalContributionId: null })).toBe(true);
+    expect(isRealSpend({ receivableId: null, goalContributionId: null, transferId: null })).toBe(true);
   });
 
   it("excludes a receivable-flagged transaction", () => {
-    expect(isRealSpend({ receivableId: "rec1", goalContributionId: null })).toBe(false);
+    expect(isRealSpend({ receivableId: "rec1", goalContributionId: null, transferId: null })).toBe(false);
   });
 
   it("excludes a goal-contribution-flagged transaction", () => {
-    expect(isRealSpend({ receivableId: null, goalContributionId: "gc1" })).toBe(false);
+    expect(isRealSpend({ receivableId: null, goalContributionId: "gc1", transferId: null })).toBe(false);
+  });
+
+  it("excludes a transfer-flagged transaction", () => {
+    expect(isRealSpend({ receivableId: null, goalContributionId: null, transferId: "tr1" })).toBe(false);
+  });
+});
+
+describe("canLinkTransfer", () => {
+  const acc1 = (direction: "IN" | "OUT") => ({ accountId: "acc-1", direction });
+  const acc2 = (direction: "IN" | "OUT") => ({ accountId: "acc-2", direction });
+
+  it("allows linking two transactions on different accounts with opposite directions", () => {
+    expect(canLinkTransfer(acc1("OUT"), acc2("IN"))).toBe(true);
+  });
+
+  it("refuses two transactions on the same account", () => {
+    expect(canLinkTransfer(acc1("OUT"), acc1("IN"))).toBe(false);
+  });
+
+  it("refuses two transactions with the same direction", () => {
+    expect(canLinkTransfer(acc1("OUT"), acc2("OUT"))).toBe(false);
+  });
+
+  it("refuses a transaction with no account at all", () => {
+    expect(canLinkTransfer({ accountId: null, direction: "OUT" }, acc2("IN"))).toBe(false);
   });
 });
 

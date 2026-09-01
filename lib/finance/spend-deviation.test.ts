@@ -12,6 +12,7 @@ function tx(dateIso: string, amount: number, category: string, opts: { receivabl
     category,
     receivableId: opts.receivableId ?? null,
     goalContributionId: opts.goalContributionId ?? null,
+    transferId: null,
   };
 }
 

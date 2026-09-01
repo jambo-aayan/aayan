@@ -18,12 +18,14 @@ export type TransactionFixture = {
   date: Date;
   amount: number;
   direction: "IN" | "OUT";
-  /** A transaction flagged as a receivable or a goal contribution is a
-   * reclassification, not real income/spend — excluded here the same
-   * way lib/finance/category-breakdown.ts's categoryBreakdown and
-   * budgetVsActual already exclude both (ADR-0010/#114/#120). */
+  /** A transaction flagged as a receivable, a goal contribution, or a
+   * transfer is a reclassification, not real income/spend — excluded here
+   * the same way lib/finance/category-breakdown.ts's categoryBreakdown and
+   * budgetVsActual already exclude all three (ADR-0010/#114/#120,
+   * ADR-0013/#138). */
   receivableId: string | null;
   goalContributionId: string | null;
+  transferId: string | null;
 };
 
 export type MomentumInputs = {
