@@ -20,6 +20,9 @@ import { getGoalOptions, getGoalsForArea } from "@/lib/goals/data";
 import { getThoughtsForArea } from "@/lib/thoughts/data";
 import { PillarAreaGoals } from "@/components/goals/pillar-area-goals";
 import { PillarAreaThoughts } from "@/components/thoughts/pillar-area-thoughts";
+import { ChartZone } from "@/components/visuals/chart-zone";
+import { TableZone } from "@/components/visuals/table-zone";
+import { getVisualsForArea } from "@/lib/visuals/data";
 import { getPainMobilityLogs } from "@/lib/pain-mobility/data";
 import { PAIN_MOBILITY_AREA_ID } from "@/lib/pain-mobility/scope";
 import { getDailyLogs } from "@/lib/daily-log/data";
@@ -57,7 +60,7 @@ export default async function AreaPage({
   const area = await getArea(areaId);
   if (!area || area.pillarId !== pillarId) notFound();
 
-  const [habits, tasks, lists, pillars, areas, goals, tags, systems, systemHabitOptions, areaGoals, thoughts] =
+  const [habits, tasks, lists, pillars, areas, goals, tags, systems, systemHabitOptions, areaGoals, thoughts, visuals] =
     await Promise.all([
       getHabitsForArea(areaId),
       getTasksForArea(areaId),
@@ -70,7 +73,10 @@ export default async function AreaPage({
       getHabitOptionsForPillar(area.pillarId),
       getGoalsForArea(areaId),
       getThoughtsForArea(areaId),
+      getVisualsForArea(areaId),
     ]);
+  const chartVisuals = visuals.filter((v) => v.type !== "TABLE");
+  const tableVisuals = visuals.filter((v) => v.type === "TABLE");
   const isPainMobilityArea = areaId === PAIN_MOBILITY_AREA_ID;
   const isSleepArea = areaId === SLEEP_AREA_ID;
   const isCareArea = areaId === CARE_AREA_ID;
@@ -164,6 +170,22 @@ export default async function AreaPage({
       node: (
         <Card key="thoughts" title="Thoughts">
           <PillarAreaThoughts pillarId={area.pillarId} areaId={area.id} initialThoughts={thoughts} />
+        </Card>
+      ),
+    },
+    {
+      type: "charts",
+      node: (
+        <Card key="charts" title="Charts">
+          <ChartZone visuals={chartVisuals} pillarId={area.pillarId} areaId={area.id} />
+        </Card>
+      ),
+    },
+    {
+      type: "table",
+      node: (
+        <Card key="table" title="Table">
+          <TableZone visuals={tableVisuals} pillarId={area.pillarId} areaId={area.id} />
         </Card>
       ),
     },

@@ -1,12 +1,18 @@
 import type { ReactNode } from "react";
 
-/** The six section types a Pillar/Area page can show (#157/ADR-0016). Not
- * every page builds all six — a Pillar page has no Habits/Tasks sections
+/** The section types a Pillar/Area page can show (#157/ADR-0016). Not every
+ * page builds all of them — a Pillar page has no Habits/Tasks sections
  * (Health's original page never had them, they're Area-scoped only), an
- * Area page has all six. `resolveSectionOrder` below (#160) works over
+ * Area page has every one. `resolveSectionOrder` below (#160) works over
  * whatever subset a given page instance actually builds, not a hardcoded
- * assumption of all six. */
-export type SectionType = "northStar" | "goals" | "habits" | "systems" | "tasks" | "thoughts";
+ * assumption of a fixed set.
+ *
+ * `charts`/`table` (#161/ADR-0017) are the one exception to "each section
+ * shows at most once" — each renders as a whole *zone* holding any number
+ * of Visual instances, not a single card. resolveSectionOrder needs no
+ * changes to support this: toggling/reordering "charts" works exactly like
+ * toggling/reordering "goals", only what the section *contains* differs. */
+export type SectionType = "northStar" | "goals" | "habits" | "systems" | "tasks" | "thoughts" | "charts" | "table";
 
 export const SECTION_LABELS: Record<SectionType, string> = {
   northStar: "North Star",
@@ -15,6 +21,8 @@ export const SECTION_LABELS: Record<SectionType, string> = {
   systems: "Systems",
   tasks: "Tasks",
   thoughts: "Thoughts",
+  charts: "Charts",
+  table: "Table",
 };
 
 export type PageSection = { type: SectionType; node: ReactNode };

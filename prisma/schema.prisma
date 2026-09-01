@@ -65,6 +65,7 @@ model Pillar {
   goals     LifeGoal[]
   habits    Habit[]
   systems   System[]
+  visuals   Visual[]
   /// Ordered `{type, visible}[]` over this page's section types (#160,
   /// ADR-0016) — Json rather than a join table, same "read/written as one
   /// blob, never queried per-section" reasoning as WeeklyReviewSession's
@@ -100,6 +101,7 @@ model Area {
   painMobilityLogs PainMobilityLog[]
   thoughts         Thought[]
   systems          System[]
+  visuals          Visual[]
   /// Same shape/reasoning as Pillar.sectionConfig (#160, ADR-0016) —
   /// independent per Area, since a Pillar and its Areas can each show a
   /// different subset/order of section types.
@@ -1125,4 +1127,106 @@ model WeeklyReviewSession {
   rankOrder   String[] @default([])
   startedAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+/// One chart or table type a Visual can be (#161, ADR-0017).
+enum VisualType {
+  LINE
+  BAR
+  PROGRESS_BAR
+  SCATTER
+  STREAK_HEATMAP
+  TABLE
+}
+
+enum TableColumnType {
+  TEXT
+  NUMBER
+  DATE
+  CHECKBOX
+}
+
+/// One chart or table instance placed in a Pillar/Area page's Charts or
+/// Table zone (#161, ADR-0017/#162) — see CONTEXT.md's "Visual" entry.
+/// Unlike the six singular Page sections (North Star, Goals, ...), Charts
+/// and Table are zones that can each hold any number of Visuals, so this
+/// has its own pillarId/areaId scoping rather than being addressed by
+/// SectionType alone. `config` holds type-specific settings: a Progress
+/// bar's ad-hoc target, a chart's source binding
+/// (`{binding: {adapter, refId}} | null`, or `{xBinding, yBinding}` for
+/// Scatter), a bound Table's adapter name. No
+/// `config` shape is enforced at the schema level, same as
+/// WeeklyReviewSession.verdicts/AppSettings-style Json fields elsewhere.
+model Visual {
+  id        String     @id @default(cuid())
+  pillarId  String
+  pillar    Pillar     @relation(fields: [pillarId], references: [id])
+  areaId    String?
+  area      Area?      @relation(fields: [areaId], references: [id])
+  type      VisualType
+  title     String
+  config    Json       @default("{}")
+  sortOrder Int        @default(0)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  columns TableColumn[]
+  rows    TableRow[]
+  records VisualRecord[]
+
+  @@index([pillarId])
+  @@index([areaId])
+}
+
+/// Ad-hoc chart data points (#161) — only exist for a Visual with no
+/// source binding in its config; a bound chart always has zero of these,
+/// resolved live from its adapter instead. Which fields a chart type reads
+/// varies: Line/Bar/Streak heatmap use date+yValue; Scatter uses
+/// xValue+yValue; Progress bar reads only the latest record's yValue.
+model VisualRecord {
+  id        String    @id @default(cuid())
+  visualId  String
+  visual    Visual    @relation(fields: [visualId], references: [id], onDelete: Cascade)
+  date      DateTime? @db.Date
+  xValue    Float?
+  yValue    Float?
+  xLabel    String?
+  note      String?
+  createdAt DateTime  @default(now())
+
+  @@index([visualId])
+}
+
+/// A Table Visual's user-added custom column (#161) — a bound table's
+/// built-in columns (e.g. Goals' Name/Status/Progress%) are never stored
+/// here, they're declared by the adapter and resolved at render time.
+model TableColumn {
+  id        String          @id @default(cuid())
+  visualId  String
+  visual    Visual          @relation(fields: [visualId], references: [id], onDelete: Cascade)
+  name      String
+  type      TableColumnType
+  sortOrder Int             @default(0)
+
+  @@index([visualId])
+}
+
+/// One row of a Table Visual (#161). For a freeform table, every row is a
+/// real TableRow. For a bound table, a row is synthesized at render time
+/// from the adapter's live entity list (boundEntityId null in that
+/// synthesized case) — a real TableRow only gets created once the user
+/// enters a value into a custom column for that entity, at which point
+/// boundEntityId links it back. `data` is keyed by TableColumn id.
+model TableRow {
+  id            String   @id @default(cuid())
+  visualId      String
+  visual        Visual   @relation(fields: [visualId], references: [id], onDelete: Cascade)
+  boundEntityId String?
+  data          Json     @default("{}")
+  sortOrder     Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([visualId])
+  @@index([visualId, boundEntityId])
 }

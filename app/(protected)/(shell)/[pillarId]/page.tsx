@@ -16,6 +16,9 @@ import { getGoalOptions, getGoalsForPillar } from "@/lib/goals/data";
 import { getThoughtsForPillar } from "@/lib/thoughts/data";
 import { PillarAreaGoals } from "@/components/goals/pillar-area-goals";
 import { PillarAreaThoughts } from "@/components/thoughts/pillar-area-thoughts";
+import { ChartZone } from "@/components/visuals/chart-zone";
+import { TableZone } from "@/components/visuals/table-zone";
+import { getVisualsForPillar } from "@/lib/visuals/data";
 import { FINANCE_PILLAR_ID } from "@/lib/finance/pillar-id";
 import { resolveColorHex, type ColorKey } from "@/lib/colors";
 import { resolveSectionOrder, type PageSection, type SectionConfigEntry } from "@/lib/pillar-page/sections";
@@ -42,13 +45,16 @@ export default async function PillarPage({
   const pillar = await getPillarWithAreas(pillarId);
   if (!pillar) notFound();
 
-  const [systems, habitOptions, goalOptions, pillarGoals, thoughts] = await Promise.all([
+  const [systems, habitOptions, goalOptions, pillarGoals, thoughts, visuals] = await Promise.all([
     getSystemsForPillar(pillarId),
     getHabitOptionsForPillar(pillarId),
     getGoalOptions(pillarId),
     getGoalsForPillar(pillarId),
     getThoughtsForPillar(pillarId),
+    getVisualsForPillar(pillarId),
   ]);
+  const chartVisuals = visuals.filter((v) => v.type !== "TABLE");
+  const tableVisuals = visuals.filter((v) => v.type === "TABLE");
   const accentColor = resolveColorHex(pillar.color as ColorKey | null);
 
   // Built as a list of section components (#157/ADR-0016); resolveSectionOrder
@@ -100,6 +106,22 @@ export default async function PillarPage({
       node: (
         <Card key="thoughts" title="Thoughts">
           <PillarAreaThoughts pillarId={pillar.id} areaId={null} initialThoughts={thoughts} />
+        </Card>
+      ),
+    },
+    {
+      type: "charts",
+      node: (
+        <Card key="charts" title="Charts">
+          <ChartZone visuals={chartVisuals} pillarId={pillar.id} areaId={null} />
+        </Card>
+      ),
+    },
+    {
+      type: "table",
+      node: (
+        <Card key="table" title="Table">
+          <TableZone visuals={tableVisuals} pillarId={pillar.id} areaId={null} />
         </Card>
       ),
     },
