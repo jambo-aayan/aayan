@@ -5,7 +5,9 @@ import { X } from "lucide-react";
 import { PrimaryButton } from "@/components/primary-button";
 import { useDialogFocusTrap } from "@/components/use-dialog-focus-trap";
 import { LineChartIcon, BarChartIcon, ProgressBarIcon, ScatterIcon, StreakHeatmapIcon } from "./chart-type-icons";
-import type { VisualType } from "@/lib/generated/prisma/client";
+import { getAdapterOptions, type AdapterOption } from "@/lib/visuals/actions";
+import type { ChartAdapterKind } from "@/lib/visuals/config";
+import type { Prisma, VisualType } from "@/lib/generated/prisma/client";
 import styles from "./add-chart-modal.module.css";
 
 const CHART_TYPES: { type: VisualType; label: string; Icon: React.ComponentType }[] = [
@@ -16,26 +18,57 @@ const CHART_TYPES: { type: VisualType; label: string; Icon: React.ComponentType 
   { type: "STREAK_HEATMAP", label: "Streak heatmap", Icon: StreakHeatmapIcon },
 ];
 
-/** The add-chart flow (#163/#164, ADR-0017) — a modal, not an inline
+const ADAPTER_LABELS: Record<ChartAdapterKind, string> = {
+  "habit-checkins": "A Habit",
+  "system-evaluations": "A System",
+  "goal-progress": "A Goal",
+  "finance-balances": "An Account",
+};
+
+const ALL_ADAPTERS: ChartAdapterKind[] = ["habit-checkins", "system-evaluations", "goal-progress", "finance-balances"];
+// A bound Progress bar's target has to come from somewhere with a natural
+// target — only Goal has one, so that's the only source it offers.
+const PROGRESS_BAR_ADAPTERS: ChartAdapterKind[] = ["goal-progress"];
+
+type Source = "adhoc" | "bound";
+
+/** The add-chart flow (#163/#164/#166, ADR-0017) — a modal, not an inline
  * expansion like NewAreaTile, since a multi-step type-gallery-then-details
- * flow needs more room than a section-list trigger has. Only ad-hoc
- * creation exists here — "bind to existing data" is #166. Progress bar
- * needs a target set at creation time (#164) since there's nothing else
- * to derive "current vs. target" from until it's bound to a Goal. */
+ * flow needs more room than a section-list trigger has. Scatter has no
+ * source step yet — its own binding is #167, so it always creates ad-hoc.
+ * Every other type gains a "use existing data" branch here: pick a
+ * source, pick which entity, done — no title-step target field for a
+ * bound Progress bar, since #166 reads that from the bound Goal at render
+ * time instead. */
 export function AddChartModal({
+  pillarId,
+  areaId,
   onClose,
   onCreate,
 }: {
+  pillarId: string;
+  areaId: string | null;
   onClose: () => void;
-  onCreate: (type: VisualType, title: string, config?: { target: number }) => Promise<{ ok: boolean; error?: string }>;
+  onCreate: (type: VisualType, title: string, config?: Prisma.InputJsonValue) => Promise<{ ok: boolean; error?: string }>;
 }) {
   const [type, setType] = useState<VisualType | null>(null);
+  const [source, setSource] = useState<Source | null>(null);
+  const [adapter, setAdapter] = useState<ChartAdapterKind | null>(null);
+  const [refId, setRefId] = useState<string | null>(null);
+  const [options, setOptions] = useState<AdapterOption[] | null>(null);
   const [title, setTitle] = useState("");
   const [target, setTarget] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const sheetRef = useRef<HTMLDivElement>(null);
   useDialogFocusTrap(sheetRef);
+
+  const skipsSourceStep = type === "SCATTER";
+  const showDetails = type !== null && (skipsSourceStep || source === "adhoc" || (source === "bound" && refId !== null));
+  // options is reset to null whenever the chosen adapter changes (see the
+  // effect below and handleBack), so "adapter chosen, no options yet" is
+  // exactly the loading window — no separate boolean to keep in sync.
+  const loadingOptions = adapter !== null && options === null;
 
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
@@ -45,14 +78,52 @@ export function AddChartModal({
     return () => document.removeEventListener("keydown", handleKey);
   }, [onClose]);
 
+  useEffect(() => {
+    if (!adapter) return;
+    let cancelled = false;
+    getAdapterOptions(adapter, pillarId, areaId).then((opts) => {
+      if (!cancelled) setOptions(opts);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [adapter, pillarId, areaId]);
+
+  function chooseBound() {
+    setSource("bound");
+    // Progress bar has exactly one bindable source, so skip straight to
+    // its entity picker rather than showing a one-item source list.
+    if (type === "PROGRESS_BAR") setAdapter(PROGRESS_BAR_ADAPTERS[0]);
+  }
+
+  function handleBack() {
+    if (refId) {
+      setRefId(null);
+      return;
+    }
+    if (adapter) {
+      setAdapter(null);
+      setOptions(null);
+      if (type === "PROGRESS_BAR") setSource(null);
+      return;
+    }
+    if (source) {
+      setSource(null);
+      return;
+    }
+    setType(null);
+  }
+
   async function handleCreate() {
     if (!type) return;
     if (!title.trim()) {
       setError("Give it a title first.");
       return;
     }
-    let config: { target: number } | undefined;
-    if (type === "PROGRESS_BAR") {
+    let config: Prisma.InputJsonValue | undefined;
+    if (source === "bound" && adapter && refId) {
+      config = { binding: { adapter, refId } };
+    } else if (type === "PROGRESS_BAR") {
       const parsedTarget = Number(target);
       // Zero rejected too, not just NaN — a zero target makes "current /
       // target" undefined (0/0) once any data is logged.
@@ -96,7 +167,41 @@ export function AddChartModal({
             </div>
           )}
 
-          {type && (
+          {type && !skipsSourceStep && !source && (
+            <div className={styles.sourceChoice}>
+              <button type="button" className={styles.sourceOption} onClick={() => setSource("adhoc")}>
+                Enter my own data
+              </button>
+              <button type="button" className={styles.sourceOption} onClick={chooseBound}>
+                Use existing data
+              </button>
+            </div>
+          )}
+
+          {source === "bound" && !adapter && type !== "PROGRESS_BAR" && (
+            <div className={styles.sourceChoice}>
+              {ALL_ADAPTERS.map((a) => (
+                <button key={a} type="button" className={styles.sourceOption} onClick={() => setAdapter(a)}>
+                  {ADAPTER_LABELS[a]}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {source === "bound" && adapter && !refId && (
+            <div className={styles.sourceChoice}>
+              {loadingOptions && <p className={styles.hint}>Loading…</p>}
+              {!loadingOptions && options?.length === 0 && <p className={styles.hint}>Nothing to bind to yet.</p>}
+              {!loadingOptions &&
+                options?.map((o) => (
+                  <button key={o.id} type="button" className={styles.sourceOption} onClick={() => setRefId(o.id)}>
+                    {o.name}
+                  </button>
+                ))}
+            </div>
+          )}
+
+          {showDetails && (
             <>
               <div className={styles.field}>
                 <label className={styles.label} htmlFor="chart-title">
@@ -113,7 +218,7 @@ export function AddChartModal({
                   onKeyDown={(e) => e.key === "Enter" && handleCreate()}
                 />
               </div>
-              {type === "PROGRESS_BAR" && (
+              {type === "PROGRESS_BAR" && source !== "bound" && (
                 <div className={styles.field}>
                   <label className={styles.label} htmlFor="chart-target">
                     Target
@@ -136,15 +241,10 @@ export function AddChartModal({
         </div>
 
         <div className={styles.footer}>
-          <button
-            type="button"
-            className={styles.cancelBtn}
-            onClick={type ? () => setType(null) : onClose}
-            disabled={saving}
-          >
+          <button type="button" className={styles.cancelBtn} onClick={type ? handleBack : onClose} disabled={saving}>
             {type ? "Back" : "Cancel"}
           </button>
-          {type && (
+          {showDetails && (
             <PrimaryButton onClick={handleCreate} disabled={saving}>
               {saving ? "Creating…" : "Create chart"}
             </PrimaryButton>

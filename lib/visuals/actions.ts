@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { pillarHref } from "@/lib/pillars/nav";
 import { isValidIsoDateString } from "./date-validation";
+import { parseChartBinding, type ChartAdapterKind } from "./config";
 import type { Prisma, VisualType } from "@/lib/generated/prisma/client";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
@@ -58,8 +59,14 @@ export async function deleteVisual(pillarId: string, areaId: string | null, id: 
 /** Undo for deleteVisual — VisualRecord cascade-deletes with its Visual,
  * so restoring means recreating both with their original ids in one
  * transaction, same "recreate with original ids" approach as Finance's
- * restoreDeletedTransactions (#151, ADR-0015). */
+ * restoreDeletedTransactions (#151, ADR-0015). A bound Visual's
+ * `visual.records` here are resolve-binding.ts's synthetic, never-persisted
+ * rows (its `config` still carries the real `binding` pointer, so undo
+ * just needs the Visual row back) — recreating those synthetic rows as
+ * real VisualRecords would permanently defeat the point of binding, so
+ * they're skipped rather than replayed. */
 export async function restoreVisual(visual: VisualWithRecords): Promise<ActionResult> {
+  const bound = parseChartBinding(visual.config) !== null;
   try {
     await prisma.$transaction([
       prisma.visual.create({
@@ -75,20 +82,22 @@ export async function restoreVisual(visual: VisualWithRecords): Promise<ActionRe
           updatedAt: visual.updatedAt,
         },
       }),
-      ...visual.records.map((r) =>
-        prisma.visualRecord.create({
-          data: {
-            id: r.id,
-            visualId: r.visualId,
-            date: r.date,
-            xValue: r.xValue,
-            yValue: r.yValue,
-            xLabel: r.xLabel,
-            note: r.note,
-            createdAt: r.createdAt,
-          },
-        })
-      ),
+      ...(bound
+        ? []
+        : visual.records.map((r) =>
+            prisma.visualRecord.create({
+              data: {
+                id: r.id,
+                visualId: r.visualId,
+                date: r.date,
+                xValue: r.xValue,
+                yValue: r.yValue,
+                xLabel: r.xLabel,
+                note: r.note,
+                createdAt: r.createdAt,
+              },
+            })
+          )),
     ]);
   } catch {
     return { ok: false, error: "Couldn't restore — try again." };
@@ -162,6 +171,35 @@ export async function createVisualRecordsBulk(
     return { ok: true, records };
   } catch {
     return { ok: false, error: "Couldn't save — try again." };
+  }
+}
+
+export type AdapterOption = { id: string; name: string };
+
+/** Lists the entities the add-chart modal's entity picker offers for a
+ * given source once "use existing data" is chosen (#166) — one Habit/
+ * System/Goal/Account per row, name only (id is the refId a binding
+ * stores). Habit and System are Pillar/Area-owned models, so they're
+ * scoped to the chart's own page exactly the same way
+ * getVisualsForPillar/getVisualsForArea scope Visuals themselves — a
+ * Habit belonging to one of the Pillar's Areas doesn't show up as
+ * bindable from the Pillar page, only from that Area's own page. Goal and
+ * Account aren't Pillar/Area-owned, so those two list app-wide. */
+export async function getAdapterOptions(
+  adapter: ChartAdapterKind,
+  pillarId: string,
+  areaId: string | null
+): Promise<AdapterOption[]> {
+  const scope = areaId ? { areaId } : { pillarId, areaId: null };
+  switch (adapter) {
+    case "habit-checkins":
+      return prisma.habit.findMany({ where: scope, select: { id: true, name: true }, orderBy: { name: "asc" } });
+    case "system-evaluations":
+      return prisma.system.findMany({ where: scope, select: { id: true, name: true }, orderBy: { name: "asc" } });
+    case "goal-progress":
+      return prisma.goal.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } });
+    case "finance-balances":
+      return prisma.account.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } });
   }
 }
 

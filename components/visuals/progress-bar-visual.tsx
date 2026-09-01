@@ -6,18 +6,19 @@ import { useToast } from "@/components/toast/toast-provider";
 import { AddRecordForm } from "./add-record-form";
 import { VisualCard } from "./visual-card";
 import { latestValue } from "@/lib/visuals/records";
-import { parseProgressBarConfig } from "@/lib/visuals/config";
+import { parseChartBinding, parseProgressBarConfig } from "@/lib/visuals/config";
 import type { VisualWithRecords } from "@/lib/visuals/actions";
 import cardStyles from "./visual-card.module.css";
 import styles from "./progress-bar-visual.module.css";
 
-/** Renders a Progress bar Visual (#164, ADR-0017) — reads only the latest
- * record's value as "current" (lib/visuals/records.ts's latestValue), set
- * against the ad-hoc target stored in config at creation time. Once #166
- * adds binding, a Goal-bound Progress bar reads its target from the Goal
- * itself instead — this component doesn't need to change for that, only
- * where its target number comes from. Still logs data via the same
- * date+value AddRecordForm every date-series chart type uses. */
+/** Renders a Progress bar Visual (#164/#166, ADR-0017) — reads only the
+ * latest record's value as "current" (lib/visuals/records.ts's
+ * latestValue), set against a target. For an ad-hoc chart that target is
+ * whatever was set at creation time; for a Goal-bound one,
+ * resolve-binding.ts merges the Goal's own target into `config` at render
+ * time, so parseProgressBarConfig reads it the same way either way —
+ * only the data-entry form hides itself for a bound chart, via
+ * parseChartBinding. */
 export function ProgressBarVisual({
   visual,
   onRemove,
@@ -42,6 +43,7 @@ export function ProgressBarVisual({
   const current = latestValue(visual.records);
   const config = parseProgressBarConfig(visual.config);
   const percent = config && current !== null ? Math.max(0, Math.min(100, (current / config.target) * 100)) : 0;
+  const bound = parseChartBinding(visual.config) !== null;
 
   return (
     <VisualCard title={visual.title} onRemove={onRemove}>
@@ -58,7 +60,7 @@ export function ProgressBarVisual({
         <p className={cardStyles.empty}>No target set.</p>
       )}
 
-      <AddRecordForm onAdd={handleAdd} />
+      {bound ? <p className={cardStyles.bound}>Synced from live data.</p> : <AddRecordForm onAdd={handleAdd} />}
     </VisualCard>
   );
 }

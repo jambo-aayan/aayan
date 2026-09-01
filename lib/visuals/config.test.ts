@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseProgressBarConfig } from "./config";
+import { parseChartBinding, parseProgressBarConfig } from "./config";
 
 describe("parseProgressBarConfig", () => {
   it("returns the target when config is a valid shape", () => {
@@ -20,5 +20,33 @@ describe("parseProgressBarConfig", () => {
     expect(parseProgressBarConfig({ target: "50" })).toBeNull();
     expect(parseProgressBarConfig({ target: NaN })).toBeNull();
     expect(parseProgressBarConfig({ target: Infinity })).toBeNull();
+  });
+});
+
+describe("parseChartBinding", () => {
+  it("returns the adapter+refId for a valid binding", () => {
+    expect(parseChartBinding({ binding: { adapter: "habit-checkins", refId: "h1" } })).toEqual({
+      adapter: "habit-checkins",
+      refId: "h1",
+    });
+  });
+
+  it("returns null when there's no binding key (an ad-hoc chart)", () => {
+    expect(parseChartBinding({})).toBeNull();
+    expect(parseChartBinding({ target: 50 })).toBeNull();
+  });
+
+  it("returns null for null/non-object config", () => {
+    expect(parseChartBinding(null)).toBeNull();
+    expect(parseChartBinding("not an object")).toBeNull();
+  });
+
+  it("returns null for an unrecognized adapter name", () => {
+    expect(parseChartBinding({ binding: { adapter: "made-up", refId: "x" } })).toBeNull();
+  });
+
+  it("returns null when refId is missing or empty", () => {
+    expect(parseChartBinding({ binding: { adapter: "goal-progress" } })).toBeNull();
+    expect(parseChartBinding({ binding: { adapter: "goal-progress", refId: "" } })).toBeNull();
   });
 });

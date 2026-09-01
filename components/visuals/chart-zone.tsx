@@ -11,10 +11,10 @@ import { ScatterVisual } from "./scatter-visual";
 import { StreakHeatmapVisual } from "./streak-heatmap-visual";
 import { createVisual, deleteVisual, restoreVisual, type VisualWithRecords } from "@/lib/visuals/actions";
 import { useUndoableCrudList } from "@/lib/hooks/use-undoable-crud-list";
-import type { VisualType } from "@/lib/generated/prisma/client";
+import type { Prisma, VisualType } from "@/lib/generated/prisma/client";
 import styles from "./chart-zone.module.css";
 
-type CreateInput = { type: VisualType; title: string; config?: { target: number } };
+type CreateInput = { type: VisualType; title: string; config?: Prisma.InputJsonValue };
 
 /** The Charts zone (#161-#164, ADR-0017) — holds any number of chart
  * Visuals on a Pillar/Area page, unlike the six singular sections it sits
@@ -47,7 +47,7 @@ export function ChartZone({
     }
   );
 
-  async function handleCreate(type: VisualType, title: string, config?: { target: number }) {
+  async function handleCreate(type: VisualType, title: string, config?: Prisma.InputJsonValue) {
     const ok = await add({ type, title, config });
     return { ok };
   }
@@ -114,7 +114,9 @@ export function ChartZone({
           </button>
         </div>
       )}
-      {modalOpen && <AddChartModal onClose={() => setModalOpen(false)} onCreate={handleCreate} />}
+      {modalOpen && (
+        <AddChartModal pillarId={pillarId} areaId={areaId} onClose={() => setModalOpen(false)} onCreate={handleCreate} />
+      )}
     </div>
   );
 }

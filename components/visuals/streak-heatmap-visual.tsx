@@ -8,6 +8,7 @@ import { BulkAddForm } from "./bulk-add-form";
 import { VisualCard } from "./visual-card";
 import { heatmapIntensities } from "@/lib/visuals/records";
 import { formatDateShort } from "@/lib/visuals/format";
+import { parseChartBinding } from "@/lib/visuals/config";
 import type { VisualWithRecords } from "@/lib/visuals/actions";
 import cardStyles from "./visual-card.module.css";
 import styles from "./streak-heatmap-visual.module.css";
@@ -50,6 +51,7 @@ export function StreakHeatmapVisual({
   }
 
   const cells = heatmapIntensities(visual.records);
+  const bound = parseChartBinding(visual.config) !== null;
 
   return (
     <VisualCard title={visual.title} onRemove={onRemove}>
@@ -68,8 +70,14 @@ export function StreakHeatmapVisual({
         </div>
       )}
 
-      <AddRecordForm onAdd={handleAdd} />
-      <BulkAddForm onAdd={handleBulkAdd} />
+      {bound ? (
+        <p className={cardStyles.bound}>Synced from live data.</p>
+      ) : (
+        <>
+          <AddRecordForm onAdd={handleAdd} />
+          <BulkAddForm onAdd={handleBulkAdd} />
+        </>
+      )}
     </VisualCard>
   );
 }

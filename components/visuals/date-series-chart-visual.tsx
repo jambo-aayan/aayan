@@ -9,6 +9,7 @@ import { BulkAddForm } from "./bulk-add-form";
 import { VisualCard } from "./visual-card";
 import { formatDateShort } from "@/lib/visuals/format";
 import { dateValuePoints } from "@/lib/visuals/records";
+import { parseChartBinding } from "@/lib/visuals/config";
 import type { VisualWithRecords } from "@/lib/visuals/actions";
 import styles from "./visual-card.module.css";
 
@@ -56,6 +57,7 @@ export function DateSeriesChartVisual({
   }
 
   const points = dateValuePoints(visual.records).map((p) => ({ label: formatDateShort(p.date), value: p.value }));
+  const bound = parseChartBinding(visual.config) !== null;
 
   return (
     <VisualCard title={visual.title} onRemove={onRemove}>
@@ -81,8 +83,14 @@ export function DateSeriesChartVisual({
         </ResponsiveContainer>
       )}
 
-      <AddRecordForm onAdd={handleAdd} />
-      <BulkAddForm onAdd={handleBulkAdd} />
+      {bound ? (
+        <p className={styles.bound}>Synced from live data.</p>
+      ) : (
+        <>
+          <AddRecordForm onAdd={handleAdd} />
+          <BulkAddForm onAdd={handleBulkAdd} />
+        </>
+      )}
     </VisualCard>
   );
 }
