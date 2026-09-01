@@ -1,29 +1,7 @@
 import Link from "next/link";
 import { ANKYLOSING_SPONDYLITIS_AREA_ID } from "@/lib/health/seed-data";
+import { computeMindmapLayout } from "@/lib/health/mindmap-layout";
 import styles from "./health-mindmap.module.css";
-
-/** Hand-placed percentages from the design_handoff_aayan README's Health
- * mindmap spec, keyed by the seeded Area id — per the handoff's own note,
- * "node positions are hand-placed percentages, not a layout algorithm."
- * Falls back to a generic radial layout for any Area outside this fixed
- * set (a custom-created Area, or the seed list growing later). */
-const NODE_POSITION: Record<string, { left: number; top: number }> = {
-  sleep: { left: 50, top: 16 },
-  diet: { left: 80, top: 29 },
-  "body-composition": { left: 62, top: 81 },
-  looks: { left: 36, top: 80 },
-  // Care merged Blood Pressure + Healthcare Navigation (see
-  // docs/adr/0005-v2-phase1-foundations-migration.md) — placed between
-  // their two former positions rather than picking one over the other.
-  care: { left: 50, top: 58 },
-  [ANKYLOSING_SPONDYLITIS_AREA_ID]: { left: 28, top: 27 },
-};
-
-function fallbackPosition(index: number, total: number): { left: number; top: number } {
-  const angleDeg = -90 + (index * 360) / total;
-  const rad = (angleDeg * Math.PI) / 180;
-  return { left: 50 + Math.cos(rad) * 38, top: 50 + Math.sin(rad) * 38 };
-}
 
 export function HealthMindmap({
   areas,
@@ -35,10 +13,7 @@ export function HealthMindmap({
    * green, one of the color system's propagation points. */
   accentColor?: string | null;
 }) {
-  const nodes = areas.map((area, i) => ({
-    ...area,
-    ...(NODE_POSITION[area.id] ?? fallbackPosition(i, areas.length)),
-  }));
+  const nodes = computeMindmapLayout(areas);
 
   return (
     <div className={styles.wrap} style={accentColor ? ({ "--pillar-accent": accentColor } as React.CSSProperties) : undefined}>

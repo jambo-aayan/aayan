@@ -46,8 +46,18 @@
 .leaf {
   position: absolute;
   transform: translate(-50%, -50%);
-  white-space: nowrap;
-  border-radius: var(--radius-pill);
+  /* max-width is a percentage of .wrap (matches
+     lib/health/mindmap-layout.ts's MINDMAP_NODE_WIDTH_PERCENT, which the
+     radius math keeps adjacent nodes clear of) rather than a fixed px
+     value, so a label wraps onto a second line instead of growing wide
+     enough to collide with its neighbor, at any container size. */
+  max-width: 20%;
+  white-space: normal;
+  text-align: center;
+  /* --radius-lg, not --radius-pill — a full pill shape (999px) reads oddly
+     once a label wraps onto a second line; a soft rounded rect looks right
+     whether the label is one line or two. */
+  border-radius: var(--radius-lg);
   background: var(--surface-sunken);
   border: 1px solid rgba(34, 30, 26, 0.12);
   color: var(--ink-2);
