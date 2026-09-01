@@ -7,7 +7,10 @@ type CreateResult<T> = { ok: true; item: T } | { ok: false; error: string };
 
 export type CrudActions<T, Input> = {
   create: (input: Input) => Promise<CreateResult<T>>;
-  update: (id: string, input: Input) => Promise<ActionResult>;
+  /** Optional — a caller with no edit UI (e.g. a chart/table Visual, which
+   * has nothing to rename yet) can omit this; `update` below then rejects
+   * rather than silently no-opping, so a caller can't accidentally call it. */
+  update?: (id: string, input: Input) => Promise<ActionResult>;
   remove: (id: string) => Promise<ActionResult>;
   restore: (item: T) => Promise<ActionResult>;
 };
@@ -54,7 +57,8 @@ export function useUndoableCrudList<T extends { id: string }, Input>(
   // list-level `error` below — a save failure on row 8 of 20 shouldn't
   // only be visible scrolled away from the row still open in edit mode.
   async function update(id: string, input: Input, merged: T): Promise<ActionResult> {
-    const result = await withRetry(() => actions.update(id, input));
+    if (!actions.update) return { ok: false, error: "This list doesn't support editing." };
+    const result = await withRetry(() => actions.update!(id, input));
     if (!result.ok) {
       notifyError(result.error, { onRetry: () => update(id, input, merged) });
       return result;
@@ -99,5 +103,10 @@ export function useUndoableCrudList<T extends { id: string }, Input>(
     await restore(item);
   }
 
-  return { items, error, undo, add, update, remove, undoDelete };
+  // Exposed for a caller that needs to reflect a change to one item's own
+  // nested data (e.g. a chart Visual gaining a new ad-hoc record) whose
+  // server call already happened separately, outside this hook's
+  // create/update/remove actions — setItems avoids a redundant second
+  // server round-trip through `update` just to sync local state.
+  return { items, setItems, error, undo, add, update, remove, undoDelete };
 }
