@@ -1,5 +1,6 @@
-/** Percentage-space geometry for the Pillar mindmap (Health today, any
- * Pillar with Areas later) — replaces the old hand-placed NODE_POSITION
+/** Percentage-space geometry for the Pillar mindmap (any Pillar with Areas,
+ * as of #157/ADR-0016 — Health originally) — replaces the old hand-placed
+ * NODE_POSITION
  * table and its dead fallbackPosition path (#145, ADR-0014). Everything
  * stays in the same 0-100 percentage units the diagram's SVG viewBox
  * already uses, so this never needs a DOM measurement or ResizeObserver —
@@ -9,7 +10,7 @@ export const MINDMAP_CENTER_PERCENT = 50;
 export const MINDMAP_MIN_RADIUS_PERCENT = 22;
 export const MINDMAP_MAX_RADIUS_PERCENT = 40;
 
-/** Must match health-mindmap.module.css's `.leaf` max-width (also a
+/** Must match pillar-mindmap.module.css's `.leaf` max-width (also a
  * percentage of the same container) — this is the value the radius math
  * below keeps adjacent nodes clear of. Long labels wrap within this width
  * via plain CSS (`white-space: normal`); this module never inspects a

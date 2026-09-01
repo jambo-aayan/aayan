@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import type { ColorKey } from "@/lib/colors";
+import { pillarHref } from "./nav";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -58,5 +59,18 @@ export async function updatePillarTimeShare(pillarId: string, percent: number | 
     return { ok: false, error: "Couldn't save — try again." };
   }
   revalidatePillarPaths();
+  return { ok: true };
+}
+
+/** Generalized off the original Health-only `updateHealthPillarNorthStar`
+ * (#157/ADR-0016) — every Pillar's North Star is editable the same way,
+ * not just Health's. */
+export async function updatePillarNorthStar(pillarId: string, value: string): Promise<ActionResult> {
+  try {
+    await prisma.pillar.update({ where: { id: pillarId }, data: { northStar: value || null } });
+  } catch {
+    return { ok: false, error: "Couldn't save — try again." };
+  }
+  revalidatePath(pillarHref(pillarId));
   return { ok: true };
 }

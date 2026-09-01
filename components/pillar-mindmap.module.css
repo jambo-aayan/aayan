@@ -47,7 +47,7 @@
   position: absolute;
   transform: translate(-50%, -50%);
   /* max-width is a percentage of .wrap (matches
-     lib/health/mindmap-layout.ts's MINDMAP_NODE_WIDTH_PERCENT, which the
+     lib/pillars/mindmap-layout.ts's MINDMAP_NODE_WIDTH_PERCENT, which the
      radius math keeps adjacent nodes clear of) rather than a fixed px
      value, so a label wraps onto a second line instead of growing wide
      enough to collide with its neighbor, at any container size. */

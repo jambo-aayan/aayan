@@ -7,17 +7,20 @@ import { MobileNavDrawer } from "./mobile-nav-drawer";
 import { CommandPalette } from "./command-palette";
 import type { DailyFocusHabit } from "./daily-focus-types";
 import type { PaletteItem } from "@/lib/palette/types";
+import type { PillarNavItem } from "./nav-config";
 import styles from "./app-shell.module.css";
 
 export function AppShell({
   dailyFocusHabits,
   nudgesUnreadCount,
   paletteItems,
+  pillarNavItems,
   children,
 }: {
   dailyFocusHabits: DailyFocusHabit[];
   nudgesUnreadCount: number;
   paletteItems: PaletteItem[];
+  pillarNavItems: PillarNavItem[];
   children: React.ReactNode;
 }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -39,6 +42,7 @@ export function AppShell({
       <Sidebar
         dailyFocusHabits={dailyFocusHabits}
         nudgesUnreadCount={nudgesUnreadCount}
+        pillarNavItems={pillarNavItems}
         onSearchClick={() => setPaletteOpen(true)}
       />
       <MobileNavDrawer
@@ -46,6 +50,7 @@ export function AppShell({
         onClose={() => setDrawerOpen(false)}
         dailyFocusHabits={dailyFocusHabits}
         nudgesUnreadCount={nudgesUnreadCount}
+        pillarNavItems={pillarNavItems}
       />
       <div className={styles.main}>
         <MobileHeader

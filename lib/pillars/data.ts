@@ -38,3 +38,17 @@ export async function getPillarsWithStats(): Promise<PillarWithStats[]> {
     habitCount: p._count.habits,
   }));
 }
+
+/** Generalized off the original Health-only `getHealthPillarWithAreas`
+ * (#157/ADR-0016) — every Pillar's ensure-seeded call already runs upstream
+ * in the shell layout (see getPillarsWithStats's own Promise.all), so this
+ * doesn't need to run one itself. Returns null for an unknown id — the
+ * generic /[pillarId] route calls notFound() rather than throwing, unlike
+ * the old Health-only findUniqueOrThrow (Health's id is always guaranteed
+ * present, an arbitrary pillarId isn't). */
+export async function getPillarWithAreas(pillarId: string) {
+  return prisma.pillar.findUnique({
+    where: { id: pillarId },
+    include: { areas: { orderBy: { sortOrder: "asc" } } },
+  });
+}

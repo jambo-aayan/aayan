@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Search } from "lucide-react";
-import { NAV_ITEMS } from "./nav-config";
+import { NAV_BEFORE_PILLARS, NAV_AFTER_PILLARS, type PillarNavItem } from "./nav-config";
 import { HabitDot } from "./habit-dot";
 import { useDailyFocusHabits } from "./use-daily-focus-habits";
 import type { DailyFocusHabit } from "./daily-focus-types";
@@ -12,10 +12,12 @@ import styles from "./sidebar.module.css";
 export function Sidebar({
   dailyFocusHabits: initialDailyFocusHabits,
   nudgesUnreadCount,
+  pillarNavItems,
   onSearchClick,
 }: {
   dailyFocusHabits: DailyFocusHabit[];
   nudgesUnreadCount: number;
+  pillarNavItems: PillarNavItem[];
   onSearchClick: () => void;
 }) {
   const pathname = usePathname();
@@ -36,7 +38,28 @@ export function Sidebar({
       </button>
 
       <div className={styles.nav}>
-        {NAV_ITEMS.map((item) => {
+        {NAV_BEFORE_PILLARS.map((item) => {
+          const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+          const Icon = item.icon;
+          return (
+            <Link key={item.href} href={item.href} className={`${styles.item} ${active ? styles.active : ""}`}>
+              <Icon size={17} strokeWidth={2} className={styles.icon} />
+              {item.label}
+            </Link>
+          );
+        })}
+        {pillarNavItems.map((item) => {
+          const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+          return (
+            <Link key={item.id} href={item.href} className={`${styles.item} ${active ? styles.active : ""}`}>
+              <span className={styles.icon}>
+                <HabitDot level="FULL" accentColor={item.color} size={9} />
+              </span>
+              {item.label}
+            </Link>
+          );
+        })}
+        {NAV_AFTER_PILLARS.map((item) => {
           const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
           const Icon = item.icon;
           return (

@@ -7,16 +7,9 @@ import { useToast } from "@/components/toast/toast-provider";
 import { withRetry } from "@/lib/with-retry";
 import { updatePillarColor, updatePillarTimeShare } from "@/lib/pillars/actions";
 import { resolveColorHex, type ColorKey } from "@/lib/colors";
-import { HEALTH_PILLAR_ID } from "@/lib/health/seed-data";
-import { FINANCE_PILLAR_ID } from "@/lib/finance/pillar-id";
+import { pillarHref } from "@/lib/pillars/nav";
 import type { PillarWithStats } from "@/lib/pillars/data";
 import styles from "./pillar-card.module.css";
-
-function hrefFor(pillarId: string): string {
-  if (pillarId === HEALTH_PILLAR_ID) return "/health";
-  if (pillarId === FINANCE_PILLAR_ID) return "/finances";
-  return `/goals?pillarId=${pillarId}`;
-}
 
 export function PillarCard({ pillar }: { pillar: PillarWithStats }) {
   const [color, setColor] = useState(pillar.color);
@@ -45,7 +38,7 @@ export function PillarCard({ pillar }: { pillar: PillarWithStats }) {
 
   return (
     <div className={styles.card} style={hex ? { borderTopColor: hex } : undefined}>
-      <Link href={hrefFor(pillar.id)} className={styles.link}>
+      <Link href={pillarHref(pillar.id)} className={styles.link}>
         <span className={styles.badge} style={hex ? { background: `${hex}24`, color: hex } : undefined}>
           {pillar.name.charAt(0).toUpperCase()}
         </span>

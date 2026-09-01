@@ -325,6 +325,7 @@ export async function getNeglectRadar(asOf: Date = new Date()) {
     prisma.area.findMany({
       select: {
         id: true,
+        pillarId: true,
         name: true,
         tasks: { select: { createdAt: true, completedAt: true } },
         thoughts: { select: { createdAt: true } },
@@ -351,6 +352,7 @@ export async function getNeglectRadar(asOf: Date = new Date()) {
     ...areas.map((a): NeglectFixture => ({
       kind: "area",
       id: a.id,
+      pillarId: a.pillarId,
       label: a.name,
       lastActivityAt: latestOf([
         ...a.tasks.flatMap((t) => [t.createdAt, t.completedAt]),

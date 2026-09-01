@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { X } from "lucide-react";
-import { NAV_ITEMS } from "./nav-config";
+import { NAV_BEFORE_PILLARS, NAV_AFTER_PILLARS, type PillarNavItem } from "./nav-config";
 import { HabitDot } from "./habit-dot";
 import { useDailyFocusHabits } from "./use-daily-focus-habits";
 import { useDialogFocusTrap } from "./use-dialog-focus-trap";
@@ -16,11 +16,13 @@ export function MobileNavDrawer({
   onClose,
   dailyFocusHabits: initialDailyFocusHabits,
   nudgesUnreadCount,
+  pillarNavItems,
 }: {
   open: boolean;
   onClose: () => void;
   dailyFocusHabits: DailyFocusHabit[];
   nudgesUnreadCount: number;
+  pillarNavItems: PillarNavItem[];
 }) {
   const pathname = usePathname();
   const { habits: dailyFocusHabits, toggle } = useDailyFocusHabits(initialDailyFocusHabits);
@@ -63,7 +65,28 @@ export function MobileNavDrawer({
           </button>
         </div>
         <div className={styles.nav}>
-          {NAV_ITEMS.map((item) => {
+          {NAV_BEFORE_PILLARS.map((item) => {
+            const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+            const Icon = item.icon;
+            return (
+              <Link key={item.href} href={item.href} className={`${styles.item} ${active ? styles.active : ""}`}>
+                <Icon size={18} strokeWidth={2} className={styles.icon} />
+                {item.label}
+              </Link>
+            );
+          })}
+          {pillarNavItems.map((item) => {
+            const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+            return (
+              <Link key={item.id} href={item.href} className={`${styles.item} ${active ? styles.active : ""}`}>
+                <span className={styles.icon}>
+                  <HabitDot level="FULL" accentColor={item.color} size={10} />
+                </span>
+                {item.label}
+              </Link>
+            );
+          })}
+          {NAV_AFTER_PILLARS.map((item) => {
             const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
             const Icon = item.icon;
             return (

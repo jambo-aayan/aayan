@@ -1,13 +1,15 @@
 import type { PaletteItem } from "./types";
 
-/** Static "Jump to" fixtures — every real page in the shell, not just the
- * 6 items in the sidebar nav (see nav-config.tsx). No colored dot per the
- * design_handoff_aayan README's Command palette spec. */
+/** Static "Jump to" fixtures — every real page in the shell that isn't a
+ * Pillar (see nav-config.tsx's own NAV_BEFORE_PILLARS/NAV_AFTER_PILLARS
+ * split). Pillar pages (Health, Finances, and every user-created Pillar)
+ * are data-driven instead — see pillarPaletteItems in the shell layout,
+ * built off getPillarsWithStats() the same way pillarNavItems is, as of
+ * #157/ADR-0016. No colored dot per the design_handoff_aayan README's
+ * Command palette spec. */
 export const PALETTE_PAGES: PaletteItem[] = [
   { id: "page-home", type: "page", label: "Home", hint: null, href: "/today", color: null },
   { id: "page-insights", type: "page", label: "Insights", hint: null, href: "/insights", color: null },
-  { id: "page-health", type: "page", label: "Health", hint: null, href: "/health", color: null },
-  { id: "page-finances", type: "page", label: "Finances", hint: null, href: "/finances", color: null },
   { id: "page-nudges", type: "page", label: "Nudges", hint: null, href: "/nudges", color: null },
   { id: "page-settings", type: "page", label: "Settings", hint: null, href: "/settings", color: null },
   { id: "page-tasks", type: "page", label: "Tasks", hint: null, href: "/tasks", color: null },

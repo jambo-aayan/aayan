@@ -7,18 +7,19 @@ import { Card } from "@/components/card";
 import { MyDayHabits } from "@/components/my-day-habits";
 import { getHabitOccurrencesForDate } from "@/lib/habits/data";
 import { getUpcomingSystemSteps } from "@/lib/systems/data";
-import { HEALTH_PILLAR_ID } from "@/lib/health/seed-data";
+import { pillarHref } from "@/lib/pillars/nav";
 import { resolveColorHex, type ColorKey } from "@/lib/colors";
 import styles from "./my-day.module.css";
 
 const UPCOMING_WINDOW_DAYS = 14;
 
-/** Only Health has a per-Area page today (`/health/[areaId]`); there's no
- * per-Pillar page yet either (`/pillars` is a flat index, no dynamic
- * route), so any other Pillar's System falls back to that index rather
- * than a link that would 404. Revisit once other Pillars grow real pages. */
+/** Every Pillar has a real page as of #157/ADR-0016, so this links straight
+ * there (and into the Area, if the step has one) instead of falling back
+ * to the flat /pillars index — the pre-#157 version could only do that for
+ * Health, which was the only Pillar with a real page at the time. */
 function upcomingStepHref(step: { areaId: string | null; pillarId: string }): string {
-  return step.areaId && step.pillarId === HEALTH_PILLAR_ID ? `/health/${step.areaId}` : "/pillars";
+  const base = pillarHref(step.pillarId);
+  return step.areaId ? `${base}/${step.areaId}` : base;
 }
 
 export default async function MyDayPage() {

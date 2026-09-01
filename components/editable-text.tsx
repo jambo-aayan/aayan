@@ -2,8 +2,15 @@
 
 import { useEffect, useRef, useState } from "react";
 import styles from "./editable-text.module.css";
-import type { SaveResult } from "@/lib/health/actions";
 import { useToast } from "@/components/toast/toast-provider";
+
+// Was imported from lib/health/actions, which #157/ADR-0016 retired along
+// with Health's hardcoded pages — inlined here since every save-action
+// module in this codebase (lib/pillars/actions.ts's ActionResult,
+// lib/areas/actions.ts's SaveResult, ...) already independently declares
+// this exact shape; this generic component shouldn't couple to any one of
+// them.
+type SaveResult = { ok: true } | { ok: false; error: string };
 
 const SAVE_DEBOUNCE_MS = 800;
 

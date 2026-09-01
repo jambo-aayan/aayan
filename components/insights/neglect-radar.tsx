@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { NeglectRow } from "@/lib/insights/neglect";
+import { pillarHref } from "@/lib/pillars/nav";
 import styles from "./neglect-radar.module.css";
 
 const KIND_ACTION: Record<NeglectRow["kind"], string> = {
@@ -12,7 +13,9 @@ const KIND_ACTION: Record<NeglectRow["kind"], string> = {
 function actionHref(row: NeglectRow): string {
   switch (row.kind) {
     case "area":
-      return `/health/${row.id}`;
+      // pillarId is always set for kind "area" (see NeglectFixture); the
+      // fallback only guards the type, never actually hit.
+      return `${pillarHref(row.pillarId ?? "health")}/${row.id}`;
     case "goal":
       return `/goals/${row.id}`;
     case "list":

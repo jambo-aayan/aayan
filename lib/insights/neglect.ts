@@ -6,6 +6,10 @@ export type NeglectSeverity = "red" | "coral" | "gold" | "muted";
 export type NeglectFixture = {
   kind: NeglectKind;
   id: string;
+  /** Only meaningful for kind "area" (#157/ADR-0016) — an Area's neglect
+   * link needs its owning Pillar's id to route to the right generic
+   * /[pillarId]/[areaId] page, not just its own id. */
+  pillarId?: string;
   label: string;
   /** Null means no activity has ever been recorded — treated as more
    * neglected than any finite day count. */
@@ -15,6 +19,7 @@ export type NeglectFixture = {
 export type NeglectRow = {
   kind: NeglectKind;
   id: string;
+  pillarId?: string;
   label: string;
   daysSince: number | null;
   severity: NeglectSeverity;
@@ -42,7 +47,7 @@ export function neglectSeverity(daysSince: number | null): NeglectSeverity {
 export function computeNeglectRadar(fixtures: NeglectFixture[], asOf: Date): NeglectRow[] {
   const rows = fixtures.map((f): NeglectRow => {
     const daysSince = f.lastActivityAt === null ? null : Math.floor((asOf.getTime() - f.lastActivityAt.getTime()) / DAY_MS);
-    return { kind: f.kind, id: f.id, label: f.label, daysSince, severity: neglectSeverity(daysSince) };
+    return { kind: f.kind, id: f.id, pillarId: f.pillarId, label: f.label, daysSince, severity: neglectSeverity(daysSince) };
   });
 
   return rows.sort((a, b) => (b.daysSince ?? Infinity) - (a.daysSince ?? Infinity));

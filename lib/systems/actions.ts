@@ -19,8 +19,17 @@ import {
 export type ActionResult = { ok: true } | { ok: false; error: string };
 const SAVE_ERROR = "Couldn't save — try again.";
 
-/** No per-Pillar dynamic route exists yet (`/pillars` is a flat index),
- * so revalidating one isn't possible — only the index. */
+/** As of #157/ADR-0016 a generic /[pillarId]/[areaId] route exists for
+ * every Pillar, not just Health — but this function still only revalidates
+ * Health's and Finances' paths (plus the always-safe index/my-day/systems
+ * ones), a pre-existing gap this ticket doesn't extend to. Threading
+ * pillarId through this file's ~30 call sites is a separate, mechanical
+ * follow-up, not in scope here. In practice this under-invalidates only
+ * the Next.js Router Cache for a user-created Pillar's page (a stale view
+ * on back/forward client nav within its revalidation window) — every page
+ * here is dynamically server-rendered against Prisma on each real request,
+ * so the underlying data is never stale, just a cached client-side render
+ * occasionally. */
 function revalidateSystemPaths(areaId: string | null) {
   if (areaId) revalidatePath(`/health/${areaId}`);
   // A pillar-scoped System (areaId null) could belong to either pillar
