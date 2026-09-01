@@ -8,9 +8,11 @@ import { Card } from "@/components/card";
 import { ThoughtQuickAdd } from "@/components/thoughts/thought-quick-add";
 import { MyDayTasks } from "@/components/tasks/my-day-tasks";
 import { DayOne } from "@/components/day-one/day-one";
+import { LogTodayWidget } from "@/components/home/log-today-widget";
 import { getHabitOccurrencesForDate } from "@/lib/habits/data";
 import { getAllGoals } from "@/lib/goals/data";
 import { getTagOptions } from "@/lib/thoughts/data";
+import { getLogTodayCharts } from "@/lib/visuals/log-today";
 import { habitsNotCheckedIn } from "@/lib/home/today";
 import { resolveColorHex, type ColorKey } from "@/lib/colors";
 import { getDayOneStatus } from "@/lib/onboarding/data";
@@ -63,6 +65,7 @@ export default async function TodayPage() {
     pillarOptions,
     areaOptions,
     taskTags,
+    logTodayCharts,
   ] = await Promise.all([
     getHabitOccurrencesForDate(now),
     getAllGoals({ status: "ACTIVE" }),
@@ -74,6 +77,7 @@ export default async function TodayPage() {
     getPillarOptions(),
     getAreaOptions(),
     getTaskTags(),
+    getLogTodayCharts(),
   ]);
 
   const dueHabits = habitsNotCheckedIn(todaysHabits);
@@ -127,6 +131,11 @@ export default async function TodayPage() {
 
         <Card>
           <ThoughtQuickAdd tagOptions={tagOptions} />
+        </Card>
+
+        <SectionHeader>Log today</SectionHeader>
+        <Card>
+          <LogTodayWidget charts={logTodayCharts} />
         </Card>
       </div>
     </>

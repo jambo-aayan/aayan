@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dateValuePoints, latestValue, scatterPoints, heatmapIntensities } from "./records";
+import { dateValuePoints, latestValue, scatterPoints, heatmapIntensities, valueForDate } from "./records";
 
 const d = (iso: string) => new Date(`${iso}T00:00:00.000Z`);
 
@@ -86,5 +86,21 @@ describe("scatterPoints", () => {
       record({ date: d("2026-01-01"), yValue: 5 }),
     ];
     expect(scatterPoints(records)).toEqual([{ x: 1, y: 2 }]);
+  });
+});
+
+describe("valueForDate", () => {
+  it("returns the value of the record matching the given date", () => {
+    const records = [record({ date: d("2026-01-01"), yValue: 10 }), record({ date: d("2026-01-02"), yValue: 20 })];
+    expect(valueForDate(records, "2026-01-02")).toBe(20);
+  });
+
+  it("returns null when no record matches the date", () => {
+    const records = [record({ date: d("2026-01-01"), yValue: 10 })];
+    expect(valueForDate(records, "2026-01-02")).toBeNull();
+  });
+
+  it("returns null for an empty records list", () => {
+    expect(valueForDate([], "2026-01-01")).toBeNull();
   });
 });

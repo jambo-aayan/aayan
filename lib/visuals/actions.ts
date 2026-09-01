@@ -161,6 +161,43 @@ export async function createVisualRecord(
   }
 }
 
+/** Home's "Log today" widget (#170) — upserts by date rather than always
+ * creating, the same "entering a second value the same day updates
+ * rather than duplicates" shape lib/daily-log/actions.ts's saveDailyLog
+ * established for the Daily Log Sheet. Unlike saveDailyLog, there's no DB
+ * uniqueness on (visualId, date) backing this — a chart's regular "Add
+ * data" form and bulk CSV import both intentionally allow multiple
+ * records on the same date already (#163/#165), so this only upserts at
+ * the app level, matching whatever single record (if any) this widget
+ * itself finds for today; it never touches a second same-day record a
+ * different flow might have created. `date` is the caller's own
+ * client-computed "today" (lib/local-date.ts's todayLocalDateString),
+ * same reasoning ThoughtQuickAdd already applies — never server-computed,
+ * to avoid a timezone mismatch between what the user sees as "today" and
+ * what gets stored. */
+export async function logTodayValue(
+  visualId: string,
+  pillarId: string,
+  areaId: string | null,
+  date: string,
+  value: number
+): Promise<CreateVisualRecordResult> {
+  if (!isValidIsoDateString(date)) return { ok: false, error: "Enter a valid date." };
+  if (!Number.isFinite(value)) return { ok: false, error: "Enter a valid number." };
+  try {
+    const day = new Date(`${date}T00:00:00.000Z`);
+    const existing = await prisma.visualRecord.findFirst({ where: { visualId, date: day } });
+    const record = existing
+      ? await prisma.visualRecord.update({ where: { id: existing.id }, data: { yValue: value } })
+      : await prisma.visualRecord.create({ data: { visualId, date: day, yValue: value } });
+    revalidateVisualPaths(pillarId, areaId);
+    revalidatePath("/today");
+    return { ok: true, record };
+  } catch {
+    return { ok: false, error: "Couldn't save — try again." };
+  }
+}
+
 export type CreateVisualRecordsBulkResult =
   | { ok: true; records: Awaited<ReturnType<typeof prisma.visualRecord.createManyAndReturn>> }
   | { ok: false; error: string };

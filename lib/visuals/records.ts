@@ -51,3 +51,15 @@ export function scatterPoints(records: Record[]): ScatterPoint[] {
     .filter((r): r is Record & { xValue: number; yValue: number } => r.xValue !== null && r.yValue !== null)
     .map((r) => ({ x: r.xValue, y: r.yValue }));
 }
+
+/** The Home "Log today" widget's own read (#170) — a chart's already-
+ * logged value for one specific date (normally today), so its inline
+ * input can show what's there already rather than a blank field that'd
+ * silently overwrite it on save. `dateStr` is compared against each
+ * record's own date via toISOString().slice(0, 10), the same round-trip
+ * lib/visuals/date-validation.ts's isValidIsoDateString uses, so this
+ * matches records exactly however they were stored. */
+export function valueForDate(records: Record[], dateStr: string): number | null {
+  const match = dateValuePoints(records).find((p) => p.date.toISOString().slice(0, 10) === dateStr);
+  return match?.value ?? null;
+}
