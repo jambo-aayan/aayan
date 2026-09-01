@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { put } from "@vercel/blob";
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@/lib/generated/prisma/client";
 import { BASELINE_ID } from "./baseline-id";
 import { canLinkTransfer, canReclassifyTransaction, isHeldForReview, resolveStatementBalance, validateStatementUpload } from "./logic";
 import { FINANCE_NORTH_STAR_ID } from "./north-star-id";
@@ -651,6 +652,123 @@ export async function restoreTransaction(
     return { ok: false, error: "Couldn't undo — the transaction may already be back." };
   }
   revalidatePath("/finances");
+  return { ok: true };
+}
+
+export type DeletedTransactionRecord = TransactionInput & {
+  id: string;
+  accountId: string | null;
+  receivableId: string | null;
+  goalContributionId: string | null;
+  transferId: string | null;
+  confidence: number | null;
+  statementId: string | null;
+};
+
+export type DeletedSnapshotRecord = {
+  id: string;
+  accountId: string;
+  date: Date;
+  balance: number;
+  confidence: number | null;
+  statementId: string | null;
+};
+
+export type BulkDeleteTransactionsResult =
+  | { ok: true; deleted: DeletedTransactionRecord[]; deletedSnapshots: DeletedSnapshotRecord[] }
+  | { ok: false; error: string };
+
+/** Deletes several Transactions in one action — the transaction list's
+ * multi-select "Delete selected" (#151, ADR-0015), including the
+ * per-statement "select all in this statement" shortcut, which routes
+ * through this same action rather than a separate deletion path. If a
+ * Statement's transactions all end up deleted (whether via that shortcut
+ * or a hand-picked selection that happens to cover the whole statement),
+ * its linked Snapshot(s) are deleted in the same action too — a
+ * half-deleted statement (transactions gone, a stale balance snapshot
+ * left behind) is a more confusing state than either extreme, and
+ * removing a statement's transactions is almost always because they
+ * were wrong or duplicated, which puts the balance they recorded in the
+ * same doubt. Returns the deleted rows (transactions and any cascaded
+ * snapshots) so the caller can offer a real undo. */
+// Under the default READ COMMITTED isolation, "delete these rows, then
+// count what's left for their statement" is a genuine check-then-act race
+// between two concurrent bulk deletes against the same Statement (e.g.
+// two browser tabs): each only sees the other's delete once it commits,
+// so both can independently count "1 remaining" and skip the snapshot
+// cascade, even though the statement ends up with zero transactions
+// once both commit. Serializable isolation makes Postgres detect that
+// conflict and abort one side with a retryable error (P2034) instead of
+// silently letting it through — retried here since the client's own
+// withRetry only handles network/ok:false failures, not a thrown
+// serialization error from inside the action itself.
+const DELETE_TRANSACTIONS_MAX_ATTEMPTS = 3;
+
+export async function deleteTransactions(ids: string[]): Promise<BulkDeleteTransactionsResult> {
+  if (ids.length === 0) return { ok: true, deleted: [], deletedSnapshots: [] };
+  for (let attempt = 1; attempt <= DELETE_TRANSACTIONS_MAX_ATTEMPTS; attempt++) {
+    try {
+      const result = await prisma.$transaction(
+        async (tx) => {
+          const transactions = await tx.transaction.findMany({ where: { id: { in: ids } } });
+          const statementIds = [...new Set(transactions.map((t) => t.statementId).filter((id): id is string => id !== null))];
+
+          await tx.transaction.deleteMany({ where: { id: { in: ids } } });
+
+          const deletedSnapshots: Awaited<ReturnType<typeof tx.snapshot.findMany>> = [];
+          for (const statementId of statementIds) {
+            const remaining = await tx.transaction.count({ where: { statementId } });
+            if (remaining === 0) {
+              const snapshots = await tx.snapshot.findMany({ where: { statementId } });
+              if (snapshots.length > 0) {
+                await tx.snapshot.deleteMany({ where: { statementId } });
+                deletedSnapshots.push(...snapshots);
+              }
+            }
+          }
+          return { transactions, deletedSnapshots };
+        },
+        { isolationLevel: "Serializable" }
+      );
+
+      revalidatePath("/finances");
+      revalidatePath("/finances/transactions");
+      revalidatePath("/finances/statements");
+      return {
+        ok: true,
+        deleted: result.transactions.map((t) => ({ ...t, amount: t.amount.toNumber() })),
+        deletedSnapshots: result.deletedSnapshots.map((s) => ({ ...s, balance: s.balance.toNumber() })),
+      };
+    } catch (error) {
+      const isSerializationConflict =
+        error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2034";
+      if (isSerializationConflict && attempt < DELETE_TRANSACTIONS_MAX_ATTEMPTS) continue;
+      return { ok: false, error: "Couldn't delete — try again." };
+    }
+  }
+  return { ok: false, error: "Couldn't delete — try again." };
+}
+
+/** Undoes a bulk delete — recreates every deleted Transaction and any
+ * cascaded Snapshot with their original ids, for the "Delete selected"
+ * undo toast (#151, ADR-0015). Snapshots first, since Transaction has no
+ * dependency on them but the reverse ordering would briefly leave a
+ * Transaction referencing a not-yet-recreated Snapshot mid-restore. */
+export async function restoreDeletedTransactions(
+  transactions: DeletedTransactionRecord[],
+  snapshots: DeletedSnapshotRecord[]
+): Promise<ActionResult> {
+  try {
+    await prisma.$transaction(async (tx) => {
+      if (snapshots.length > 0) await tx.snapshot.createMany({ data: snapshots });
+      if (transactions.length > 0) await tx.transaction.createMany({ data: transactions });
+    });
+  } catch {
+    return { ok: false, error: "Couldn't undo — try again." };
+  }
+  revalidatePath("/finances");
+  revalidatePath("/finances/transactions");
+  revalidatePath("/finances/statements");
   return { ok: true };
 }
 
