@@ -89,14 +89,9 @@
   font-weight: 500;
 }
 
-.galleryItem:hover:not(:disabled) {
+.galleryItem:hover {
   background: var(--surface-hover);
   border-color: var(--ink);
-}
-
-.galleryItem:disabled {
-  opacity: 0.35;
-  cursor: default;
 }
 
 .field {

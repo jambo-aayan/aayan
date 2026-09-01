@@ -8,22 +8,30 @@ import { LineChartIcon, BarChartIcon, ProgressBarIcon, ScatterIcon, StreakHeatma
 import type { VisualType } from "@/lib/generated/prisma/client";
 import styles from "./add-chart-modal.module.css";
 
-const CHART_TYPES: { type: VisualType; label: string; Icon: React.ComponentType; enabled: boolean }[] = [
-  { type: "LINE", label: "Line", Icon: LineChartIcon, enabled: true },
-  { type: "BAR", label: "Bar", Icon: BarChartIcon, enabled: false },
-  { type: "PROGRESS_BAR", label: "Progress bar", Icon: ProgressBarIcon, enabled: false },
-  { type: "SCATTER", label: "Scatter", Icon: ScatterIcon, enabled: false },
-  { type: "STREAK_HEATMAP", label: "Streak heatmap", Icon: StreakHeatmapIcon, enabled: false },
+const CHART_TYPES: { type: VisualType; label: string; Icon: React.ComponentType }[] = [
+  { type: "LINE", label: "Line", Icon: LineChartIcon },
+  { type: "BAR", label: "Bar", Icon: BarChartIcon },
+  { type: "PROGRESS_BAR", label: "Progress bar", Icon: ProgressBarIcon },
+  { type: "SCATTER", label: "Scatter", Icon: ScatterIcon },
+  { type: "STREAK_HEATMAP", label: "Streak heatmap", Icon: StreakHeatmapIcon },
 ];
 
-/** The add-chart flow (#163, ADR-0017) — a modal, not an inline expansion
- * like NewAreaTile, since a multi-step type-gallery-then-details flow
- * needs more room than a section-list trigger has. Step 1 (gallery) only
- * lets Line through in this ticket; #164 enables the other four. Only
- * ad-hoc creation exists here — "bind to existing data" is #166. */
-export function AddChartModal({ onClose, onCreate }: { onClose: () => void; onCreate: (type: VisualType, title: string) => Promise<{ ok: boolean; error?: string }> }) {
+/** The add-chart flow (#163/#164, ADR-0017) — a modal, not an inline
+ * expansion like NewAreaTile, since a multi-step type-gallery-then-details
+ * flow needs more room than a section-list trigger has. Only ad-hoc
+ * creation exists here — "bind to existing data" is #166. Progress bar
+ * needs a target set at creation time (#164) since there's nothing else
+ * to derive "current vs. target" from until it's bound to a Goal. */
+export function AddChartModal({
+  onClose,
+  onCreate,
+}: {
+  onClose: () => void;
+  onCreate: (type: VisualType, title: string, config?: { target: number }) => Promise<{ ok: boolean; error?: string }>;
+}) {
   const [type, setType] = useState<VisualType | null>(null);
   const [title, setTitle] = useState("");
+  const [target, setTarget] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const sheetRef = useRef<HTMLDivElement>(null);
@@ -43,9 +51,20 @@ export function AddChartModal({ onClose, onCreate }: { onClose: () => void; onCr
       setError("Give it a title first.");
       return;
     }
+    let config: { target: number } | undefined;
+    if (type === "PROGRESS_BAR") {
+      const parsedTarget = Number(target);
+      // Zero rejected too, not just NaN — a zero target makes "current /
+      // target" undefined (0/0) once any data is logged.
+      if (target.trim() === "" || Number.isNaN(parsedTarget) || parsedTarget <= 0) {
+        setError("Enter a target greater than zero.");
+        return;
+      }
+      config = { target: parsedTarget };
+    }
     setSaving(true);
     setError(null);
-    const result = await onCreate(type, title);
+    const result = await onCreate(type, title, config);
     setSaving(false);
     if (!result.ok) {
       setError(result.error ?? "Couldn't save — try again.");
@@ -68,8 +87,8 @@ export function AddChartModal({ onClose, onCreate }: { onClose: () => void; onCr
         <div className={styles.body}>
           {!type && (
             <div className={styles.gallery}>
-              {CHART_TYPES.map(({ type: t, label, Icon, enabled }) => (
-                <button key={t} type="button" className={styles.galleryItem} disabled={!enabled} onClick={() => setType(t)}>
+              {CHART_TYPES.map(({ type: t, label, Icon }) => (
+                <button key={t} type="button" className={styles.galleryItem} onClick={() => setType(t)}>
                   <Icon />
                   {label}
                 </button>
@@ -78,21 +97,39 @@ export function AddChartModal({ onClose, onCreate }: { onClose: () => void; onCr
           )}
 
           {type && (
-            <div className={styles.field}>
-              <label className={styles.label} htmlFor="chart-title">
-                Title
-              </label>
-              <input
-                id="chart-title"
-                type="text"
-                className={styles.textInput}
-                value={title}
-                autoFocus
-                disabled={saving}
-                onChange={(e) => setTitle(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleCreate()}
-              />
-            </div>
+            <>
+              <div className={styles.field}>
+                <label className={styles.label} htmlFor="chart-title">
+                  Title
+                </label>
+                <input
+                  id="chart-title"
+                  type="text"
+                  className={styles.textInput}
+                  value={title}
+                  autoFocus
+                  disabled={saving}
+                  onChange={(e) => setTitle(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleCreate()}
+                />
+              </div>
+              {type === "PROGRESS_BAR" && (
+                <div className={styles.field}>
+                  <label className={styles.label} htmlFor="chart-target">
+                    Target
+                  </label>
+                  <input
+                    id="chart-target"
+                    type="number"
+                    className={styles.textInput}
+                    value={target}
+                    disabled={saving}
+                    onChange={(e) => setTarget(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleCreate()}
+                  />
+                </div>
+              )}
+            </>
           )}
 
           {error && <p className={styles.error}>{error}</p>}

@@ -20,20 +20,23 @@ export type VisualWithRecords = Prisma.VisualGetPayload<{ include: { records: tr
 export type CreateVisualResult = { ok: true; visual: VisualWithRecords } | { ok: false; error: string };
 
 /** Creates an ad-hoc (unbound) chart or table — a bound chart's config is
- * set by #166, not here. `config` starts empty for a fresh ad-hoc chart;
- * a Progress bar's target is set via updateVisualConfig once #164 lands.
- * `records: []` on the return value matches VisualWithRecords's shape so
- * callers (ChartZone's useUndoableCrudList) can hold it without a refetch. */
+ * set by #166, not here. `config` is empty for every type except Progress
+ * bar, which needs its ad-hoc target set at creation time (there's nothing
+ * else to derive "current vs. target" from until it's bound to a Goal in
+ * #166). `records: []` on the return value matches VisualWithRecords's
+ * shape so callers (ChartZone's useUndoableCrudList) can hold it without a
+ * refetch. */
 export async function createVisual(
   pillarId: string,
   areaId: string | null,
   type: VisualType,
-  title: string
+  title: string,
+  config: Prisma.InputJsonValue = {}
 ): Promise<CreateVisualResult> {
   const trimmed = title.trim();
   if (!trimmed) return { ok: false, error: "Give it a title first." };
   try {
-    const visual = await prisma.visual.create({ data: { pillarId, areaId, type, title: trimmed } });
+    const visual = await prisma.visual.create({ data: { pillarId, areaId, type, title: trimmed, config } });
     revalidateVisualPaths(pillarId, areaId);
     return { ok: true, visual: { ...visual, records: [] } };
   } catch {
@@ -116,6 +119,28 @@ export async function createVisualRecord(
   try {
     const record = await prisma.visualRecord.create({
       data: { visualId, date: parsedDate, yValue: value, note: note?.trim() || null },
+    });
+    revalidateVisualPaths(pillarId, areaId);
+    return { ok: true, record };
+  } catch {
+    return { ok: false, error: "Couldn't save — try again." };
+  }
+}
+
+/** A Scatter chart's own ad-hoc data point (#164) — xValue+yValue, no
+ * date, unlike every other chart type's createVisualRecord above. */
+export async function createVisualXYRecord(
+  visualId: string,
+  pillarId: string,
+  areaId: string | null,
+  x: number,
+  y: number,
+  note?: string
+): Promise<CreateVisualRecordResult> {
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return { ok: false, error: "Enter valid numbers for both X and Y." };
+  try {
+    const record = await prisma.visualRecord.create({
+      data: { visualId, xValue: x, yValue: y, note: note?.trim() || null },
     });
     revalidateVisualPaths(pillarId, areaId);
     return { ok: true, record };

@@ -1,0 +1,18 @@
+.track {
+  height: 10px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-sunken);
+  overflow: hidden;
+}
+
+.fill {
+  height: 100%;
+  background: var(--coral);
+  border-radius: var(--radius-pill);
+  transition: width var(--duration-fast) var(--ease);
+}
+
+.numbers {
+  font-size: 12.5px;
+  color: var(--ink-2);
+}
