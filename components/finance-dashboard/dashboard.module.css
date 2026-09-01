@@ -79,6 +79,33 @@
   color: var(--bg);
 }
 
+.chartWrap {
+  position: relative;
+}
+
+.chartTooltip {
+  position: absolute;
+  top: -6px;
+  transform: translateX(-50%);
+  z-index: 1;
+  pointer-events: none;
+  background: var(--ink);
+  color: var(--bg);
+  border-radius: var(--radius-sm);
+  padding: 4px 8px;
+  font-size: 11.5px;
+  white-space: nowrap;
+  box-shadow: var(--shadow-md);
+}
+
+.chartTooltipDate {
+  color: var(--muted);
+}
+
+.chartTooltipValue {
+  font-weight: 600;
+}
+
 .ringWrap {
   display: flex;
   flex-direction: column;
