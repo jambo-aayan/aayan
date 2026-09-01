@@ -18,6 +18,7 @@ import { EmptyState } from "@/components/empty-state";
 import { FlagReceivableForm } from "@/components/flag-receivable-form";
 import { FlagGoalContributionForm, type GoalOption } from "@/components/flag-goal-contribution-form";
 import { LinkTransferForm } from "@/components/link-transfer-form";
+import { RowActions } from "@/components/row-actions";
 import { withRetry } from "@/lib/with-retry";
 import styles from "./transactions-manager.module.css";
 
@@ -227,11 +228,14 @@ export function TransactionsManager({
                 </div>
                 <div className={styles.date}>{formatDate(t.date)}</div>
               </div>
-              <div className={styles.rowActions}>
-                <span className={t.direction === "IN" ? styles.amtPos : styles.amtNeutral}>
-                  {t.direction === "IN" ? "+" : "−"}
-                  {formatGBP(t.amount)}
-                </span>
+              <RowActions
+                value={
+                  <span className={t.direction === "IN" ? styles.amtPos : styles.amtNeutral}>
+                    {t.direction === "IN" ? "+" : "−"}
+                    {formatGBP(t.amount)}
+                  </span>
+                }
+              >
                 {t.direction === "OUT" && canReclassifyTransaction(t) && (
                   <>
                     <button
@@ -276,7 +280,7 @@ export function TransactionsManager({
                 <button type="button" className={styles.link} onClick={() => remove(t)}>
                   Delete
                 </button>
-              </div>
+              </RowActions>
             </li>
           )
         )}

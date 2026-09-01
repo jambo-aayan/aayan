@@ -32,13 +32,6 @@
   color: var(--danger);
 }
 
-.rowActions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
-}
-
 .link {
   border: none;
   background: none;

@@ -57,13 +57,6 @@
   margin-top: 6px;
 }
 
-.rowActions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-shrink: 0;
-}
-
 .link {
   border: none;
   background: none;

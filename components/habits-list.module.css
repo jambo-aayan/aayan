@@ -43,13 +43,6 @@
   color: var(--health);
 }
 
-.rowActions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-shrink: 0;
-}
-
 .dot {
   width: 22px;
   height: 22px;

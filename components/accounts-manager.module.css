@@ -28,12 +28,6 @@
   text-transform: capitalize;
 }
 
-.rowActions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
 .value {
   font-size: 13px;
   font-weight: 600;

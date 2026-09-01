@@ -18,6 +18,7 @@ import { VEHICLE_LABEL } from "@/lib/finance/goal-vehicle-label";
 import { withRetry } from "@/lib/with-retry";
 import { PrimaryButton } from "@/components/primary-button";
 import { EmptyState } from "@/components/empty-state";
+import { RowActions } from "@/components/row-actions";
 import styles from "./goals-manager.module.css";
 
 type ContributionCandidate = { id: string; date: Date; amount: number; category: string };
@@ -146,7 +147,7 @@ export function GoalsManager({
                   })()}
                 </div>
               </div>
-              <div className={styles.rowActions}>
+              <RowActions>
                 <button
                   type="button"
                   className={styles.link}
@@ -165,14 +166,19 @@ export function GoalsManager({
                 >
                   ↓
                 </button>
-                <LogContributionControl goalId={goal.id} candidates={contributionCandidates} />
+                {/* Multi-step control: stop the click from bubbling to
+                    RowActions' close-on-select handler, since expanding
+                    into its own inline form must not dismiss the menu. */}
+                <span onClick={(e) => e.stopPropagation()}>
+                  <LogContributionControl goalId={goal.id} candidates={contributionCandidates} />
+                </span>
                 <button type="button" className={styles.link} onClick={() => setEditingId(goal.id)}>
                   Edit
                 </button>
                 <button type="button" className={styles.link} onClick={() => remove(goal)}>
                   Delete
                 </button>
-              </div>
+              </RowActions>
             </li>
           )
         )}

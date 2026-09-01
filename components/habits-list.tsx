@@ -20,6 +20,7 @@ import { withRetry } from "@/lib/with-retry";
 import { useToast } from "@/components/toast/toast-provider";
 import { ThoughtPrompt } from "@/components/thoughts/thought-prompt";
 import { HabitDot } from "@/components/habit-dot";
+import { RowActions } from "@/components/row-actions";
 import styles from "./habits-list.module.css";
 
 const UNDO_WINDOW_MS = 5000;
@@ -238,18 +239,21 @@ export function HabitsList({
                   <div className={styles.meta}>{HABIT_STATUS_LABEL[habit.status]}</div>
                 )}
               </div>
-              <div className={styles.rowActions}>
-                {habit.status === "ACTIVE" && (
-                  <HabitDot
-                    level={habit.todayLevel}
-                    accentColor={pillarColor}
-                    size={20}
-                    label={`Check in "${habit.name}": currently ${habit.todayLevel ?? "not checked in"}`}
-                    onToggle={
-                      pendingIds.has(habit.id) ? undefined : withPending(habit.id, () => handleToggleCheckIn(habit))
-                    }
-                  />
-                )}
+              <RowActions
+                value={
+                  habit.status === "ACTIVE" && (
+                    <HabitDot
+                      level={habit.todayLevel}
+                      accentColor={pillarColor}
+                      size={20}
+                      label={`Check in "${habit.name}": currently ${habit.todayLevel ?? "not checked in"}`}
+                      onToggle={
+                        pendingIds.has(habit.id) ? undefined : withPending(habit.id, () => handleToggleCheckIn(habit))
+                      }
+                    />
+                  )
+                }
+              >
                 <button
                   type="button"
                   className={styles.link}
@@ -264,7 +268,7 @@ export function HabitsList({
                 <button type="button" className={styles.link} onClick={() => handleDelete(habit)}>
                   Delete
                 </button>
-              </div>
+              </RowActions>
               {promptHabitId === habit.id && areaId && (
                 <ThoughtPrompt areaId={areaId} onDone={() => setPromptHabitId(null)} />
               )}

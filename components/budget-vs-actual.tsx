@@ -8,6 +8,7 @@ import { DEFAULT_CATEGORIES } from "@/lib/finance/categories";
 import { formatGBP } from "@/lib/finance/format";
 import { PrimaryButton } from "@/components/primary-button";
 import { EmptyState } from "@/components/empty-state";
+import { RowActions } from "@/components/row-actions";
 import { PiggyBank } from "lucide-react";
 import styles from "./budget-vs-actual.module.css";
 
@@ -80,7 +81,7 @@ export function BudgetVsActual({ initialStatuses }: { initialStatuses: BudgetSta
                   </div>
                 )}
               </div>
-              <div className={styles.rowActions}>
+              <RowActions gap={8}>
                 <button
                   type="button"
                   className={styles.link}
@@ -89,7 +90,7 @@ export function BudgetVsActual({ initialStatuses }: { initialStatuses: BudgetSta
                 >
                   {removingCategory === s.category ? "Removing…" : "Remove"}
                 </button>
-              </div>
+              </RowActions>
             </li>
           );
         })}

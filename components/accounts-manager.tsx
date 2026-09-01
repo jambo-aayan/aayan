@@ -17,6 +17,7 @@ import { useUndoableCrudList, type ActionResult } from "@/lib/hooks/use-undoable
 import { isHeldForReview, validateStatementUpload } from "@/lib/finance/logic";
 import { PrimaryButton } from "@/components/primary-button";
 import { EmptyState } from "@/components/empty-state";
+import { RowActions } from "@/components/row-actions";
 import styles from "./accounts-manager.module.css";
 
 type Account = AccountInput & { id: string; valueConfidence: number | null };
@@ -98,18 +99,30 @@ export function AccountsManager({ initialAccounts }: { initialAccounts: Account[
             {!account.active && " · hidden"}
           </div>
         </div>
-        <div className={styles.rowActions}>
-          <span className={styles.value}>{formatGBP(account.value)}</span>
-          {isHeldForReview(account.valueConfidence) && <span className={styles.badge}>Held for review</span>}
-          <AddSnapshotControl accountId={account.id} />
-          <UploadStatementControl accountId={account.id} kind={account.kind} />
+        <RowActions
+          value={
+            <>
+              <span className={styles.value}>{formatGBP(account.value)}</span>
+              {isHeldForReview(account.valueConfidence) && <span className={styles.badge}>Held for review</span>}
+            </>
+          }
+        >
+          {/* Multi-step controls: stop the click from bubbling to
+              RowActions' close-on-select handler, since their own internal
+              "expand into a form" click must not dismiss the menu. */}
+          <span onClick={(e) => e.stopPropagation()}>
+            <AddSnapshotControl accountId={account.id} />
+          </span>
+          <span onClick={(e) => e.stopPropagation()}>
+            <UploadStatementControl accountId={account.id} kind={account.kind} />
+          </span>
           <button type="button" className={styles.link} onClick={() => setEditingId(account.id)}>
             Edit
           </button>
           <button type="button" className={styles.link} onClick={() => remove(account)}>
             Delete
           </button>
-        </div>
+        </RowActions>
       </li>
     );
   }
