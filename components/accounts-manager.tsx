@@ -325,14 +325,17 @@ function AddSnapshotControl({ accountId }: { accountId: string }) {
   );
 }
 
-/** Uploads a statement for either account kind, parsed by Gemini — a
- * Transactional account's statement into dated Transactions (#115), a
- * Valuation account's into a single balance Snapshot with no Transaction
- * rows (#116), both per ADR-0010. The parsed result lives in server-
- * fetched sibling components (TransactionsManager, the account's own
- * value here), so a successful upload refreshes the route rather than
- * trying to thread new rows through client state across component
- * boundaries. */
+/** Uploads one or more statements for either account kind, parsed by
+ * Gemini — a Transactional account's statements into dated Transactions
+ * (#115), a Valuation account's into a single balance Snapshot per file
+ * with no Transaction rows (#116), both per ADR-0010. Multiple files are
+ * parsed sequentially, not in parallel (#140, ADR-0013) — avoids Gemini
+ * rate-limit contention across files and keeps each upload's atomic
+ * balance-claim logic simple, one at a time. One failed file doesn't stop
+ * the rest of the batch. The parsed result lives in server-fetched
+ * sibling components (TransactionsManager, the account's own value here),
+ * so a successful batch refreshes the route rather than trying to thread
+ * new rows through client state across component boundaries. */
 function UploadStatementControl({ accountId, kind }: { accountId: string; kind: AccountInput["kind"] }) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -340,35 +343,58 @@ function UploadStatementControl({ accountId, kind }: { accountId: string; kind: 
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  async function handleFileSelect(file: File | undefined) {
-    if (!file) return;
-    const validation = validateStatementUpload(file.type, file.size);
-    if (!validation.ok) {
-      setError(validation.error);
-      if (inputRef.current) inputRef.current.value = "";
-      return;
-    }
+  async function handleFilesSelect(fileList: FileList | null) {
+    const files = fileList ? Array.from(fileList) : [];
+    if (files.length === 0) return;
+
     setUploading(true);
     setError(null);
     setStatus(null);
-    const result =
-      kind === "TRANSACTIONAL" ? await uploadStatement(accountId, file) : await uploadValuationStatement(accountId, file);
+
+    let importedTotal = 0;
+    let heldTotal = 0;
+    let succeeded = 0;
+    const failed: { name: string; error: string }[] = [];
+
+    for (const file of files) {
+      const validation = validateStatementUpload(file.type, file.size);
+      if (!validation.ok) {
+        failed.push({ name: file.name, error: validation.error });
+        continue;
+      }
+      const result =
+        kind === "TRANSACTIONAL" ? await uploadStatement(accountId, file) : await uploadValuationStatement(accountId, file);
+      if (!result.ok) {
+        failed.push({ name: file.name, error: result.error });
+        continue;
+      }
+      succeeded++;
+      if ("importedCount" in result) {
+        importedTotal += result.importedCount;
+        heldTotal += result.heldCount;
+      } else if (result.held) {
+        heldTotal++;
+      }
+    }
+
     setUploading(false);
     if (inputRef.current) inputRef.current.value = "";
-    if (!result.ok) {
-      setError(result.error);
-      return;
+
+    if (succeeded > 0) {
+      setStatus(
+        kind === "TRANSACTIONAL"
+          ? heldTotal > 0
+            ? `Imported ${importedTotal} transactions, ${heldTotal} held for review.`
+            : `Imported ${importedTotal} transactions.`
+          : heldTotal > 0
+            ? `${succeeded} balance${succeeded === 1 ? "" : "s"} updated (${heldTotal} held for review).`
+            : `${succeeded} balance${succeeded === 1 ? "" : "s"} updated.`
+      );
+      router.refresh();
     }
-    setStatus(
-      "importedCount" in result
-        ? result.heldCount > 0
-          ? `Imported ${result.importedCount} transactions, ${result.heldCount} held for review.`
-          : `Imported ${result.importedCount} transactions.`
-        : result.held
-          ? "Balance updated (held for review)."
-          : "Balance updated."
-    );
-    router.refresh();
+    if (failed.length > 0) {
+      setError(failed.map((f) => `${f.name}: ${f.error}`).join(" "));
+    }
   }
 
   return (
@@ -378,10 +404,11 @@ function UploadStatementControl({ accountId, kind }: { accountId: string; kind: 
         <input
           ref={inputRef}
           type="file"
+          multiple
           accept="application/pdf,text/csv"
           style={{ display: "none" }}
           disabled={uploading}
-          onChange={(e) => handleFileSelect(e.target.files?.[0])}
+          onChange={(e) => handleFilesSelect(e.target.files)}
         />
       </label>
       {status && <span className={styles.meta}>{status}</span>}
