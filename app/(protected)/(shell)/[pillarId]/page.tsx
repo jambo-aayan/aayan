@@ -2,8 +2,11 @@ import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/page-header";
 import pageStyles from "@/components/page-header.module.css";
 import { PageTitle } from "@/components/page-title";
+import { Layers } from "lucide-react";
 import { Card } from "@/components/card";
 import { PillarMindmap } from "@/components/pillar-mindmap";
+import { NewAreaTile } from "@/components/new-area-tile";
+import { EmptyState } from "@/components/empty-state";
 import { EditableText } from "@/components/editable-text";
 import { SystemsList } from "@/components/systems-list";
 import { getPillarWithAreas } from "@/lib/pillars/data";
@@ -110,11 +113,14 @@ export default async function PillarPage({
           title={pillar.name}
           lede={pillar.areas.length > 0 ? "Tap an area to go into it." : undefined}
         />
-        {pillar.areas.length > 0 && (
-          <Card>
+        <Card title={pillar.areas.length === 0 ? "Areas" : undefined}>
+          {pillar.areas.length > 0 ? (
             <PillarMindmap pillarId={pillar.id} pillarName={pillar.name} areas={pillar.areas} accentColor={accentColor} />
-          </Card>
-        )}
+          ) : (
+            <EmptyState icon={Layers} message="No areas yet." />
+          )}
+          <NewAreaTile pillarId={pillar.id} />
+        </Card>
         {sections.map((s) => s.node)}
       </div>
     </>

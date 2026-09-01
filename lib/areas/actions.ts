@@ -16,6 +16,28 @@ async function trySave(write: () => Promise<unknown>, revalidate: string): Promi
   return { ok: true };
 }
 
+export type CreateAreaResult = { ok: true; id: string } | { ok: false; error: string };
+
+/** Mirrors createPillar's minimalism exactly (#159/ADR-0016) — a new Area
+ * is just its row + a name, everything else (currentState, northStar)
+ * fill-in-later. sortOrder is appended after every existing Area under
+ * this Pillar; a race between two concurrent creates could in principle
+ * both compute the same count and land on the same sortOrder, but that's
+ * a display-order tie, not a correctness bug, and not worth guarding
+ * against in this single-user app. */
+export async function createArea(pillarId: string, name: string): Promise<CreateAreaResult> {
+  const trimmed = name.trim();
+  if (!trimmed) return { ok: false, error: "Give the area a name first." };
+  try {
+    const sortOrder = await prisma.area.count({ where: { pillarId } });
+    const area = await prisma.area.create({ data: { id: crypto.randomUUID(), pillarId, name: trimmed, sortOrder } });
+    revalidatePath(pillarHref(pillarId));
+    return { ok: true, id: area.id };
+  } catch {
+    return { ok: false, error: "Couldn't save — try again." };
+  }
+}
+
 /** Generalized off the original Health-only lib/health/actions.ts
  * (#157/ADR-0016) — takes pillarId alongside areaId (unlike the old
  * Health-only version, which could hardcode "/health") so the right
