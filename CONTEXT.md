@@ -9,12 +9,15 @@ A personal life-management app covering health, habits, finance, and life admin 
 ## Language
 
 **Pillar**:
-A top-level life domain — the highest level of the hierarchy. MVP Pillars: Health, Finances. Deferred Pillars: Religion, Productivity, Relationship, Career.
+A top-level life domain — the highest level of the hierarchy. MVP Pillars: Health, Finances. Deferred Pillars (still real, just not yet built out): Religion, Productivity, Relationship, Career. As of ADR-0016, **a Pillar is user-creatable at any time** — the deferred list above isn't a gate on new Pillars, it's just what hasn't been fleshed out yet. Every Pillar (seeded or user-created) gets a dedicated page (a nav-bar entry, at `/{pillarId}`) built from the same generic **section**-based layout — see "Page section" below — except Finances, which keeps its own bespoke, non-sectioned shape (Items/Baseline/Goals/Expenses/North Star, ADR-0016 leaves it untouched).
 _Avoid_: Bucket (the original prototype's term — replaced for being too informal). "Category" used to be avoided here too (the original prototype used it as a synonym for Pillar) — as of ADR-0015, **Category is now a real, distinct Finance-scoped concept** (a Transaction's spending category — see "Finance" below), unrelated to Pillar. Don't conflate the two just because they share a name.
 
 **Area**:
-A sub-topic within a Pillar, e.g. Sleep or Diet within Health. Carries over the original prototype's "buckets" one level down. Not every Pillar needs Areas — Finances' existing shape (Items, Baseline, Goals, Expenses, North Star) doesn't need them.
+A sub-topic within a Pillar, e.g. Sleep or Diet within Health. Carries over the original prototype's "buckets" one level down. Not every Pillar needs Areas — Finances' existing shape (Items, Baseline, Goals, Expenses, North Star) doesn't need them. As of ADR-0016, **an Area is user-creatable under any Pillar** (name only — everything else is filled in later) and gets its own dedicated page at `/{pillarId}/{areaId}`, same generic section-based layout as a Pillar page.
 _Avoid_: Sub-bucket, Topic.
+
+**Page section** (ADR-0016):
+One block of a Pillar or Area page — North Star, Goals, Habits, Systems, Tasks, or Thoughts, each scoped to that Pillar/Area. A Pillar/Area page is a **reorderable, toggleable list** of these, not a fixed layout — the user picks which show and in what order, per Pillar/Area (a systems-heavy Pillar can feature Systems and hide Tasks, say). Deliberately generic groundwork for a much larger "modular, Notion-like" ambition (see "Future direction" below) without building that ambition yet — new section *types* (Chart, Table) are a later, separate spec, but the list itself is already built to accept them without rework. A page can also carry fixed, non-section content above its section list for content that doesn't fit the generic model (e.g. Health's Ankylosing Spondylitis Area keeps its bespoke Pain & Mobility Tracking card this way); Finances' entire page is exactly this kind of fixed content, with no section list today.
 
 **System** (deferred — not required for Health+Finances MVP):
 A process within a single Pillar that can target one Area or several Areas in that same Pillar at once — e.g. a stretch routine that improves both the Ankylosing Spondylitis and Body Composition Areas within Health. Systems don't cross Pillars. Concept kept for later — build a real System only once a concrete one earns a dedicated screen (e.g. "Payday routine"); for MVP a System can just be an informal label rather than a managed object.
