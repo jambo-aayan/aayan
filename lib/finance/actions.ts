@@ -9,6 +9,7 @@ import { FINANCE_NORTH_STAR_ID } from "./north-star-id";
 import { parseStatement, parseValuation } from "./statement-parser";
 import { resolveCategoryId } from "./categories";
 import { generateStatementName } from "./statement-naming";
+import { partitionNewTransactions } from "./statement-dedup";
 
 export type AccountInput = {
   name: string;
@@ -103,7 +104,7 @@ export async function addSnapshot(accountId: string, date: Date, balance: number
 }
 
 export type UploadStatementResult =
-  | { ok: true; importedCount: number; heldCount: number }
+  | { ok: true; importedCount: number; skippedCount: number; heldCount: number }
   | { ok: false; error: string };
 
 /** Uploads a bank statement (PDF/CSV) for a Transactional Account, keeps
@@ -115,7 +116,11 @@ export type UploadStatementResult =
  * parsed transactions is only a fallback for a statement that doesn't
  * state a balance at all (resolveStatementBalance, lib/finance/logic.ts).
  * A Statement row records the upload event itself; the new Snapshot and
- * every parsed Transaction link back to it (#148, ADR-0015). */
+ * every newly inserted Transaction link back to it (#148, ADR-0015).
+ * Rows already present for this account — same (date, amount, direction),
+ * ignoring the free-text description — are skipped rather than inserted
+ * again, so a re-uploaded statement whose date range overlaps a previous
+ * upload only adds genuinely new transactions (#149, ADR-0015). */
 export async function uploadStatement(accountId: string, file: File): Promise<UploadStatementResult> {
   const validation = validateStatementUpload(file.type, file.size);
   if (!validation.ok) return validation;
@@ -155,8 +160,31 @@ export async function uploadStatement(accountId: string, file: File): Promise<Up
       return { ok: false, error: "Couldn't find any transactions in that statement — try again." };
     }
 
+    // Scoped to the statement's own date span (±1 day buffer) rather than
+    // the account's whole history — dedup only ever needs to compare
+    // against rows that could share a key, and this runs on every upload,
+    // not just once (#149, ADR-0015).
+    const parsedDates = parsed.transactions.map((t) => new Date(t.date).getTime());
+    const dayMs = 24 * 60 * 60 * 1000;
+    const existingTransactions = await prisma.transaction.findMany({
+      where: {
+        accountId,
+        date: { gte: new Date(Math.min(...parsedDates) - dayMs), lte: new Date(Math.max(...parsedDates) + dayMs) },
+      },
+      select: { accountId: true, date: true, amount: true, direction: true },
+    });
+    const { toInsert, skipped } = partitionNewTransactions(
+      accountId,
+      parsed.transactions,
+      existingTransactions.map((t) => ({ ...t, amount: t.amount.toNumber() }))
+    );
+
     const previousBalance = account.snapshots[0]?.balance.toNumber() ?? 0;
-    const newBalance = resolveStatementBalance(previousBalance, parsed.transactions, parsed.closingBalance, account.type);
+    // Only toInsert, not every parsed row: previousBalance already
+    // reflects whatever a prior overlapping upload already recorded, so
+    // re-adding the net of rows that were already counted there would
+    // double-count them (#149, ADR-0015).
+    const newBalance = resolveStatementBalance(previousBalance, toInsert, parsed.closingBalance, account.type);
     const uploadedAt = new Date();
     const periodEnd = parsed.periodEnd ? new Date(parsed.periodEnd) : null;
     const statementName = generateStatementName({
@@ -182,25 +210,28 @@ export async function uploadStatement(accountId: string, file: File): Promise<Up
       await tx.snapshot.create({
         data: { accountId, date: uploadedAt, balance: newBalance, statementId: statement.id },
       });
-      await tx.transaction.createMany({
-        data: parsed.transactions.map((t) => ({
-          date: new Date(t.date),
-          amount: t.amount,
-          direction: t.direction,
-          categoryId: resolveCategoryId(categories, t.category, fallbackCategoryId),
-          source: t.description,
-          accountId,
-          confidence: t.confidence,
-          statementId: statement.id,
-        })),
-      });
+      if (toInsert.length > 0) {
+        await tx.transaction.createMany({
+          data: toInsert.map((t) => ({
+            date: new Date(t.date),
+            amount: t.amount,
+            direction: t.direction,
+            categoryId: resolveCategoryId(categories, t.category, fallbackCategoryId),
+            source: t.description,
+            accountId,
+            confidence: t.confidence,
+            statementId: statement.id,
+          })),
+        });
+      }
     });
 
     revalidatePath("/finances");
     return {
       ok: true,
-      importedCount: parsed.transactions.length,
-      heldCount: parsed.transactions.filter((t) => isHeldForReview(t.confidence)).length,
+      importedCount: toInsert.length,
+      skippedCount: skipped.length,
+      heldCount: toInsert.filter((t) => isHeldForReview(t.confidence)).length,
     };
   } catch (error) {
     // Logged (not just swallowed) so a real failure — a missing Blob token,

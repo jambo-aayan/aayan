@@ -365,6 +365,7 @@ function UploadStatementControl({ accountId, kind }: { accountId: string; kind: 
     setStatus(null);
 
     let importedTotal = 0;
+    let skippedTotal = 0;
     let heldTotal = 0;
     let succeeded = 0;
     const failed: { name: string; error: string }[] = [];
@@ -384,6 +385,7 @@ function UploadStatementControl({ accountId, kind }: { accountId: string; kind: 
       succeeded++;
       if ("importedCount" in result) {
         importedTotal += result.importedCount;
+        skippedTotal += result.skippedCount;
         heldTotal += result.heldCount;
       } else if (result.held) {
         heldTotal++;
@@ -396,9 +398,13 @@ function UploadStatementControl({ accountId, kind }: { accountId: string; kind: 
     if (succeeded > 0) {
       setStatus(
         kind === "TRANSACTIONAL"
-          ? heldTotal > 0
-            ? `Imported ${importedTotal} transactions, ${heldTotal} held for review.`
-            : `Imported ${importedTotal} transactions.`
+          ? [
+              `Imported ${importedTotal} transaction${importedTotal === 1 ? "" : "s"}.`,
+              skippedTotal > 0 ? `${skippedTotal} already existed, skipped.` : null,
+              heldTotal > 0 ? `${heldTotal} held for review.` : null,
+            ]
+              .filter(Boolean)
+              .join(" ")
           : heldTotal > 0
             ? `${succeeded} balance${succeeded === 1 ? "" : "s"} updated (${heldTotal} held for review).`
             : `${succeeded} balance${succeeded === 1 ? "" : "s"} updated.`
