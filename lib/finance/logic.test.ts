@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   canLinkTransfer,
   canReclassifyTransaction,
+  findTransferSuggestions,
   isHeldForReview,
   isRealSpend,
   netTransactionAmount,
@@ -178,6 +179,48 @@ describe("rankTransferCandidates", () => {
       amount: 500 + i,
     }));
     expect(rankTransferCandidates(target, candidates)).toHaveLength(5);
+  });
+});
+
+describe("findTransferSuggestions", () => {
+  const d = (iso: string) => new Date(`${iso}T00:00:00.000Z`);
+
+  it("returns nothing when there are no candidates", () => {
+    expect(findTransferSuggestions([])).toEqual([]);
+  });
+
+  it("finds one clear pair", () => {
+    const out = { id: "out", accountId: "lloyds", direction: "OUT" as const, date: d("2026-08-15"), amount: 500 };
+    const in_ = { id: "in", accountId: "yonder", direction: "IN" as const, date: d("2026-08-16"), amount: 500 };
+    expect(findTransferSuggestions([out, in_])).toEqual([{ a: out, b: in_ }]);
+  });
+
+  it("finds several pairs across multiple accounts, each transaction used at most once", () => {
+    const pairA_out = { id: "a-out", accountId: "lloyds", direction: "OUT" as const, date: d("2026-08-15"), amount: 500 };
+    const pairA_in = { id: "a-in", accountId: "yonder", direction: "IN" as const, date: d("2026-08-15"), amount: 500 };
+    const pairB_out = { id: "b-out", accountId: "savings", direction: "OUT" as const, date: d("2026-08-20"), amount: 200 };
+    const pairB_in = { id: "b-in", accountId: "lloyds", direction: "IN" as const, date: d("2026-08-21"), amount: 200 };
+    const suggestions = findTransferSuggestions([pairA_out, pairA_in, pairB_out, pairB_in]);
+    expect(suggestions).toHaveLength(2);
+    const usedIds = suggestions.flatMap((s) => [s.a.id, s.b.id]);
+    expect(new Set(usedIds).size).toBe(4);
+  });
+
+  it("never pairs a transaction with itself and reports no suggestion when nothing else qualifies", () => {
+    const lone = { id: "lone", accountId: "lloyds", direction: "OUT" as const, date: d("2026-08-15"), amount: 500 };
+    expect(findTransferSuggestions([lone])).toEqual([]);
+  });
+
+  it("excludes an already-linked transaction — via the caller pre-filtering, same contract rankTransferCandidates' own callers already follow", () => {
+    // findTransferSuggestions has no transferId field to check for itself;
+    // transactions-manager.tsx filters via canReclassifyTransaction before
+    // ever calling rankTransferCandidates, and a suggestions caller does
+    // the same before calling this function.
+    const out = { id: "out", accountId: "lloyds", direction: "OUT" as const, date: d("2026-08-15"), amount: 500 };
+    const alreadyLinked = { id: "linked", accountId: "yonder", direction: "IN" as const, date: d("2026-08-16"), amount: 500 };
+    const reclassifiable = [out]; // caller has already dropped alreadyLinked
+    expect(findTransferSuggestions(reclassifiable)).toEqual([]);
+    expect(findTransferSuggestions([out, alreadyLinked])).toEqual([{ a: out, b: alreadyLinked }]);
   });
 });
 

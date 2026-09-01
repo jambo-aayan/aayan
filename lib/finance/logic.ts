@@ -87,6 +87,38 @@ export function rankTransferCandidates<T extends RankableTransaction>(target: Ra
     .slice(0, TRANSFER_CANDIDATE_MAX);
 }
 
+export type TransferSuggestion<T> = { a: T; b: T };
+
+/** Scans a set of reclassifiable transactions for probable Transfer
+ * pairs, proactively — surfaced as a review list instead of relying on
+ * the user to notice and manually open "Link as transfer" on the right
+ * transaction (#152, ADR-0015). The caller is expected to have already
+ * excluded anything not reclassifiable (e.g. via canReclassifyTransaction,
+ * the same contract rankTransferCandidates' own callers already follow) —
+ * this function has no transferId field to check for itself.
+ *
+ * Reuses rankTransferCandidates unchanged: each transaction's best-ranked
+ * match (if any) becomes a suggestion. Greedy, not globally optimal — once
+ * a transaction is claimed by a suggestion (on either side), it's removed
+ * from the candidate pool for every transaction considered afterward, so
+ * no transaction appears in more than one suggestion and the review list
+ * never offers the same transaction twice. Still suggest-and-confirm only
+ * (ADR-0013) — nothing here links anything. */
+export function findTransferSuggestions<T extends RankableTransaction>(transactions: T[]): TransferSuggestion<T>[] {
+  const suggestions: TransferSuggestion<T>[] = [];
+  const claimed = new Set<string>();
+  for (const target of transactions) {
+    if (claimed.has(target.id)) continue;
+    const candidates = transactions.filter((c) => !claimed.has(c.id));
+    const [best] = rankTransferCandidates(target, candidates);
+    if (!best) continue;
+    suggestions.push({ a: target, b: best });
+    claimed.add(target.id);
+    claimed.add(best.id);
+  }
+  return suggestions;
+}
+
 /** Below this, a statement-parsed transaction is held for review rather
  * than silently accepted with a possibly-wrong category (#115, ADR-0010).
  * Chosen as a starting point balancing false-holds against silently

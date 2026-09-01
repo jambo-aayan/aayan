@@ -24,6 +24,7 @@ import { SystemsList } from "@/components/systems-list";
 import { GoalProgressRings, SurplusSplitCard } from "@/components/financial-plan-section";
 import { FinanceSetupChecklist } from "@/components/finance-setup-checklist";
 import { BudgetVsActual } from "@/components/budget-vs-actual";
+import { TransferSuggestionsBanner } from "@/components/transfer-suggestions-banner";
 import dashboardStyles from "@/components/finance-dashboard/dashboard.module.css";
 import {
   getAccounts,
@@ -49,6 +50,7 @@ import { netWorthBreakdown } from "@/lib/finance/net-worth-breakdown";
 import { getSystemsForPillar, getHabitOptionsForPillar } from "@/lib/systems/data";
 import { getGoalOptions as getGoalOptionsForPillar } from "@/lib/goals/data";
 import { FINANCE_PILLAR_ID } from "@/lib/finance/pillar-id";
+import { canReclassifyTransaction, findTransferSuggestions } from "@/lib/finance/logic";
 
 const TREND_MONTHS = 6;
 
@@ -112,6 +114,7 @@ export default async function FinancesPage({ searchParams }: { searchParams: Pro
   const contributionCandidates = transactions.filter(
     (t) => t.direction === "OUT" && t.receivableId === null && t.goalContributionId === null
   );
+  const transferSuggestions = findTransferSuggestions(transactions.filter(canReclassifyTransaction));
 
   return (
     <>
@@ -119,6 +122,7 @@ export default async function FinancesPage({ searchParams }: { searchParams: Pro
       <div className={pageStyles.content}>
         <PageTitle eyebrow="Pillar" title="Finances" />
         {!setupStatus.complete && <FinanceSetupChecklist steps={setupStatus.steps} />}
+        <TransferSuggestionsBanner suggestions={transferSuggestions} />
         <StatRow accessible={accessible} total={total} surplus={monthlySurplus} northStarPercent={northStarPercent} />
 
         <div className={dashboardStyles.dashGrid}>

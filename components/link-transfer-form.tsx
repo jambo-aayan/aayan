@@ -4,16 +4,9 @@ import { useState } from "react";
 import { linkTransfer } from "@/lib/finance/actions";
 import { rankTransferCandidates, canLinkTransfer, type RankableTransaction } from "@/lib/finance/logic";
 import { withRetry } from "@/lib/with-retry";
+import { formatGBP, formatDateShort as formatDate } from "@/lib/finance/format";
 import { PrimaryButton } from "@/components/primary-button";
 import styles from "./link-transfer-form.module.css";
-
-function formatGBP(value: number): string {
-  return new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP" }).format(value);
-}
-
-function formatDate(date: Date): string {
-  return new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short" }).format(date);
-}
 
 type Candidate = RankableTransaction & { category: string };
 
