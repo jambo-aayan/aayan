@@ -1,5 +1,6 @@
 import { doneEarlierThisWeek, expectedCount, habitOccursOn, type HabitSchedule } from "../habits/schedule";
 import { utcMidnight } from "../habits/date-utils";
+import { isRealSpend } from "../finance/logic";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const WINDOW_DAYS = 28;
@@ -110,9 +111,7 @@ export function computeFollowThrough(tasks: TaskFixture[], start: Date, end: Dat
  * excludes receivable/goal-contribution-flagged transactions from both
  * sides, since neither is real income or spend. */
 export function computeSurplusRate(transactions: TransactionFixture[], start: Date, end: Date): number {
-  const inRangeTx = transactions.filter(
-    (t) => inRange(t.date, start, end) && t.receivableId === null && t.goalContributionId === null
-  );
+  const inRangeTx = transactions.filter((t) => inRange(t.date, start, end) && isRealSpend(t));
   const income = inRangeTx.filter((t) => t.direction === "IN").reduce((sum, t) => sum + t.amount, 0);
   const outgoings = inRangeTx.filter((t) => t.direction === "OUT").reduce((sum, t) => sum + t.amount, 0);
   if (income <= 0) return 0;

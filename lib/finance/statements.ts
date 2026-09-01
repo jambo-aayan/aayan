@@ -1,4 +1,5 @@
 import { categoryBreakdown } from "./category-breakdown";
+import { isRealSpend } from "./logic";
 
 export type StatementTransaction = {
   id: string;
@@ -15,13 +16,13 @@ function isSameUtcMonth(date: Date, month: Date): boolean {
   return date.getUTCFullYear() === month.getUTCFullYear() && date.getUTCMonth() === month.getUTCMonth();
 }
 
-function isRealSpend(t: StatementTransaction): boolean {
-  return t.direction === "OUT" && t.receivableId === null && t.goalContributionId === null;
+function isRealOutSpend(t: StatementTransaction): boolean {
+  return t.direction === "OUT" && isRealSpend(t);
 }
 
 function monthSpendTotal(transactions: StatementTransaction[], month: Date): number {
   return transactions
-    .filter((t) => isRealSpend(t) && isSameUtcMonth(t.date, month))
+    .filter((t) => isRealOutSpend(t) && isSameUtcMonth(t.date, month))
     .reduce((sum, t) => sum + t.amount, 0);
 }
 
@@ -74,7 +75,7 @@ export type MerchantTotal = { source: string; total: number; count: number };
 export function topMerchants(transactions: StatementTransaction[], limit: number): MerchantTotal[] {
   const totals = new Map<string, { total: number; count: number }>();
   for (const t of transactions) {
-    if (!isRealSpend(t)) continue;
+    if (!isRealOutSpend(t)) continue;
     const key = t.source ?? "Unknown";
     const existing = totals.get(key) ?? { total: 0, count: 0 };
     totals.set(key, { total: existing.total + t.amount, count: existing.count + 1 });
@@ -94,7 +95,7 @@ export type RecurringCharge = { source: string; amount: number; occurrences: num
 export function detectRecurringCharges(transactions: StatementTransaction[]): RecurringCharge[] {
   const bySourceAmount = new Map<string, { source: string; amount: number; months: Set<string> }>();
   for (const t of transactions) {
-    if (!isRealSpend(t) || t.source === null) continue;
+    if (!isRealOutSpend(t) || t.source === null) continue;
     const key = `${t.source}::${t.amount}`;
     const monthKey = `${t.date.getUTCFullYear()}-${t.date.getUTCMonth()}`;
     const existing = bySourceAmount.get(key) ?? { source: t.source, amount: t.amount, months: new Set<string>() };
@@ -114,7 +115,7 @@ export function detectRecurringCharges(transactions: StatementTransaction[]): Re
 export function detectAnomalies(transactions: StatementTransaction[]): string[] {
   const byCategory = new Map<string, StatementTransaction[]>();
   for (const t of transactions) {
-    if (!isRealSpend(t)) continue;
+    if (!isRealOutSpend(t)) continue;
     const list = byCategory.get(t.category) ?? [];
     list.push(t);
     byCategory.set(t.category, list);
@@ -144,7 +145,7 @@ export type YoYComparison = { currentTotal: number; priorYearTotal: number; diff
  * honesty pattern — see lib/systems/widgets.ts). */
 export function yearOverYearComparison(transactions: StatementTransaction[], month: Date): YoYComparison | null {
   const priorYearMonth = new Date(Date.UTC(month.getUTCFullYear() - 1, month.getUTCMonth(), 1));
-  const hasPriorYearData = transactions.some((t) => isRealSpend(t) && isSameUtcMonth(t.date, priorYearMonth));
+  const hasPriorYearData = transactions.some((t) => isRealOutSpend(t) && isSameUtcMonth(t.date, priorYearMonth));
   if (!hasPriorYearData) return null;
 
   const currentTotal = monthSpendTotal(transactions, month);

@@ -1,3 +1,5 @@
+import { isRealSpend } from "./logic";
+
 export type TransactionForBreakdown = {
   date: Date;
   amount: number;
@@ -24,13 +26,7 @@ export function categoryBreakdown(
   const totals = new Map<string, number>();
 
   for (const t of transactions) {
-    if (
-      t.direction !== "OUT" ||
-      !isSameUtcMonth(t.date, month) ||
-      t.receivableId !== null ||
-      t.goalContributionId !== null
-    )
-      continue;
+    if (t.direction !== "OUT" || !isSameUtcMonth(t.date, month) || !isRealSpend(t)) continue;
     totals.set(t.category, (totals.get(t.category) ?? 0) + t.amount);
   }
 

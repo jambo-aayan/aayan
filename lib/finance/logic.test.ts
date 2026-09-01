@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   canReclassifyTransaction,
   isHeldForReview,
+  isRealSpend,
   netTransactionAmount,
   resolveAccountValueAt,
   resolveStatementBalance,
@@ -89,6 +90,20 @@ describe("canReclassifyTransaction", () => {
 
   it("refuses a transaction already linked to a goal contribution", () => {
     expect(canReclassifyTransaction({ receivableId: null, goalContributionId: "gc1" })).toBe(false);
+  });
+});
+
+describe("isRealSpend", () => {
+  it("counts a transaction with no reclassification as real spend", () => {
+    expect(isRealSpend({ receivableId: null, goalContributionId: null })).toBe(true);
+  });
+
+  it("excludes a receivable-flagged transaction", () => {
+    expect(isRealSpend({ receivableId: "rec1", goalContributionId: null })).toBe(false);
+  });
+
+  it("excludes a goal-contribution-flagged transaction", () => {
+    expect(isRealSpend({ receivableId: null, goalContributionId: "gc1" })).toBe(false);
   });
 });
 

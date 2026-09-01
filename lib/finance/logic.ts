@@ -30,6 +30,19 @@ export function canReclassifyTransaction(transaction: ReclassifiableTransaction)
   return transaction.receivableId === null && transaction.goalContributionId === null;
 }
 
+export type SpendClassifiedTransaction = { receivableId: string | null; goalContributionId: string | null };
+
+/** Whether a transaction counts as real spend/income anywhere totals are
+ * computed — a receivable- or goal-contribution-flagged transaction is a
+ * reclassification, not real money movement (ADR-0010). The single shared
+ * predicate for what was previously 5 duplicated inline checks across
+ * categoryBreakdown, statements.ts, computeSurplusRate, getCorrelations,
+ * and spend-deviation.ts's own reliance on categoryBreakdown (#137,
+ * ADR-0013) — kept as one rule so it can never drift between call sites. */
+export function isRealSpend(transaction: SpendClassifiedTransaction): boolean {
+  return transaction.receivableId === null && transaction.goalContributionId === null;
+}
+
 /** Below this, a statement-parsed transaction is held for review rather
  * than silently accepted with a possibly-wrong category (#115, ADR-0010).
  * Chosen as a starting point balancing false-holds against silently

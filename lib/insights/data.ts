@@ -37,6 +37,7 @@ import { splitMean } from "./split-mean";
 import { TRAINED_HABIT_ID } from "@/lib/daily-log/habit-seed";
 import { computeTrajectory, type TrajectoryPoint } from "./trajectory";
 import { netWorth } from "@/lib/finance/net-worth";
+import { isRealSpend } from "@/lib/finance/logic";
 import { FINANCE_NORTH_STAR_ID } from "@/lib/finance/north-star-id";
 import { computeWeeklyDigest, type DeltaFixture, type CorrelationFixture, type HabitAdherenceFixture } from "./weekly-digest";
 import { adherenceForHabit } from "./momentum";
@@ -513,8 +514,9 @@ export async function getCorrelations(range: InsightsRange, asOf: Date = new Dat
   // literal call to computeSurplusRate itself — that returns a clamped
   // 0-100 rate over a range, a different shape from this pair's raw
   // signed daily net amount ("Daily surplus") — but the same underlying
-  // filter, kept in lockstep rather than re-derived.
-  const realTransactions = transactions.filter((tx) => tx.receivableId === null && tx.goalContributionId === null);
+  // filter (isRealSpend, lib/finance/logic.ts), kept in lockstep rather
+  // than re-derived.
+  const realTransactions = transactions.filter(isRealSpend);
 
   const surplusByDay = new Map<string, number>();
   const hasTxByDay = new Set<string>();
