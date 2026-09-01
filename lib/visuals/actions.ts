@@ -14,20 +14,22 @@ function revalidateVisualPaths(pillarId: string, areaId: string | null) {
   revalidatePath(href);
 }
 
-/** Matches getVisualsForPillar/getVisualsForArea's `include: { records }`
- * shape exactly, so the same type flows from the initial page fetch
- * through useUndoableCrudList's local state without a cast. */
-export type VisualWithRecords = Prisma.VisualGetPayload<{ include: { records: true } }>;
+/** Matches getVisualsForPillar/getVisualsForArea's `include: { records,
+ * columns, rows }` shape exactly, so the same type flows from the initial
+ * page fetch through useUndoableCrudList's local state without a cast —
+ * `columns`/`rows` (#168) are always empty for a chart type, only a Table
+ * ever populates them. */
+export type VisualWithRecords = Prisma.VisualGetPayload<{ include: { records: true; columns: true; rows: true } }>;
 
 export type CreateVisualResult = { ok: true; visual: VisualWithRecords } | { ok: false; error: string };
 
-/** Creates an ad-hoc (unbound) chart or table — a bound chart's config is
- * set by #166, not here. `config` is empty for every type except Progress
- * bar, which needs its ad-hoc target set at creation time (there's nothing
- * else to derive "current vs. target" from until it's bound to a Goal in
- * #166). `records: []` on the return value matches VisualWithRecords's
- * shape so callers (ChartZone's useUndoableCrudList) can hold it without a
- * refetch. */
+/** Creates an ad-hoc (unbound) chart, or a freeform Table (#168) — a bound
+ * chart's config is set by #166, not here. `config` is empty for every
+ * type except Progress bar, which needs its ad-hoc target set at creation
+ * time (there's nothing else to derive "current vs. target" from until
+ * it's bound to a Goal in #166). `records`/`columns`/`rows: []` on the
+ * return value matches VisualWithRecords's shape so callers (ChartZone/
+ * TableZone's useUndoableCrudList) can hold it without a refetch. */
 export async function createVisual(
   pillarId: string,
   areaId: string | null,
@@ -40,7 +42,7 @@ export async function createVisual(
   try {
     const visual = await prisma.visual.create({ data: { pillarId, areaId, type, title: trimmed, config } });
     revalidateVisualPaths(pillarId, areaId);
-    return { ok: true, visual: { ...visual, records: [] } };
+    return { ok: true, visual: { ...visual, records: [], columns: [], rows: [] } };
   } catch {
     return { ok: false, error: "Couldn't save — try again." };
   }
@@ -56,20 +58,22 @@ export async function deleteVisual(pillarId: string, areaId: string | null, id: 
   return { ok: true };
 }
 
-/** Undo for deleteVisual — VisualRecord cascade-deletes with its Visual,
- * so restoring means recreating both with their original ids in one
- * transaction, same "recreate with original ids" approach as Finance's
- * restoreDeletedTransactions (#151, ADR-0015). resolve-binding.ts's
- * synthetic, never-persisted rows (a fully-bound chart's #166 single
- * binding, or Scatter's #167 fully- or mixed-bound axes) all carry a
- * `bound-${visualId}-${i}` id rather than a real cuid — replaying one of
- * those as a real VisualRecord would permanently defeat the point of
- * binding, so they're filtered out here by id shape rather than
- * replayed. A mixed-binding Scatter's real, still-persisted manual-axis
- * rows (kept alongside the synthetic ones in `visual.records`, see
- * resolve-binding.ts) have ordinary cuids and pass straight through —
- * they're genuinely gone once the cascade-delete happens, same as any
- * other real VisualRecord, so undo needs to recreate them for real. */
+/** Undo for deleteVisual — VisualRecord/TableColumn/TableRow all
+ * cascade-delete with their Visual, so restoring means recreating all of
+ * them with their original ids in one transaction, same "recreate with
+ * original ids" approach as Finance's restoreDeletedTransactions (#151,
+ * ADR-0015). resolve-binding.ts's synthetic, never-persisted records (a
+ * fully-bound chart's #166 single binding, or Scatter's #167 fully- or
+ * mixed-bound axes) all carry a `bound-${visualId}-${i}` id rather than a
+ * real cuid — replaying one of those as a real VisualRecord would
+ * permanently defeat the point of binding, so they're filtered out here
+ * by id shape rather than replayed. A mixed-binding Scatter's real,
+ * still-persisted manual-axis rows (kept alongside the synthetic ones in
+ * `visual.records`, see resolve-binding.ts) have ordinary cuids and pass
+ * straight through — they're genuinely gone once the cascade-delete
+ * happens, same as any other real VisualRecord, so undo needs to recreate
+ * them for real. A Table's columns/rows (#168) are never synthetic —
+ * every one gets replayed as-is. */
 export async function restoreVisual(visual: VisualWithRecords): Promise<ActionResult> {
   const realRecords = visual.records.filter((r) => !r.id.startsWith("bound-"));
   try {
@@ -98,6 +102,24 @@ export async function restoreVisual(visual: VisualWithRecords): Promise<ActionRe
             xLabel: r.xLabel,
             note: r.note,
             createdAt: r.createdAt,
+          },
+        })
+      ),
+      ...visual.columns.map((c) =>
+        prisma.tableColumn.create({
+          data: { id: c.id, visualId: c.visualId, name: c.name, type: c.type, sortOrder: c.sortOrder },
+        })
+      ),
+      ...visual.rows.map((r) =>
+        prisma.tableRow.create({
+          data: {
+            id: r.id,
+            visualId: r.visualId,
+            boundEntityId: r.boundEntityId,
+            data: r.data ?? {},
+            sortOrder: r.sortOrder,
+            createdAt: r.createdAt,
+            updatedAt: r.updatedAt,
           },
         })
       ),
