@@ -27,7 +27,8 @@ import { SLEEP_AREA_ID, CARE_AREA_ID } from "@/lib/health/seed-data";
 import { pillarHref } from "@/lib/pillars/nav";
 import { resolveColorHex, type ColorKey } from "@/lib/colors";
 import type { StiffnessBucket } from "@/lib/daily-log/logic";
-import type { PageSection } from "@/lib/pillar-page/sections";
+import { resolveSectionOrder, type PageSection, type SectionConfigEntry } from "@/lib/pillar-page/sections";
+import { SectionManager } from "@/components/pillar-page/section-manager";
 import styles from "./area-detail.module.css";
 
 const STIFFNESS_LABELS: Record<StiffnessBucket, string> = {
@@ -81,13 +82,20 @@ export default async function AreaPage({
   const pillar = pillars.find((p) => p.id === area.pillarId);
   const accentColor = resolveColorHex(pillar?.color as ColorKey | null);
 
-  // Rendered from a list of section components (#157/ADR-0016), even
-  // though visibility/ordering isn't user-configurable until #160. Current
-  // state isn't one of the six section types — it's fixed content, sharing
-  // a two-column grid with the North Star section for the existing visual
-  // layout. The bespoke Health-only cards below (Pain & Mobility, Sleep
-  // quality, Blood pressure) are fixed content too, not sections — see
-  // ADR-0016's "no generic score-tracking primitive".
+  // Built as a list of section components (#157/ADR-0016); resolveSectionOrder
+  // (#160) applies the stored order/visibility on top before rendering.
+  // Current state isn't one of the six section types — it's fixed content,
+  // sharing a two-column grid with the North Star section for the existing
+  // visual layout. North Star's *visibility* is user-configurable like any
+  // other section, but its *position* stays pinned in that grid — freeing
+  // it to float among the other sections would break the paired-grid
+  // layout Current state depends on, for a rare edge case (why would North
+  // Star not be first?) not worth that cost. SectionManager is told about
+  // this via `pinnedTypes` below, so it renders North Star's row without a
+  // drag handle/move buttons rather than offering a reorder that would
+  // silently do nothing. The bespoke Health-only cards below (Pain &
+  // Mobility, Sleep quality, Blood pressure) are fixed content too, not
+  // sections — see ADR-0016's "no generic score-tracking primitive".
   const sections: PageSection[] = [
     {
       type: "northStar",
@@ -160,8 +168,13 @@ export default async function AreaPage({
       ),
     },
   ];
-  const northStarSection = sections.find((s) => s.type === "northStar")!;
-  const otherSections = sections.filter((s) => s.type !== "northStar");
+  const resolvedOrder = resolveSectionOrder(
+    sections.map((s) => s.type),
+    area.sectionConfig as SectionConfigEntry[] | null
+  );
+  const sectionByType = new Map(sections.map((s) => [s.type, s.node]));
+  const northStarVisible = resolvedOrder.find((e) => e.type === "northStar")?.visible ?? true;
+  const otherVisibleTypes = resolvedOrder.filter((e) => e.type !== "northStar" && e.visible);
 
   return (
     <>
@@ -169,6 +182,8 @@ export default async function AreaPage({
       <div className={pageStyles.content}>
         <BackLink href={pillarHrefValue} label={pillar?.name ?? "Back"} />
         <PageTitle eyebrow="Area" title={area.name} />
+
+        <SectionManager pillarId={area.pillarId} areaId={area.id} initialConfig={resolvedOrder} pinnedTypes={["northStar"]} />
 
         <div className={styles.fieldsGrid}>
           <Card>
@@ -179,10 +194,10 @@ export default async function AreaPage({
               onSave={updateAreaCurrentState.bind(null, area.pillarId, area.id)}
             />
           </Card>
-          {northStarSection.node}
+          {northStarVisible && sectionByType.get("northStar")}
         </div>
 
-        {otherSections.map((s) => s.node)}
+        {otherVisibleTypes.map((e) => sectionByType.get(e.type))}
         {isPainMobilityArea && (
           <>
             <Card title="Pain & Mobility">

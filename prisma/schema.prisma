@@ -65,6 +65,15 @@ model Pillar {
   goals     LifeGoal[]
   habits    Habit[]
   systems   System[]
+  /// Ordered `{type, visible}[]` over this page's section types (#160,
+  /// ADR-0016) — Json rather than a join table, same "read/written as one
+  /// blob, never queried per-section" reasoning as WeeklyReviewSession's
+  /// verdicts. Null means "no config yet" — resolveSectionOrder in
+  /// lib/pillar-page/sections.ts then shows every section this page
+  /// builds, visible, in the order its own `sections` array lists them
+  /// (see e.g. app/(protected)/(shell)/[pillarId]/page.tsx) — same as
+  /// before this field existed.
+  sectionConfig Json?
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
 }
@@ -91,6 +100,10 @@ model Area {
   painMobilityLogs PainMobilityLog[]
   thoughts         Thought[]
   systems          System[]
+  /// Same shape/reasoning as Pillar.sectionConfig (#160, ADR-0016) —
+  /// independent per Area, since a Pillar and its Areas can each show a
+  /// different subset/order of section types.
+  sectionConfig    Json?
 
   @@index([pillarId])
 }

@@ -18,7 +18,8 @@ import { PillarAreaGoals } from "@/components/goals/pillar-area-goals";
 import { PillarAreaThoughts } from "@/components/thoughts/pillar-area-thoughts";
 import { FINANCE_PILLAR_ID } from "@/lib/finance/pillar-id";
 import { resolveColorHex, type ColorKey } from "@/lib/colors";
-import type { PageSection } from "@/lib/pillar-page/sections";
+import { resolveSectionOrder, type PageSection, type SectionConfigEntry } from "@/lib/pillar-page/sections";
+import { SectionManager } from "@/components/pillar-page/section-manager";
 
 /** Generic Pillar page (#157/ADR-0016) — every Pillar, seeded or
  * user-created, gets this same page, retrofitted off the original
@@ -50,8 +51,8 @@ export default async function PillarPage({
   ]);
   const accentColor = resolveColorHex(pillar.color as ColorKey | null);
 
-  // Rendered from a list of section components (#157/ADR-0016), even
-  // though visibility/ordering isn't user-configurable until #160 — the
+  // Built as a list of section components (#157/ADR-0016); resolveSectionOrder
+  // (#160) applies the stored order/visibility on top before rendering. The
   // mindmap overview isn't in this list, it's fixed content shown above it
   // whenever the Pillar has Areas, per ADR-0016's "a page can carry fixed,
   // non-section content" note.
@@ -103,6 +104,11 @@ export default async function PillarPage({
       ),
     },
   ];
+  const resolvedOrder = resolveSectionOrder(
+    sections.map((s) => s.type),
+    pillar.sectionConfig as SectionConfigEntry[] | null
+  );
+  const sectionByType = new Map(sections.map((s) => [s.type, s.node]));
 
   return (
     <>
@@ -113,6 +119,7 @@ export default async function PillarPage({
           title={pillar.name}
           lede={pillar.areas.length > 0 ? "Tap an area to go into it." : undefined}
         />
+        <SectionManager pillarId={pillar.id} areaId={null} initialConfig={resolvedOrder} />
         <Card title={pillar.areas.length === 0 ? "Areas" : undefined}>
           {pillar.areas.length > 0 ? (
             <PillarMindmap pillarId={pillar.id} pillarName={pillar.name} areas={pillar.areas} accentColor={accentColor} />
@@ -121,7 +128,7 @@ export default async function PillarPage({
           )}
           <NewAreaTile pillarId={pillar.id} />
         </Card>
-        {sections.map((s) => s.node)}
+        {resolvedOrder.filter((e) => e.visible).map((e) => sectionByType.get(e.type))}
       </div>
     </>
   );

@@ -1,0 +1,103 @@
+.details {
+  margin-bottom: 12px;
+}
+
+.summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--muted-2);
+  cursor: pointer;
+  list-style: none;
+}
+
+.summary::-webkit-details-marker {
+  display: none;
+}
+
+.summary:hover {
+  color: var(--ink);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  max-width: 320px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  transition: opacity 0.15s, box-shadow 0.12s;
+}
+
+.dragging {
+  opacity: 0.38;
+}
+
+.dragOver {
+  box-shadow: inset 0 2px 0 var(--coral);
+}
+
+.grip {
+  color: var(--muted-2);
+  flex-shrink: 0;
+  cursor: grab;
+}
+
+.checkboxLabel {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--ink);
+}
+
+.hiddenLabel {
+  color: var(--muted-2);
+}
+
+.pinnedNote {
+  font-size: 11px;
+  color: var(--muted-2);
+  flex-shrink: 0;
+}
+
+.arrows {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex-shrink: 0;
+}
+
+.arrowButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 15px;
+  color: var(--muted);
+  position: relative;
+}
+
+.arrowButton::before {
+  content: "";
+  position: absolute;
+  inset: -3px -11px;
+}
+
+.arrowButton:disabled {
+  opacity: 0.3;
+}
