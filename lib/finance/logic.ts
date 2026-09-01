@@ -66,6 +66,27 @@ export function canLinkTransfer(a: TransferCandidateTransaction, b: TransferCand
   return a.direction !== b.direction;
 }
 
+export const TRANSFER_CANDIDATE_WINDOW_DAYS = 5;
+export const TRANSFER_CANDIDATE_MAX = 5;
+
+export type RankableTransaction = { id: string; accountId: string | null; direction: "IN" | "OUT"; date: Date; amount: number };
+
+/** Ranks candidate transactions as likely Transfer matches for `target` —
+ * a suggestion, never an auto-link (#139, ADR-0013). Filtered to what
+ * canLinkTransfer would allow (different account, opposite direction) and
+ * within ±TRANSFER_CANDIDATE_WINDOW_DAYS of target's date, then sorted by
+ * closest absolute amount difference first and capped at
+ * TRANSFER_CANDIDATE_MAX — the user still picks, this just surfaces the
+ * likeliest options first. */
+export function rankTransferCandidates(target: RankableTransaction, candidates: RankableTransaction[]): RankableTransaction[] {
+  const windowMs = TRANSFER_CANDIDATE_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+  return candidates
+    .filter((c) => c.id !== target.id && canLinkTransfer(target, c))
+    .filter((c) => Math.abs(c.date.getTime() - target.date.getTime()) <= windowMs)
+    .sort((a, b) => Math.abs(a.amount - target.amount) - Math.abs(b.amount - target.amount))
+    .slice(0, TRANSFER_CANDIDATE_MAX);
+}
+
 /** Below this, a statement-parsed transaction is held for review rather
  * than silently accepted with a possibly-wrong category (#115, ADR-0010).
  * Chosen as a starting point balancing false-holds against silently

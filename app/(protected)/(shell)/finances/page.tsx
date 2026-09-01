@@ -196,7 +196,7 @@ export default async function FinancesPage({ searchParams }: { searchParams: Pro
           <BudgetVsActual initialStatuses={budgetStatuses} />
         </Card>
         <Card title="Transactions">
-          <TransactionsManager initialTransactions={transactions} goals={goals} />
+          <TransactionsManager initialTransactions={transactions} goals={goals} accounts={accounts} />
         </Card>
         <Card title="Receivables">
           <ReceivablesList initialReceivables={receivables} repaymentCandidates={repaymentCandidates} />

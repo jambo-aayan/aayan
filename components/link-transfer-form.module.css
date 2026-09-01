@@ -1,0 +1,75 @@
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.suggestions {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.suggestion {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+  font-size: 12.5px;
+  border-top: 1px solid var(--border);
+}
+
+.suggestion:first-child {
+  border-top: none;
+}
+
+.muted {
+  color: var(--muted);
+  font-size: 12.5px;
+  margin: 0;
+}
+
+.manualRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.input {
+  padding: 9px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  font-size: 13px;
+  background: var(--bg);
+  color: var(--ink);
+  min-height: 38px;
+  flex: 1;
+  min-width: 200px;
+}
+
+.input:focus-visible {
+  border-color: var(--ink);
+}
+
+.link {
+  border: none;
+  background: none;
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 4px;
+  transition: color var(--duration-fast) var(--ease);
+}
+
+.link:hover {
+  color: var(--ink);
+}
+
+.error {
+  color: var(--danger);
+  font-size: 12px;
+  margin: 0;
+}

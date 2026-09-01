@@ -5,6 +5,7 @@ import {
   isHeldForReview,
   isRealSpend,
   netTransactionAmount,
+  rankTransferCandidates,
   resolveAccountValueAt,
   resolveStatementBalance,
   sortGoalsByPriority,
@@ -134,6 +135,49 @@ describe("canLinkTransfer", () => {
 
   it("refuses a transaction with no account at all", () => {
     expect(canLinkTransfer({ accountId: null, direction: "OUT" }, acc2("IN"))).toBe(false);
+  });
+});
+
+describe("rankTransferCandidates", () => {
+  const d = (iso: string) => new Date(`${iso}T00:00:00.000Z`);
+  const target = { id: "target", accountId: "lloyds", direction: "OUT" as const, date: d("2026-08-15"), amount: 500 };
+
+  it("excludes a candidate on the same account", () => {
+    const candidates = [{ id: "c1", accountId: "lloyds", direction: "IN" as const, date: d("2026-08-15"), amount: 500 }];
+    expect(rankTransferCandidates(target, candidates)).toEqual([]);
+  });
+
+  it("excludes a candidate with the same direction", () => {
+    const candidates = [{ id: "c1", accountId: "yonder", direction: "OUT" as const, date: d("2026-08-15"), amount: 500 }];
+    expect(rankTransferCandidates(target, candidates)).toEqual([]);
+  });
+
+  it("excludes a candidate outside the +/-5-day window", () => {
+    const candidates = [{ id: "c1", accountId: "yonder", direction: "IN" as const, date: d("2026-08-21"), amount: 500 }];
+    expect(rankTransferCandidates(target, candidates)).toEqual([]);
+  });
+
+  it("includes a candidate at the edge of the window", () => {
+    const candidates = [{ id: "c1", accountId: "yonder", direction: "IN" as const, date: d("2026-08-20"), amount: 500 }];
+    expect(rankTransferCandidates(target, candidates)).toHaveLength(1);
+  });
+
+  it("ranks by closest amount first", () => {
+    const far = { id: "far", accountId: "yonder", direction: "IN" as const, date: d("2026-08-15"), amount: 100 };
+    const close = { id: "close", accountId: "yonder", direction: "IN" as const, date: d("2026-08-16"), amount: 495 };
+    const result = rankTransferCandidates(target, [far, close]);
+    expect(result.map((c) => c.id)).toEqual(["close", "far"]);
+  });
+
+  it("caps results at 5", () => {
+    const candidates = Array.from({ length: 8 }, (_, i) => ({
+      id: `c${i}`,
+      accountId: "yonder",
+      direction: "IN" as const,
+      date: d("2026-08-15"),
+      amount: 500 + i,
+    }));
+    expect(rankTransferCandidates(target, candidates)).toHaveLength(5);
   });
 });
 
