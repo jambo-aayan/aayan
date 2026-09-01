@@ -136,11 +136,21 @@ export function netTransactionAmount(transactions: SignedAmount[]): number {
  * (e.g. the account's balance before its very first statement upload), so
  * every subsequent upload would otherwise carry that error forward
  * indefinitely. Falls back to the computed delta only when the statement
- * doesn't state a balance at all (e.g. some CSV exports). */
+ * doesn't state a balance at all (e.g. some CSV exports) — and only in
+ * that fallback, `accountType` matters: netTransactionAmount's IN-adds/
+ * OUT-subtracts convention is correct for an ASSET (spending reduces what
+ * you hold), but backwards for a LIABILITY like a credit card, where a
+ * purchase (OUT) increases what's owed rather than decreasing it (#141,
+ * ADR-0013). The closing-balance-stated path is already sign-agnostic — a
+ * plain magnitude straight from the statement — so accountType has no
+ * effect there. */
 export function resolveStatementBalance(
   previousBalance: number,
   transactions: SignedAmount[],
-  closingBalance: number | null
+  closingBalance: number | null,
+  accountType: "ASSET" | "LIABILITY"
 ): number {
-  return closingBalance ?? previousBalance + netTransactionAmount(transactions);
+  if (closingBalance !== null) return closingBalance;
+  const delta = netTransactionAmount(transactions);
+  return previousBalance + (accountType === "LIABILITY" ? -delta : delta);
 }

@@ -233,7 +233,7 @@ describe("netTransactionAmount", () => {
 
 describe("resolveStatementBalance", () => {
   it("uses the statement's own closing balance when stated, ignoring the computed delta", () => {
-    const result = resolveStatementBalance(0, [{ amount: 500, direction: "OUT" }], 9015.44);
+    const result = resolveStatementBalance(0, [{ amount: 500, direction: "OUT" }], 9015.44, "ASSET");
     expect(result).toBe(9015.44);
   });
 
@@ -242,12 +242,27 @@ describe("resolveStatementBalance", () => {
     // but the statement's own stated closing balance is the real figure —
     // this is the exact bug scenario: a running total starting from 0
     // never learns the account's actual opening balance.
-    const result = resolveStatementBalance(0, [], 11040.59);
+    const result = resolveStatementBalance(0, [], 11040.59, "ASSET");
     expect(result).toBe(11040.59);
   });
 
-  it("falls back to the computed running total when the statement states no balance", () => {
-    const result = resolveStatementBalance(100, [{ amount: 40, direction: "OUT" }, { amount: 10, direction: "IN" }], null);
+  it("uses the stated closing balance for a LIABILITY account too, sign-agnostic", () => {
+    const result = resolveStatementBalance(0, [{ amount: 500, direction: "OUT" }], 4994.58, "LIABILITY");
+    expect(result).toBe(4994.58);
+  });
+
+  it("falls back to the computed running total when the statement states no balance (ASSET)", () => {
+    const result = resolveStatementBalance(100, [{ amount: 40, direction: "OUT" }, { amount: 10, direction: "IN" }], null, "ASSET");
     expect(result).toBe(70);
+  });
+
+  it("flips the fallback direction for a LIABILITY account — a purchase increases what's owed", () => {
+    const result = resolveStatementBalance(100, [{ amount: 40, direction: "OUT" }], null, "LIABILITY");
+    expect(result).toBe(140);
+  });
+
+  it("flips the fallback direction for a LIABILITY account — a payment received decreases what's owed", () => {
+    const result = resolveStatementBalance(100, [{ amount: 40, direction: "IN" }], null, "LIABILITY");
+    expect(result).toBe(60);
   });
 });

@@ -142,7 +142,7 @@ export async function uploadStatement(accountId: string, file: File): Promise<Up
     }
 
     const previousBalance = account.snapshots[0]?.balance.toNumber() ?? 0;
-    const newBalance = resolveStatementBalance(previousBalance, transactions, closingBalance);
+    const newBalance = resolveStatementBalance(previousBalance, transactions, closingBalance, account.type);
 
     await prisma.$transaction([
       prisma.snapshot.create({
