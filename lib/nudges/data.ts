@@ -6,6 +6,8 @@ import { BASELINE_ID } from "@/lib/finance/baseline-id";
 import { APP_SETTINGS_ID } from "@/lib/settings/constants";
 import { resolveColorHex, type ColorKey } from "@/lib/colors";
 import { isVerdictDue, resolveReviewNudgeTarget, systemDeepLinkHref } from "@/lib/systems/logic";
+import { categorySpendDeviation, SPEND_DEVIATION_BASELINE_MONTHS } from "@/lib/finance/spend-deviation";
+import type { TransactionForBreakdown } from "@/lib/finance/category-breakdown";
 import {
   evaluateEligibility,
   reEvaluateSnoozed,
@@ -15,6 +17,7 @@ import {
   type TaskEligibilityFixture,
   type MetricEligibilityFixture,
   type SystemReviewEligibilityFixture,
+  type CategorySpendEligibilityFixture,
   type ExistingNudgeFixture,
   type EligibleTargetFixture,
 } from "./eligibility";
@@ -117,6 +120,45 @@ async function getMetricFixtures(today: Date): Promise<MetricEligibilityFixture[
  * filtered in the query; `isVerdictDue` itself is applied in JS since the
  * expected dataset is small and it keeps the actual due-date logic in
  * exactly one place. */
+/** Leaf categories running notably (>=20%) above their own trailing-
+ * 3-month baseline this month — reuses lib/finance/spend-deviation.ts's
+ * categorySpendDeviation (ADR-0012) directly rather than a parallel
+ * implementation, filtered to "more" callouts only (this nudge is about
+ * overspending, not celebrating an underspend). Needs the last
+ * SPEND_DEVIATION_BASELINE_MONTHS+1 months of transactions, not just
+ * month-to-date like getMetricFixtures above, since the baseline itself
+ * spans those prior months. */
+async function getCategorySpendAnomalyFixtures(today: Date): Promise<CategorySpendEligibilityFixture[]> {
+  const earliestNeeded = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() - SPEND_DEVIATION_BASELINE_MONTHS, 1));
+  const transactions = await prisma.transaction.findMany({
+    where: { date: { gte: earliestNeeded } },
+    select: {
+      date: true,
+      amount: true,
+      direction: true,
+      receivableId: true,
+      goalContributionId: true,
+      transferId: true,
+      category: { include: { parent: true } },
+    },
+  });
+  const forBreakdown: TransactionForBreakdown[] = transactions.map((t) => ({
+    date: t.date,
+    amount: t.amount.toNumber(),
+    direction: t.direction,
+    category: t.category.name,
+    categoryParent: t.category.parent?.name ?? t.category.name,
+    receivableId: t.receivableId,
+    goalContributionId: t.goalContributionId,
+    transferId: t.transferId,
+  }));
+
+  const monthStart = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1));
+  return categorySpendDeviation(forBreakdown, monthStart)
+    .filter((d) => d.callout === "more")
+    .map((d) => ({ category: d.category, categoryParent: d.categoryParent, current: d.current, baseline: d.baseline, diffPercent: d.diffPercent }));
+}
+
 async function getDueSystemReviewFixtures(now: Date): Promise<SystemReviewEligibilityFixture[]> {
   const systems = await prisma.system.findMany({
     where: { state: "ACTIVE", type: "EXPERIMENT", verdict: null, review: { not: null } },
@@ -210,15 +252,17 @@ async function reEvaluateSnoozes(
  * moment. */
 export async function runNudgeEvaluation(runKind: NudgeRunKind, now: Date = new Date()): Promise<{ delivered: number; held: boolean }> {
   const today = utcMidnight(now);
-  const [deliveryRules, habits, overdueTasks, topTasks, metrics, dueSystemReviews, existingNudgesToday] = await Promise.all([
-    getDeliveryRules(),
-    getHabitFixtures(today),
-    getOverdueTaskFixtures(today),
-    getTopTaskFixtures(today),
-    getMetricFixtures(today),
-    getDueSystemReviewFixtures(now),
-    getExistingNudgesToday(now),
-  ]);
+  const [deliveryRules, habits, overdueTasks, topTasks, metrics, dueSystemReviews, categorySpendAnomalies, existingNudgesToday] =
+    await Promise.all([
+      getDeliveryRules(),
+      getHabitFixtures(today),
+      getOverdueTaskFixtures(today),
+      getTopTaskFixtures(today),
+      getMetricFixtures(today),
+      getDueSystemReviewFixtures(now),
+      getCategorySpendAnomalyFixtures(today),
+      getExistingNudgesToday(now),
+    ]);
 
   await reEvaluateSnoozes(now, habits, overdueTasks, dueSystemReviews);
 
@@ -231,6 +275,7 @@ export async function runNudgeEvaluation(runKind: NudgeRunKind, now: Date = new 
     topTasks,
     metrics,
     dueSystemReviews,
+    categorySpendAnomalies,
     existingNudgesToday,
   });
 

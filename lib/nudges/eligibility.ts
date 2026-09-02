@@ -1,3 +1,4 @@
+import { formatGBP } from "../finance/format";
 import { NUDGE_SEVERITY, type NudgeCandidate, type NudgeType, type NudgeTargetType } from "./types";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -53,6 +54,19 @@ export type ExistingNudgeFixture = {
   severity: number;
 };
 
+/** A leaf category whose current-month spend is notably above its own
+ * trailing-3-month baseline (ADR-0012's categorySpendDeviation) — the
+ * caller (lib/nudges/data.ts) pre-filters to `callout: "more"` only,
+ * since this nudge is about overspending, not celebrating an
+ * underspend. */
+export type CategorySpendEligibilityFixture = {
+  category: string;
+  categoryParent: string;
+  current: number;
+  baseline: number;
+  diffPercent: number;
+};
+
 export type NudgeContext = {
   now: Date;
   runKind: NudgeRunKind;
@@ -62,6 +76,7 @@ export type NudgeContext = {
   topTasks: TaskEligibilityFixture[];
   metrics: MetricEligibilityFixture[];
   dueSystemReviews: SystemReviewEligibilityFixture[];
+  categorySpendAnomalies: CategorySpendEligibilityFixture[];
   existingNudgesToday: ExistingNudgeFixture[];
 };
 
@@ -196,6 +211,20 @@ function generateCandidates(ctx: NudgeContext): NudgeCandidate[] {
           ? `"${review.name}" (started ${dateKey(review.startedOn)}) is ready for a verdict`
           : `"${review.name}" is ready for a verdict`,
         body: "Its review date has arrived — decide whether to continue, escalate, or stop.",
+      });
+    }
+  }
+
+  if (ctx.runKind === "MORNING") {
+    for (const anomaly of ctx.categorySpendAnomalies) {
+      candidates.push({
+        dedupKey: `category-spend:${anomaly.categoryParent}:${anomaly.category}:${today}`,
+        type: "CATEGORY_SPEND_ANOMALY",
+        severity: NUDGE_SEVERITY.CATEGORY_SPEND_ANOMALY,
+        targetType: "NONE",
+        targetId: null,
+        title: `${anomaly.categoryParent}: ${anomaly.category} is up this month`,
+        body: `${formatGBP(anomaly.current, true)} so far, ${Math.round(anomaly.diffPercent)}% above your usual ${formatGBP(anomaly.baseline, true)}.`,
       });
     }
   }

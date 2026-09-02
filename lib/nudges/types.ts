@@ -5,7 +5,8 @@ export type NudgeType =
   | "WEEKLY_REVIEW_READY"
   | "METRIC_OFF_TARGET"
   | "MORNING_BRIEF"
-  | "SYSTEM_REVIEW_DUE";
+  | "SYSTEM_REVIEW_DUE"
+  | "CATEGORY_SPEND_ANOMALY";
 
 export type NudgeTargetType = "HABIT" | "TASK" | "SYSTEM" | "NONE";
 
@@ -20,6 +21,7 @@ export const NUDGE_SEVERITY: Record<NudgeType, number> = {
   TASK_OVERDUE: 3,
   SYSTEM_REVIEW_DUE: 3,
   METRIC_OFF_TARGET: 2,
+  CATEGORY_SPEND_ANOMALY: 2,
   HABIT_DUE: 1,
   WEEKLY_REVIEW_READY: 1,
   MORNING_BRIEF: 1,
@@ -37,6 +39,9 @@ export const NUDGE_ACCENT: Record<Exclude<NudgeType, "HABIT_DUE">, "danger" | "c
   METRIC_OFF_TARGET: "gold",
   MORNING_BRIEF: "ink",
   SYSTEM_REVIEW_DUE: "coral",
+  // Same "gold" as METRIC_OFF_TARGET — both are a Finance figure trending
+  // the wrong way, not an urgent/danger-level event.
+  CATEGORY_SPEND_ANOMALY: "gold",
 };
 
 /** SYSTEM_REVIEW_DUE's primary action is the first that actually
@@ -50,6 +55,7 @@ export const NUDGE_PRIMARY_ACTION_LABEL: Record<NudgeType, string> = {
   METRIC_OFF_TARGET: "See finances",
   MORNING_BRIEF: "Open My Day",
   SYSTEM_REVIEW_DUE: "Set verdict",
+  CATEGORY_SPEND_ANOMALY: "See finances",
 };
 
 export type NudgeCandidate = {

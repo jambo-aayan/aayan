@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  categorySpendBuiltInValues,
   goalBuiltInValues,
   habitBuiltInValues,
   isBuiltInColumnId,
@@ -66,6 +67,18 @@ describe("systemBuiltInValues", () => {
       "systems:name": "Morning routine",
       "systems:type": "HABIT_LOOP",
       "systems:state": "ACTIVE",
+    });
+  });
+});
+
+describe("categorySpendBuiltInValues", () => {
+  it("maps category/parent/this-month/last-month totals", () => {
+    const values = categorySpendBuiltInValues({ category: "Dining Out", categoryParent: "Food", thisMonth: 120, lastMonth: 80 });
+    expect(values).toEqual({
+      "category-spend:category": "Dining Out",
+      "category-spend:parent": "Food",
+      "category-spend:thisMonth": 120,
+      "category-spend:lastMonth": 80,
     });
   });
 });

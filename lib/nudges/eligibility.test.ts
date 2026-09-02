@@ -17,6 +17,7 @@ function baseCtx(overrides: Partial<NudgeContext> = {}): NudgeContext {
     topTasks: [],
     metrics: [],
     dueSystemReviews: [],
+    categorySpendAnomalies: [],
     existingNudgesToday: [],
     ...overrides,
   };
@@ -190,6 +191,57 @@ describe("evaluateEligibility — system review due", () => {
     const [candidate] = evaluateEligibility(ctx).deliver.filter((c) => c.type === "SYSTEM_REVIEW_DUE");
     expect(candidate.title).toContain("Training block");
     expect(candidate.title).toContain("2026-07-15");
+  });
+});
+
+describe("evaluateEligibility — category spend anomaly", () => {
+  it("creates one CATEGORY_SPEND_ANOMALY candidate per flagged category, targetType NONE", () => {
+    const ctx = baseCtx({
+      categorySpendAnomalies: [
+        { category: "Dining Out", categoryParent: "Food", current: 130, baseline: 100, diffPercent: 30 },
+      ],
+    });
+    const flagged = evaluateEligibility(ctx).deliver.filter((c) => c.type === "CATEGORY_SPEND_ANOMALY");
+    expect(flagged).toHaveLength(1);
+    expect(flagged[0].targetType).toBe("NONE");
+    expect(flagged[0].targetId).toBeNull();
+    expect(flagged[0].dedupKey).toBe("category-spend:Food:Dining Out:2026-08-21");
+  });
+
+  it("names the parent and category, and states the percent over baseline", () => {
+    const ctx = baseCtx({
+      categorySpendAnomalies: [
+        { category: "Dining Out", categoryParent: "Food", current: 130, baseline: 100, diffPercent: 30 },
+      ],
+    });
+    const [candidate] = evaluateEligibility(ctx).deliver.filter((c) => c.type === "CATEGORY_SPEND_ANOMALY");
+    expect(candidate.title).toContain("Food");
+    expect(candidate.title).toContain("Dining Out");
+    expect(candidate.body).toContain("30%");
+  });
+
+  it("disambiguates same-named leaves under different parents by dedup key", () => {
+    const ctx = baseCtx({
+      categorySpendAnomalies: [
+        { category: "General", categoryParent: "Shopping", current: 100, baseline: 50, diffPercent: 100 },
+        { category: "General", categoryParent: "Travel", current: 200, baseline: 100, diffPercent: 100 },
+      ],
+    });
+    const flagged = evaluateEligibility(ctx).deliver.filter((c) => c.type === "CATEGORY_SPEND_ANOMALY");
+    expect(flagged.map((c) => c.dedupKey).sort()).toEqual([
+      "category-spend:Shopping:General:2026-08-21",
+      "category-spend:Travel:General:2026-08-21",
+    ]);
+  });
+
+  it("only evaluates on the morning run", () => {
+    const ctx = baseCtx({
+      runKind: "EVENING",
+      categorySpendAnomalies: [
+        { category: "Dining Out", categoryParent: "Food", current: 130, baseline: 100, diffPercent: 30 },
+      ],
+    });
+    expect(evaluateEligibility(ctx).deliver.filter((c) => c.type === "CATEGORY_SPEND_ANOMALY")).toEqual([]);
   });
 });
 

@@ -1087,6 +1087,10 @@ enum NudgeType {
   /// review date has arrived with no verdict recorded yet — see #109/#111
   /// and docs/adr/0009-systems-review-nudges.md.
   SYSTEM_REVIEW_DUE
+  /// A leaf category's current-month spend running notably above its own
+  /// trailing-3-month baseline (ADR-0012's spend-deviation math) — see
+  /// #179 and ADR-0015's #173 addendum.
+  CATEGORY_SPEND_ANOMALY
 }
 
 enum NudgeTargetType {
