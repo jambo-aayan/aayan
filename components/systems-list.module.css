@@ -190,6 +190,7 @@
 .stepRow {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   justify-content: space-between;
   padding: 4px 0;
   font-size: 13px;
