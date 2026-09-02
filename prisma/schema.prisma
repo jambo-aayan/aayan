@@ -66,6 +66,7 @@ model Pillar {
   habits    Habit[]
   systems   System[]
   visuals   Visual[]
+  metrics   Metric[]
   /// Ordered `{type, visible}[]` over this page's section types (#160,
   /// ADR-0016) — Json rather than a join table, same "read/written as one
   /// blob, never queried per-section" reasoning as WeeklyReviewSession's
@@ -102,6 +103,7 @@ model Area {
   thoughts         Thought[]
   systems          System[]
   visuals          Visual[]
+  metrics          Metric[]
   /// Same shape/reasoning as Pillar.sectionConfig (#160, ADR-0016) —
   /// independent per Area, since a Pillar and its Areas can each show a
   /// different subset/order of section types.
@@ -297,42 +299,84 @@ model PainMobilityLog {
   @@index([areaId])
 }
 
-enum HeadacheLevel {
-  NONE
-  MILD
-  MODERATE
-  BAD
+enum MetricValueType {
+  NUMBER
+  SCALE_5
+  BOOLEAN
+  ENUM
+  TEXT
 }
 
-/// One cross-cutting entry per date (no Area scoping — unlike PainMobilityLog,
-/// which stays untouched as a separate, Area-scoped, 0-10-scale table; see
-/// docs/adr/0007-v2-phase3-daily-log-sheet.md). 1-5 is the only scale this
-/// model ever stores. stiffness stores the bucket's representative midpoint
-/// (7/22/45/75), never the raw bucket selection — the bucket is a UI-only
-/// concept. headache stores the day's worst value reached so far (see
-/// lib/daily-log's day's-worst logic — a lower tap later in the day is a
-/// no-op, enforced above the schema, not by a DB constraint). mobility/
-/// trained are deliberately NOT columns here — they're derived at read time
-/// from that day's check-ins on the two seeded habits in
-/// lib/daily-log/habit-seed.ts (see lib/daily-log/data.ts), never
-/// persisted, so they can never go stale relative to the CheckIn rows they
-/// come from.
-model DailyLog {
-  id           String        @id @default(cuid())
-  date         DateTime      @unique @db.Date
-  mood         Int
-  stress       Int
-  energy       Int
-  sleepQuality Int
-  pain         Int
-  headache     HeadacheLevel
-  stiffness    Int
-  weight       Float?
-  waist        Float?
-  bpSystolic   Int?
-  bpDiastolic  Int?
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+enum MetricCadence {
+  DAILY
+  WEEKLY
+  AD_HOC
+}
+
+/// A user-defined thing to log over time (#181/#182) — replaces the old
+/// fixed-shape DailyLog (mobility/trained stay derived from CheckIn data
+/// exactly as before, unrelated to this model — see lib/daily-log/data.ts's
+/// former getDerivedStateFields, now in lib/metrics). valueType decides how
+/// MetricEntry.numberValue/textValue is interpreted: NUMBER/SCALE_5/BOOLEAN
+/// (stored 0/1) use numberValue; ENUM/TEXT use textValue. enumOptions only
+/// applies to ENUM — a JSON-encoded string array, no separate join table for
+/// a handful of fixed choices. cadence drives what "due" means on the Log
+/// tab (#184) and whether `required` can trigger a missed-logging nudge
+/// (#186): DAILY/WEEKLY have a real due period; AD_HOC never does (always
+/// loggable, never nudges). pillarId/areaId are both independently
+/// optional, same shape as Thought's — a Metric can be fully global (both
+/// null), Pillar-scoped, or Area-scoped, unlike Visual's always-Pillar-
+/// scoped requirement. archivedAt is a soft-delete: an archived metric's
+/// history/correlations stay intact, it just stops appearing as
+/// loggable/due — deleting a Metric outright is deliberately not exposed
+/// (see the entries relation's default RESTRICT: a Metric with any
+/// MetricEntry can't be hard-deleted, only archived).
+model Metric {
+  id          String          @id @default(cuid())
+  name        String
+  valueType   MetricValueType
+  cadence     MetricCadence
+  required    Boolean         @default(false)
+  unit        String?
+  enumOptions String?
+  pillarId    String?
+  pillar      Pillar?         @relation(fields: [pillarId], references: [id])
+  areaId      String?
+  area        Area?           @relation(fields: [areaId], references: [id])
+  sortOrder   Int             @default(0)
+  archivedAt  DateTime?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  entries     MetricEntry[]
+
+  @@index([pillarId])
+  @@index([areaId])
+}
+
+/// One logged value for a Metric, dated (#181/#182). `date` is a plain
+/// DateTime, not @db.Date, because its precision depends on the Metric's
+/// cadence: for DAILY/WEEKLY it's truncated to that period's start
+/// (midnight, or that week's Monday) by the app layer before writing —
+/// exactly like DailyLog's own utcMidnight did — so `@@unique([metricId,
+/// date])` alone enforces "one entry per period" with no extra DB
+/// constraint needed. For AD_HOC it's the exact log timestamp instead, so
+/// the same unique constraint effectively never collides (two genuinely
+/// simultaneous entries are not a real scenario worth guarding against).
+/// numberValue covers NUMBER/SCALE_5/BOOLEAN (as 0/1); textValue covers
+/// TEXT/ENUM (an ENUM entry stores one of its Metric's enumOptions
+/// verbatim).
+model MetricEntry {
+  id          String   @id @default(cuid())
+  metricId    String
+  metric      Metric   @relation(fields: [metricId], references: [id])
+  date        DateTime
+  numberValue Float?
+  textValue   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([metricId, date])
+  @@index([metricId])
 }
 
 enum SystemType {

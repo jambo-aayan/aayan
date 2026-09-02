@@ -41,6 +41,7 @@ import { isRealSpend } from "@/lib/finance/logic";
 import { FINANCE_NORTH_STAR_ID } from "@/lib/finance/north-star-id";
 import { categorySpendTrend } from "./category-spend";
 import { getTransactions } from "@/lib/finance/data";
+import { METRIC_MOOD_ID, METRIC_SLEEP_QUALITY_ID, METRIC_STIFFNESS_ID } from "@/lib/metrics/seeded-ids";
 import { computeWeeklyDigest, type DeltaFixture, type CorrelationFixture, type HabitAdherenceFixture } from "./weekly-digest";
 import { adherenceForHabit } from "./momentum";
 import { resolveColorHex, type ColorKey } from "@/lib/colors";
@@ -472,7 +473,7 @@ export async function getCorrelations(range: InsightsRange, asOf: Date = new Dat
   const [start, end] = current;
   const days = eachDayCorr(start, end);
 
-  const [habits, checkIns, tasks, painLogs, transactions, dailyLogs, experiments] = await Promise.all([
+  const [habits, checkIns, tasks, painLogs, transactions, sleepMoodStiffnessEntries, experiments] = await Promise.all([
     prisma.habit.findMany({
       where: { status: "ACTIVE" },
       select: {
@@ -491,7 +492,10 @@ export async function getCorrelations(range: InsightsRange, asOf: Date = new Dat
       where: { date: { gte: start, lte: end } },
       select: { date: true, amount: true, direction: true, receivableId: true, goalContributionId: true, transferId: true },
     }),
-    prisma.dailyLog.findMany({ where: { date: { gte: start, lte: end } }, select: { date: true, sleepQuality: true, stiffness: true, mood: true } }),
+    prisma.metricEntry.findMany({
+      where: { metricId: { in: [METRIC_SLEEP_QUALITY_ID, METRIC_STIFFNESS_ID, METRIC_MOOD_ID] }, date: { gte: start, lte: end } },
+      select: { metricId: true, date: true, numberValue: true },
+    }),
     prisma.system.findMany({
       where: { state: "ACTIVE", type: "EXPERIMENT" },
       select: { id: true, name: true, review: true, verdict: true },
@@ -558,10 +562,15 @@ export async function getCorrelations(range: InsightsRange, asOf: Date = new Dat
   const adherenceVsPain = pairedSeries(adherenceByDay, new Set(avgPainByDay.keys()), avgPainByDay);
   const adherenceVsSurplus = pairedSeries(adherenceByDay, hasTxByDay, surplusByDay);
 
-  // DailyLog is one row per date carrying both fields already, so no
-  // per-day aggregation is needed the way painByDay/surplusByDay require.
-  const sleepByDay = new Map(dailyLogs.map((l) => [dateKeyCorr(l.date), l.sleepQuality]));
-  const stiffnessByDay = new Map(dailyLogs.map((l) => [dateKeyCorr(l.date), l.stiffness]));
+  // Sleep quality/stiffness/mood are now three separate Metrics (#182,
+  // replacing DailyLog's one-row-per-date shape) fetched in a single query
+  // above and split back out by metricId here.
+  const sleepByDay = new Map(
+    sleepMoodStiffnessEntries.filter((e) => e.metricId === METRIC_SLEEP_QUALITY_ID).map((e) => [dateKeyCorr(e.date), e.numberValue!])
+  );
+  const stiffnessByDay = new Map(
+    sleepMoodStiffnessEntries.filter((e) => e.metricId === METRIC_STIFFNESS_ID).map((e) => [dateKeyCorr(e.date), e.numberValue!])
+  );
   const sleepVsStiffness = pairedSeries(sleepByDay, new Set(stiffnessByDay.keys()), stiffnessByDay);
 
   // "On track" is a live snapshot check, re-evaluated per day via the same
@@ -588,7 +597,9 @@ export async function getCorrelations(range: InsightsRange, asOf: Date = new Dat
   // lib/daily-log/data.ts's getDerivedStateFields), not a numeric series —
   // so it's a mean-split (lib/insights/split-mean.ts), a different shape
   // from CorrelationResult, surfaced as its own small card (#128, ADR-0011).
-  const moodLogs = dailyLogs.map((l) => ({ date: l.date, value: l.mood }));
+  const moodLogs = sleepMoodStiffnessEntries
+    .filter((e) => e.metricId === METRIC_MOOD_ID)
+    .map((e) => ({ date: e.date, value: e.numberValue! }));
   const trainedDates = checkIns.filter((c) => c.habitId === TRAINED_HABIT_ID).map((c) => c.date);
   const trainedVsMood = moodLogs.length >= CORRELATION_MIN_N ? splitMean(moodLogs, trainedDates) : null;
 
