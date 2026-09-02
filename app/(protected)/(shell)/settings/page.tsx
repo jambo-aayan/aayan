@@ -26,7 +26,7 @@ export default async function SettingsPage() {
           <SettingsToggles initialSettings={settings} />
         </Card>
         <Card title="Categories">
-          <CategoryManager initialCategories={categories} />
+          <CategoryManager categories={categories} />
         </Card>
         <Card title="Danger zone">
           <FinanceReset />
