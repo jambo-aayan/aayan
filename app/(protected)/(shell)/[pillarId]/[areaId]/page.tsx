@@ -88,9 +88,9 @@ export default async function AreaPage({
   // Star not be first?) not worth that cost. SectionManager is told about
   // this via `pinnedTypes` below, so it renders North Star's row without a
   // drag handle/move buttons rather than offering a reorder that would
-  // silently do nothing. The bespoke Health-only cards below (Pain &
-  // Mobility, Sleep quality, Blood pressure) are fixed content too, not
-  // sections — see ADR-0016's "no generic score-tracking primitive".
+  // silently do nothing. The bespoke Pain & Mobility card below is fixed
+  // content too, not a section — see ADR-0016's "no generic score-tracking
+  // primitive".
   const sections: PageSection[] = [
     {
       type: "northStar",
