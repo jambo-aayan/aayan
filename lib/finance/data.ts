@@ -136,9 +136,13 @@ const MAX_GROUPED_STATEMENTS = 100;
 /** The full transaction browser's source data (#150, ADR-0015) — either a
  * flat, paginated page of Transactions, or every Transaction matching the
  * current filters grouped by the Statement it came from, per
- * `buildTransactionQuery`'s two modes. */
+ * `buildTransactionQuery`'s two modes. Fetches the category hierarchy so
+ * a `categoryId` filter naming a top-level category expands to "any of
+ * its subcategories" (#176) — cheap, and every category row is needed
+ * for the filter picker itself anyway (see the transactions page). */
 export async function getTransactionsPage(filters: TransactionFilters) {
-  const query = buildTransactionQuery(filters);
+  const categories = await prisma.category.findMany({ select: { id: true, name: true, parentId: true } });
+  const query = buildTransactionQuery(filters, categories);
   const include = { category: true, account: { select: { name: true } } } as const;
 
   if (query.mode === "byStatement") {

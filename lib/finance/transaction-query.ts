@@ -1,3 +1,5 @@
+import type { CategoryOption } from "./categories";
+
 export type TransactionFilters = {
   categoryId?: string;
   accountId?: string;
@@ -9,7 +11,7 @@ export type TransactionFilters = {
 };
 
 export type TransactionWhere = {
-  categoryId?: string;
+  categoryId?: string | { in: string[] };
   accountId?: string;
   date?: { gte?: Date; lte?: Date };
   source?: { contains: string; mode: "insensitive" };
@@ -26,10 +28,22 @@ export type TransactionQuery =
  * the full rows — the transaction list's own "Select all N matching"
  * button, lib/finance/actions.ts's getMatchingTransactionIds) can reuse
  * the exact same filter logic without going through buildTransactionQuery's
- * two-mode split. */
-export function buildWhere(filters: TransactionFilters): TransactionWhere {
+ * two-mode split.
+ *
+ * `categories` (default `[]`, so every existing caller/test that doesn't
+ * pass it keeps working unchanged) is only needed to resolve `categoryId`
+ * when it names a top-level category (#176) — a Transaction only ever
+ * carries a leaf categoryId (see ADR-0015's #173 addendum), so filtering
+ * by a parent means "any of its children," expressed as an `in` filter
+ * over their ids. When `categoryId` already names a leaf (or `categories`
+ * wasn't given, e.g. because the caller already knows it's a leaf), it's
+ * used as an exact match, same as before #176. */
+export function buildWhere(filters: TransactionFilters, categories: CategoryOption[] = []): TransactionWhere {
   const where: TransactionWhere = {};
-  if (filters.categoryId) where.categoryId = filters.categoryId;
+  if (filters.categoryId) {
+    const childIds = categories.filter((c) => c.parentId === filters.categoryId).map((c) => c.id);
+    where.categoryId = childIds.length > 0 ? { in: childIds } : filters.categoryId;
+  }
   if (filters.accountId) where.accountId = filters.accountId;
   if (filters.dateFrom || filters.dateTo) {
     where.date = {};
@@ -52,8 +66,8 @@ export function buildWhere(filters: TransactionFilters): TransactionWhere {
  * Statements than Transactions, so fetching every filtered row and
  * grouping it is the simpler, still-bounded option). Filters apply
  * identically in both modes. */
-export function buildTransactionQuery(filters: TransactionFilters): TransactionQuery {
-  const where = buildWhere(filters);
+export function buildTransactionQuery(filters: TransactionFilters, categories: CategoryOption[] = []): TransactionQuery {
+  const where = buildWhere(filters, categories);
   const orderBy = { date: "desc" as const };
   if (filters.groupByStatement) return { mode: "byStatement", where, orderBy };
   const page = Math.max(1, filters.page ?? 1);

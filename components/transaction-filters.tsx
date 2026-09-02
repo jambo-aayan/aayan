@@ -5,6 +5,7 @@ import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import styles from "@/components/tasks/task-filters.module.css";
 
 type Option = { id: string; name: string };
+type CategoryOption = { id: string; name: string; parentId: string | null };
 
 const SEARCH_DEBOUNCE_MS = 400;
 
@@ -13,7 +14,7 @@ const SEARCH_DEBOUNCE_MS = 400;
  * so a filtered view is a shareable, bookmarkable link. Changing any
  * filter resets back to page 1 — a stale page number past the new
  * filtered result's end would just show an empty page. */
-export function TransactionFilters({ categories, accounts }: { categories: Option[]; accounts: Option[] }) {
+export function TransactionFilters({ categories, accounts }: { categories: CategoryOption[]; accounts: Option[] }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -51,6 +52,8 @@ export function TransactionFilters({ categories, accounts }: { categories: Optio
     router.push(`${pathname}?${next.toString()}`);
   }
 
+  const parentCategories = categories.filter((c) => c.parentId === null).sort((a, b) => a.name.localeCompare(b.name));
+
   return (
     <div className={styles.bar}>
       <select
@@ -60,11 +63,19 @@ export function TransactionFilters({ categories, accounts }: { categories: Optio
         onChange={(e) => setParam("categoryId", e.target.value)}
       >
         <option value="">All categories</option>
-        {categories.map((c) => (
-          <option key={c.id} value={c.id}>
-            {c.name}
-          </option>
-        ))}
+        {parentCategories.map((parent) => {
+          const children = categories.filter((c) => c.parentId === parent.id).sort((a, b) => a.name.localeCompare(b.name));
+          return (
+            <optgroup key={parent.id} label={parent.name}>
+              <option value={parent.id}>All of {parent.name}</option>
+              {children.map((child) => (
+                <option key={child.id} value={child.id}>
+                  {child.name}
+                </option>
+              ))}
+            </optgroup>
+          );
+        })}
       </select>
       <select
         className={styles.select}

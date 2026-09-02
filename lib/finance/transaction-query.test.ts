@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { buildTransactionQuery, TRANSACTIONS_PAGE_SIZE } from "./transaction-query";
+import { buildTransactionQuery, buildWhere, TRANSACTIONS_PAGE_SIZE } from "./transaction-query";
+
+const FOOD = { id: "cat-food", name: "Food", parentId: null };
+const DINING = { id: "cat-dining", name: "Dining Out", parentId: "cat-food" };
+const GROCERIES = { id: "cat-groceries", name: "Groceries", parentId: "cat-food" };
+const HOUSING = { id: "cat-housing", name: "Housing", parentId: null };
+const CATEGORIES = [FOOD, DINING, GROCERIES, HOUSING];
 
 describe("buildTransactionQuery", () => {
   it("returns an unfiltered flat query by default", () => {
@@ -87,5 +93,25 @@ describe("buildTransactionQuery", () => {
     expect(query.where).toEqual({ categoryId: "cat-1" });
     expect(query).not.toHaveProperty("skip");
     expect(query).not.toHaveProperty("take");
+  });
+});
+
+describe("buildWhere: category hierarchy (#176)", () => {
+  it("filters by exact id when categories aren't provided", () => {
+    expect(buildWhere({ categoryId: "cat-dining" })).toEqual({ categoryId: "cat-dining" });
+  });
+
+  it("filters by exact id when it names a leaf, even with categories provided", () => {
+    expect(buildWhere({ categoryId: "cat-dining" }, CATEGORIES)).toEqual({ categoryId: "cat-dining" });
+  });
+
+  it("expands a top-level category id to every one of its subcategories", () => {
+    expect(buildWhere({ categoryId: "cat-food" }, CATEGORIES)).toEqual({
+      categoryId: { in: ["cat-dining", "cat-groceries"] },
+    });
+  });
+
+  it("falls back to an exact match for a top-level category with no children", () => {
+    expect(buildWhere({ categoryId: "cat-housing" }, CATEGORIES)).toEqual({ categoryId: "cat-housing" });
   });
 });

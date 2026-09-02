@@ -686,7 +686,8 @@ const MAX_MATCHING_TRANSACTION_IDS = 5000;
  * only shows one page of rows at a time, so the client can't derive "every
  * matching id" from what's rendered the way byStatement mode can. */
 export async function getMatchingTransactionIds(filters: TransactionFilters): Promise<string[]> {
-  const where = buildWhere(filters);
+  const categories = await prisma.category.findMany({ select: { id: true, name: true, parentId: true } });
+  const where = buildWhere(filters, categories);
   const rows = await prisma.transaction.findMany({
     where,
     select: { id: true },
