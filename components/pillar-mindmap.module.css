@@ -46,6 +46,12 @@
 .leaf {
   position: absolute;
   transform: translate(-50%, -50%);
+  /* The visible pill (padding 8px 13px, ~31px tall) is well under the
+     ~44px touch-target minimum — expand the tappable area via an
+     invisible overflowing pseudo-element instead of growing the pill
+     itself, same trick task-menu.module.css's own .trigger uses, so the
+     radial layout math (which sizes/spaces leaves off the visible box)
+     stays untouched. */
   /* max-width is a percentage of .wrap (matches
      lib/pillars/mindmap-layout.ts's MINDMAP_NODE_WIDTH_PERCENT, which the
      radius math keeps adjacent nodes clear of) rather than a fixed px
@@ -66,6 +72,12 @@
   font-weight: 500;
   z-index: 1;
   transition: background var(--duration-fast) var(--ease), color var(--duration-fast) var(--ease);
+}
+
+.leaf::before {
+  content: "";
+  position: absolute;
+  inset: -7px;
 }
 
 .leaf:hover {
