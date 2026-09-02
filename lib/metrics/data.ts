@@ -18,3 +18,17 @@ export async function getMetric(id: string) {
 export async function getMetricEntries(metricId: string) {
   return prisma.metricEntry.findMany({ where: { metricId }, orderBy: { date: "asc" } });
 }
+
+/** Every Pillar/Area, for the metric-management form's scope picker
+ * (#183) — same shape as lib/tasks/data.ts's own getPillarOptions/
+ * getAreaOptions, not reused directly since that module isn't meant to be
+ * a shared "every picker in the app" dependency; a metric's scope picker
+ * is different enough a use case (optional, "Global" is a real choice
+ * here) to warrant its own small query rather than importing tasks'. */
+export async function getMetricScopeOptions() {
+  const [pillars, areas] = await Promise.all([
+    prisma.pillar.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
+    prisma.area.findMany({ select: { id: true, name: true, pillarId: true }, orderBy: { sortOrder: "asc" } }),
+  ]);
+  return { pillars, areas };
+}
