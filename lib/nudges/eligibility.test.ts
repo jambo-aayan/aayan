@@ -205,7 +205,7 @@ describe("evaluateEligibility — category spend anomaly", () => {
     expect(flagged).toHaveLength(1);
     expect(flagged[0].targetType).toBe("NONE");
     expect(flagged[0].targetId).toBeNull();
-    expect(flagged[0].dedupKey).toBe("category-spend:Food:Dining Out:2026-08-21");
+    expect(flagged[0].dedupKey).toBe("category-spend:Food Dining Out:2026-08-21");
   });
 
   it("names the parent and category, and states the percent over baseline", () => {
@@ -229,8 +229,8 @@ describe("evaluateEligibility — category spend anomaly", () => {
     });
     const flagged = evaluateEligibility(ctx).deliver.filter((c) => c.type === "CATEGORY_SPEND_ANOMALY");
     expect(flagged.map((c) => c.dedupKey).sort()).toEqual([
-      "category-spend:Shopping:General:2026-08-21",
-      "category-spend:Travel:General:2026-08-21",
+      "category-spend:Shopping General:2026-08-21",
+      "category-spend:Travel General:2026-08-21",
     ]);
   });
 

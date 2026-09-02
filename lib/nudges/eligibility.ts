@@ -1,4 +1,5 @@
 import { formatGBP } from "../finance/format";
+import { drilldownKey } from "../finance/category-breakdown";
 import { NUDGE_SEVERITY, type NudgeCandidate, type NudgeType, type NudgeTargetType } from "./types";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -218,7 +219,7 @@ function generateCandidates(ctx: NudgeContext): NudgeCandidate[] {
   if (ctx.runKind === "MORNING") {
     for (const anomaly of ctx.categorySpendAnomalies) {
       candidates.push({
-        dedupKey: `category-spend:${anomaly.categoryParent}:${anomaly.category}:${today}`,
+        dedupKey: `category-spend:${drilldownKey(anomaly.category, anomaly.categoryParent)}:${today}`,
         type: "CATEGORY_SPEND_ANOMALY",
         severity: NUDGE_SEVERITY.CATEGORY_SPEND_ANOMALY,
         targetType: "NONE",
