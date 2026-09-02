@@ -26,6 +26,15 @@ export type TransactionForBreakdown = {
 export type CategoryBreakdownRow = { category: string; total: number };
 export type CategoryDrilldownRow = { category: string; categoryParent: string; total: number };
 
+/** A collision-safe map key for a (leaf, parent) pair — exported so
+ * spend-deviation.ts's categorySpendDeviation can key its own baseline
+ * Maps identically to categoryDrilldownBreakdown's rows below, rather
+ * than each file hand-rolling the same composite-key format
+ * independently and risking the two silently drifting apart. */
+export function drilldownKey(category: string, categoryParent: string): string {
+  return `${categoryParent} ${category}`;
+}
+
 function isSameUtcMonth(date: Date, month: Date): boolean {
   return date.getUTCFullYear() === month.getUTCFullYear() && date.getUTCMonth() === month.getUTCMonth();
 }
@@ -72,7 +81,7 @@ export function categoryDrilldownBreakdown(transactions: TransactionForBreakdown
 
   for (const t of transactions) {
     if (!inScopeForBreakdown(t, month)) continue;
-    const key = `${t.categoryParent} ${t.category}`;
+    const key = drilldownKey(t.category, t.categoryParent);
     const existing = totals.get(key);
     totals.set(key, { category: t.category, categoryParent: t.categoryParent, total: (existing?.total ?? 0) + t.amount });
   }

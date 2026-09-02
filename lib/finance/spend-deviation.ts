@@ -1,4 +1,4 @@
-import { categoryBreakdown, categoryDrilldownBreakdown, type TransactionForBreakdown } from "./category-breakdown";
+import { categoryBreakdown, categoryDrilldownBreakdown, drilldownKey, type TransactionForBreakdown } from "./category-breakdown";
 
 export const SPEND_DEVIATION_BASELINE_MONTHS = 3;
 export const SPEND_DEVIATION_CALLOUT_PERCENT = 20;
@@ -43,10 +43,6 @@ export function deviationFrom(current: number, baseline: number): SpendDeviation
 
 function monthSpendTotal(transactions: TransactionForBreakdown[], month: Date): number {
   return categoryBreakdown(transactions, month).reduce((sum, c) => sum + c.total, 0);
-}
-
-function drilldownKey(category: string, categoryParent: string): string {
-  return `${categoryParent} ${category}`;
 }
 
 /** Every (leaf) category's current spend vs. its own trailing-3-month
