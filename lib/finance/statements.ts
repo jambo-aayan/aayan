@@ -7,6 +7,10 @@ export type StatementTransaction = {
   amount: number;
   direction: "IN" | "OUT";
   category: string;
+  /** The leaf category's parent name (#173/#177) — carried through only
+   * because `categoryTimeSeries` below calls into `categoryBreakdown`,
+   * which now needs it. */
+  categoryParent: string;
   source: string | null;
   receivableId: string | null;
   goalContributionId: string | null;

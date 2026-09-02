@@ -19,6 +19,7 @@ function tx(overrides: Partial<Parameters<typeof topMerchants>[0][number]> = {})
     amount: 40,
     direction: "OUT" as const,
     category: "Food",
+    categoryParent: "Food",
     source: "Tesco",
     receivableId: null,
     goalContributionId: null,

@@ -4,12 +4,18 @@ import { categorySpendDeviation, totalSpendDeviation } from "./spend-deviation";
 const d = (iso: string) => new Date(`${iso}T00:00:00.000Z`);
 const month = d("2026-08-01");
 
-function tx(dateIso: string, amount: number, category: string, opts: { receivableId?: string | null; goalContributionId?: string | null } = {}) {
+function tx(
+  dateIso: string,
+  amount: number,
+  category: string,
+  opts: { receivableId?: string | null; goalContributionId?: string | null; categoryParent?: string } = {}
+) {
   return {
     date: d(dateIso),
     amount,
     direction: "OUT" as const,
     category,
+    categoryParent: opts.categoryParent ?? category,
     receivableId: opts.receivableId ?? null,
     goalContributionId: opts.goalContributionId ?? null,
     transferId: null,
@@ -28,7 +34,7 @@ describe("categorySpendDeviation", () => {
       month
     );
     expect(result).toEqual([
-      { category: "Food", current: 130, baseline: 100, diffAmount: 30, diffPercent: 30, callout: "more" },
+      { category: "Food", categoryParent: "Food", current: 130, baseline: 100, diffAmount: 30, diffPercent: 30, callout: "more" },
     ]);
   });
 
@@ -96,7 +102,7 @@ describe("categorySpendDeviation", () => {
       month
     );
     expect(result).toEqual([
-      { category: "Food", current: 100, baseline: 100, diffAmount: 0, diffPercent: 0, callout: null },
+      { category: "Food", categoryParent: "Food", current: 100, baseline: 100, diffAmount: 0, diffPercent: 0, callout: null },
     ]);
   });
 });

@@ -4,7 +4,12 @@ export type TransactionForBreakdown = {
   date: Date;
   amount: number;
   direction: "IN" | "OUT";
+  /** The subcategory (leaf) name a Transaction always categorizes at —
+   * see ADR-0015's #173 addendum. */
   category: string;
+  /** That leaf's parent category name (#173/#177) — e.g. "Dining Out"'s
+   * categoryParent is "Food". */
+  categoryParent: string;
   /** A transaction flagged "this became a receivable" is a loan, not
    * real spending — excluded from spend totals (ADR-0010). */
   receivableId: string | null;
@@ -18,20 +23,71 @@ export type TransactionForBreakdown = {
   transferId: string | null;
 };
 
+export type CategoryBreakdownRow = { category: string; total: number };
+export type CategoryDrilldownRow = { category: string; categoryParent: string; total: number };
+
 function isSameUtcMonth(date: Date, month: Date): boolean {
   return date.getUTCFullYear() === month.getUTCFullYear() && date.getUTCMonth() === month.getUTCMonth();
 }
 
-/** This-month spending (OUT only) grouped by category, sorted highest first. */
-export function categoryBreakdown(
-  transactions: TransactionForBreakdown[],
-  month: Date
-): { category: string; total: number }[] {
+function inScopeForBreakdown(t: TransactionForBreakdown, month: Date): boolean {
+  return t.direction === "OUT" && isSameUtcMonth(t.date, month) && isRealSpend(t);
+}
+
+/** This-month spending (OUT only) grouped by leaf category name alone,
+ * sorted highest first — unchanged in shape/behavior from before the
+ * hierarchy (#173): `budgetVsActual` below still matches against this by
+ * bare name, and `Budget.category` is (still) free text with no parent
+ * concept of its own, so keeping this grouping bare-name-keyed is what
+ * keeps Budget vs. actual working unchanged. The one accepted tradeoff:
+ * if two different parents ever have a same-named child (the current
+ * taxonomy's only case is "General," under both Shopping and Travel),
+ * their spend collapses into one row here — narrow, pre-existing-shaped
+ * (Budget's own free-text schema has no way to disambiguate this either),
+ * and not something this ticket fixes. `categoryDrilldownBreakdown` below
+ * is the collision-safe alternative for callers that don't need
+ * bare-name compatibility. */
+export function categoryBreakdown(transactions: TransactionForBreakdown[], month: Date): CategoryBreakdownRow[] {
   const totals = new Map<string, number>();
 
   for (const t of transactions) {
-    if (t.direction !== "OUT" || !isSameUtcMonth(t.date, month) || !isRealSpend(t)) continue;
+    if (!inScopeForBreakdown(t, month)) continue;
     totals.set(t.category, (totals.get(t.category) ?? 0) + t.amount);
+  }
+
+  return [...totals.entries()]
+    .map(([category, total]) => ({ category, total }))
+    .sort((a, b) => b.total - a.total);
+}
+
+/** This-month spending grouped by (leaf, parent) pair — collision-safe
+ * even when two different parents share a child name, unlike
+ * `categoryBreakdown` above. The "drill-down" half of #177's rollup +
+ * drill-down pair, for callers (the category-spend Visual adapter #178,
+ * the Insights spend card #180) that display or key on the parent
+ * alongside the leaf and so don't need `categoryBreakdown`'s
+ * Budget-compatible bare-name grouping. */
+export function categoryDrilldownBreakdown(transactions: TransactionForBreakdown[], month: Date): CategoryDrilldownRow[] {
+  const totals = new Map<string, CategoryDrilldownRow>();
+
+  for (const t of transactions) {
+    if (!inScopeForBreakdown(t, month)) continue;
+    const key = `${t.categoryParent} ${t.category}`;
+    const existing = totals.get(key);
+    totals.set(key, { category: t.category, categoryParent: t.categoryParent, total: (existing?.total ?? 0) + t.amount });
+  }
+
+  return [...totals.values()].sort((a, b) => b.total - a.total);
+}
+
+/** This-month spending rolled up to just the top-level category, sorted
+ * highest first — the "rollup" half of #177's rollup + drill-down pair. */
+export function categoryParentBreakdown(transactions: TransactionForBreakdown[], month: Date): CategoryBreakdownRow[] {
+  const totals = new Map<string, number>();
+
+  for (const t of transactions) {
+    if (!inScopeForBreakdown(t, month)) continue;
+    totals.set(t.categoryParent, (totals.get(t.categoryParent) ?? 0) + t.amount);
   }
 
   return [...totals.entries()]

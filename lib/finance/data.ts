@@ -79,18 +79,24 @@ export async function getFinanceNorthStar() {
   };
 }
 
-/** Resolves each Transaction's categoryId to its Category name (ADR-0015)
- * — every pure finance module (categoryBreakdown, categoryTimeSeries,
- * spend-deviation, ...) keeps consuming `category: string`, unchanged. */
+/** Resolves each Transaction's categoryId to its Category's own name plus
+ * its parent's name (ADR-0015, hierarchy added #173/#177) — every pure
+ * finance module (categoryBreakdown, categoryTimeSeries, spend-deviation,
+ * ...) keeps consuming `category`/`categoryParent` as plain strings.
+ * `category.parent` should always exist (a Transaction only ever
+ * categorizes at a leaf — see ADR-0015's #173 addendum), but the
+ * fallback to `category.name` keeps this from crashing if that invariant
+ * is ever violated, rather than throwing on a null parent. */
 export async function getTransactions() {
   const transactions = await prisma.transaction.findMany({
     orderBy: { date: "desc" },
-    include: { category: true },
+    include: { category: { include: { parent: true } } },
   });
   return transactions.map(({ category, amount, ...t }) => ({
     ...t,
     amount: amount.toNumber(),
     category: category.name,
+    categoryParent: category.parent?.name ?? category.name,
   }));
 }
 

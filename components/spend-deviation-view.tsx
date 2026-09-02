@@ -4,7 +4,7 @@ import { formatGBP } from "@/lib/finance/format";
 import styles from "./spend-deviation-view.module.css";
 
 type SpendDeviation = { current: number; baseline: number; diffAmount: number; diffPercent: number; callout: "more" | "less" | null };
-type CategorySpendDeviation = SpendDeviation & { category: string };
+type CategorySpendDeviation = SpendDeviation & { category: string; categoryParent: string };
 
 function phrase(deviation: SpendDeviation): string {
   const direction = deviation.diffPercent >= 0 ? "more" : "less";
@@ -43,8 +43,8 @@ export function SpendDeviationView({
       {calledOut.length > 0 && (
         <ul className={styles.list}>
           {calledOut.map((c) => (
-            <li key={c.category} className={`${styles.row} ${styles[tone(c)]}`}>
-              <span className={styles.category}>{c.category}</span>
+            <li key={`${c.categoryParent}: ${c.category}`} className={`${styles.row} ${styles[tone(c)]}`}>
+              <span className={styles.category}>{c.categoryParent}: {c.category}</span>
               <span className={styles.detail}>{phrase(c)}</span>
             </li>
           ))}
@@ -55,8 +55,8 @@ export function SpendDeviationView({
           <summary>{rest.length} more categor{rest.length === 1 ? "y" : "ies"} tracked, within usual range</summary>
           <ul className={styles.list}>
             {rest.map((c) => (
-              <li key={c.category} className={styles.row}>
-                <span className={styles.category}>{c.category}</span>
+              <li key={`${c.categoryParent}: ${c.category}`} className={styles.row}>
+                <span className={styles.category}>{c.categoryParent}: {c.category}</span>
                 <span className={styles.detail}>{formatGBP(c.current)} (usual {formatGBP(c.baseline)})</span>
               </li>
             ))}
