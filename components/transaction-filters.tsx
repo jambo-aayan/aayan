@@ -2,10 +2,10 @@
 
 import { useEffect, useRef } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
+import type { CategoryOption } from "@/lib/finance/categories";
 import styles from "@/components/tasks/task-filters.module.css";
 
 type Option = { id: string; name: string };
-type CategoryOption = { id: string; name: string; parentId: string | null };
 
 const SEARCH_DEBOUNCE_MS = 400;
 
