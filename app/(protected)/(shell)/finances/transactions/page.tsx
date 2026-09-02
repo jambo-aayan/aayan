@@ -50,16 +50,18 @@ export default async function TransactionsPage({ searchParams }: { searchParams:
   const groupByStatement = params.groupByStatement === "1";
   const page = Math.max(1, Number(params.page) || 1);
 
+  const filters = {
+    categoryId: params.categoryId,
+    accountId: params.accountId,
+    dateFrom: params.dateFrom,
+    dateTo: params.dateTo,
+    search: params.search,
+    page,
+    groupByStatement,
+  };
+
   const [result, categories, accounts] = await Promise.all([
-    getTransactionsPage({
-      categoryId: params.categoryId,
-      accountId: params.accountId,
-      dateFrom: params.dateFrom,
-      dateTo: params.dateTo,
-      search: params.search,
-      page,
-      groupByStatement,
-    }),
+    getTransactionsPage(filters),
     getCategories(),
     getAccounts(),
   ]);
@@ -77,7 +79,7 @@ export default async function TransactionsPage({ searchParams }: { searchParams:
               forces a full remount (fresh selection/hidden-rows state)
               on a page/filter change instead of carrying stale selected
               ids across to a completely different set of rows. */}
-          <TransactionBulkList key={JSON.stringify(params)} result={result} />
+          <TransactionBulkList key={JSON.stringify(params)} result={result} filters={filters} />
           {result.mode === "flat" && result.total > result.pageSize && (
             <nav className={styles.pagination} aria-label="Transaction pages">
               {result.page > 1 && (

@@ -21,7 +21,13 @@ export type TransactionQuery =
   | { mode: "flat"; where: TransactionWhere; orderBy: { date: "desc" }; skip: number; take: number }
   | { mode: "byStatement"; where: TransactionWhere; orderBy: { date: "desc" } };
 
-function buildWhere(filters: TransactionFilters): TransactionWhere {
+/** The filters-to-Prisma-where translation, exported on its own so a
+ * caller that needs every matching id (not a paginated/grouped fetch of
+ * the full rows — the transaction list's own "Select all N matching"
+ * button, lib/finance/actions.ts's getMatchingTransactionIds) can reuse
+ * the exact same filter logic without going through buildTransactionQuery's
+ * two-mode split. */
+export function buildWhere(filters: TransactionFilters): TransactionWhere {
   const where: TransactionWhere = {};
   if (filters.categoryId) where.categoryId = filters.categoryId;
   if (filters.accountId) where.accountId = filters.accountId;

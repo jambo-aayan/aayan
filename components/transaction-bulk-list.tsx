@@ -4,9 +4,11 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   deleteTransactions,
+  getMatchingTransactionIds,
   restoreDeletedTransactions,
   type BulkDeleteTransactionsResult,
 } from "@/lib/finance/actions";
+import type { TransactionFilters } from "@/lib/finance/transaction-query";
 import { withRetry } from "@/lib/with-retry";
 import { useToast } from "@/components/toast/toast-provider";
 import { formatGBP } from "@/lib/finance/format";
@@ -25,7 +27,7 @@ export type TransactionListRow = {
 export type StatementGroup = { id: string; name: string; accountName: string; transactions: TransactionListRow[] };
 
 type Result =
-  | { mode: "flat"; transactions: TransactionListRow[] }
+  | { mode: "flat"; transactions: TransactionListRow[]; total: number }
   | { mode: "byStatement"; statements: StatementGroup[] };
 
 const UNDO_WINDOW_MS = 5000;
@@ -83,12 +85,13 @@ function Row({ t, checked, onToggle }: { t: TransactionListRow; checked: boolean
  * hook's shape for every other caller. Same visual pattern regardless
  * (a 5s toast, an Undo button) — a small, purpose-built equivalent
  * rather than a forced generalization of the shared hook. */
-export function TransactionBulkList({ result }: { result: Result }) {
+export function TransactionBulkList({ result, filters }: { result: Result; filters: TransactionFilters }) {
   const router = useRouter();
   const { notifyError } = useToast();
   const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set());
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [deleting, setDeleting] = useState(false);
+  const [selectingAll, setSelectingAll] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [undoState, setUndoState] = useState<(BulkDeleteTransactionsResult & { ok: true }) | undefined>(undefined);
   const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -122,6 +125,24 @@ export function TransactionBulkList({ result }: { result: Result }) {
       }
       return next;
     });
+  }
+
+  // The count "Select all N matching filters" promises: byStatement mode
+  // already has every matching row loaded client-side (no new fetch
+  // needed), while flat mode is paginated — its count/fetch both go
+  // through the server, since only one page of rows is ever on the page.
+  const matchingCount = result.mode === "flat" ? result.total : visibleRows.length;
+  const allMatchingSelected = matchingCount > 0 && selected.size >= matchingCount;
+
+  async function handleSelectAllMatching() {
+    if (result.mode === "byStatement") {
+      setSelected(new Set(visibleRows.map((t) => t.id)));
+      return;
+    }
+    setSelectingAll(true);
+    const ids = await getMatchingTransactionIds(filters);
+    setSelectingAll(false);
+    setSelected(new Set(ids));
   }
 
   async function handleDelete() {
@@ -167,15 +188,24 @@ export function TransactionBulkList({ result }: { result: Result }) {
 
   return (
     <div>
-      {selected.size > 0 && (
+      {visibleRows.length > 0 && (
         <div className={styles.bulkBar}>
-          <span>{selected.size} selected</span>
-          <button type="button" className={styles.bulkDelete} onClick={handleDelete} disabled={deleting}>
-            {deleting ? "Deleting…" : "Delete selected"}
-          </button>
-          <button type="button" className={styles.bulkClear} onClick={() => setSelected(new Set())}>
-            Clear
-          </button>
+          {selected.size > 0 && <span>{selected.size} selected</span>}
+          {!allMatchingSelected && (
+            <button type="button" className={styles.bulkClear} onClick={handleSelectAllMatching} disabled={selectingAll}>
+              {selectingAll ? "Selecting…" : `Select all ${matchingCount} matching filters`}
+            </button>
+          )}
+          {selected.size > 0 && (
+            <>
+              <button type="button" className={styles.bulkDelete} onClick={handleDelete} disabled={deleting}>
+                {deleting ? "Deleting…" : "Delete selected"}
+              </button>
+              <button type="button" className={styles.bulkClear} onClick={() => setSelected(new Set())}>
+                Clear
+              </button>
+            </>
+          )}
         </div>
       )}
       {error && <p className={styles.error}>{error}</p>}

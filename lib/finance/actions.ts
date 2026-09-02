@@ -11,6 +11,7 @@ import { parseStatement, parseValuation } from "./statement-parser";
 import { resolveCategoryId } from "./categories";
 import { generateStatementName } from "./statement-naming";
 import { partitionNewTransactions } from "./statement-dedup";
+import { buildWhere, type TransactionFilters } from "./transaction-query";
 
 export type AccountInput = {
   name: string;
@@ -747,6 +748,28 @@ export async function deleteTransactions(ids: string[]): Promise<BulkDeleteTrans
     }
   }
   return { ok: false, error: "Couldn't delete — try again." };
+}
+
+// A "select all matching filters" click without a bound is one unfiltered
+// query away from selecting the entire transaction table — cap it at the
+// same order of magnitude the app already treats as "a lot" (mirrors
+// MAX_GROUPED_STATEMENTS's role in lib/finance/data.ts), so the bulk-delete
+// bar stays honest about what it's about to delete.
+const MAX_MATCHING_TRANSACTION_IDS = 5000;
+
+/** Returns every Transaction id matching the given filters, for the
+ * transaction list's "Select all N matching filters" button — flat mode
+ * only shows one page of rows at a time, so the client can't derive "every
+ * matching id" from what's rendered the way byStatement mode can. */
+export async function getMatchingTransactionIds(filters: TransactionFilters): Promise<string[]> {
+  const where = buildWhere(filters);
+  const rows = await prisma.transaction.findMany({
+    where,
+    select: { id: true },
+    orderBy: { date: "desc" },
+    take: MAX_MATCHING_TRANSACTION_IDS,
+  });
+  return rows.map((r) => r.id);
 }
 
 /** Undoes a bulk delete — recreates every deleted Transaction and any
