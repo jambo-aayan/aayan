@@ -153,3 +153,30 @@ future bug surfaces, not a one-off cleanup this session runs directly.
 - No change to `Budget`, `Statements analytics`, or `Spend deviation` (ADR-0012) — those read from
   `Transaction`/`categoryBreakdown` and inherit the Category/dedup fixes for free, no direct changes
   needed to those modules themselves.
+
+## Addendum (#173): `Category` becomes a fixed, system-managed hierarchy
+
+The user-editable flat taxonomy this ADR introduced above fragmented again over time — organic
+Add/merge use produced ~40 near-duplicate categories (Housing/Housing (Rent)/Rent, Shopping ×5
+variants, Utilities ×6 variants, etc.), the same failure mode this ADR originally fixed, just via a
+different mechanism (user-driven drift instead of two unvalidated free-text sources). Rather than
+another round of merge-cleanup, `Category` gains one level of hierarchy (`parentId`, nullable
+self-relation — top-level categories have `parentId: null`, subcategories point to a parent) and
+becomes fixed: no more Add/Rename/Merge from Settings (that screen becomes read-only, a later
+ticket), the taxonomy only changes by editing `lib/finance/categories.ts`'s `CATEGORY_HIERARCHY` and
+writing a matching migration.
+
+**A `Transaction` always categorizes at the leaf (subcategory) level, never a top-level category
+directly.** Every top-level category needs at least one subcategory to be assignable at all — even
+"Other" gets a single "Uncategorized" leaf, so the fallback path still lands on a real leaf rather
+than the special-casing a top-level fallback would need everywhere spend is grouped by category.
+This can't be enforced by a Postgres check constraint (no same-table subquery support), so it's an
+app-layer invariant instead: the statement/import categorizer only ever resolves to a leaf (#174),
+and every category-grouping/breakdown module downstream can assume `categoryId` is always a leaf.
+
+`Category.parentId`'s FK is `ON DELETE CASCADE` rather than this codebase's usual optional-relation
+default of `SET NULL` — deliberately, since a `parentId: null` row left behind by `SET NULL` would
+silently (and incorrectly) look like a new top-level category rather than an orphaned subcategory.
+Cascading is safe specifically because the taxonomy is now fixed and system-managed: a top-level
+category is never deleted except by a migration that's also revising its subcategories in the same
+breath.

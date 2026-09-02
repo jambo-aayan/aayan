@@ -815,8 +815,14 @@ enum TransactionDirection {
 /// per parent (not globally) so two different parents can each have a
 /// same-named child without colliding; a separate partial unique index
 /// (see migration SQL) keeps top-level names unique among themselves.
-/// Unrelated to Pillar despite the shared word "Category" — see
-/// CONTEXT.md's Pillar entry.
+/// parentId's FK is ON DELETE CASCADE rather than this codebase's usual
+/// optional-relation default of SET NULL — deliberately: a parentId:null
+/// row left behind by SET NULL would silently look like a new top-level
+/// category instead of an orphaned subcategory. Cascading is safe only
+/// because the taxonomy is fixed/system-managed — a top-level category is
+/// never deleted except by a migration revising its children in the same
+/// breath (see ADR-0015's #173 addendum). Unrelated to Pillar despite the
+/// shared word "Category" — see CONTEXT.md's Pillar entry.
 model Category {
   id           String        @id @default(cuid())
   name         String
