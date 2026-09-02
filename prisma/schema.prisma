@@ -801,18 +801,34 @@ enum TransactionDirection {
   OUT
 }
 
-/// A Transaction's spending category (ADR-0015) — a real, user-editable
-/// entity (add/rename/merge from Settings), not free text. Unrelated to
-/// Pillar despite the shared word "Category" — see CONTEXT.md's Pillar
-/// entry. Pre-seeded with a default set on migration; name is unique so
-/// the category trend view can't silently fragment into near-duplicate
-/// rows again.
+/// A Transaction's spending category (ADR-0015, hierarchy added #173) — a
+/// fixed, system-managed two-level hierarchy (parentId null = top-level
+/// "Housing"/"Food"/etc., parentId set = a subcategory like "Groceries"
+/// under "Food"), not free text and no longer user-editable from Settings
+/// (that screen is read-only, #175) — the earlier flat, user-editable
+/// version fragmented into ~40 near-duplicate categories, which is why
+/// the hierarchy is fixed rather than another freeform list. A
+/// Transaction always references a leaf subcategory, never a top-level
+/// category directly — enforced at the app layer (the categorizer only
+/// ever resolves to a leaf, #174), not by a DB constraint, since Postgres
+/// check constraints can't reference other rows of the same table. Unique
+/// per parent (not globally) so two different parents can each have a
+/// same-named child without colliding; a separate partial unique index
+/// (see migration SQL) keeps top-level names unique among themselves.
+/// Unrelated to Pillar despite the shared word "Category" — see
+/// CONTEXT.md's Pillar entry.
 model Category {
   id           String        @id @default(cuid())
-  name         String        @unique
+  name         String
+  parentId     String?
+  parent       Category?     @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  children     Category[]    @relation("CategoryHierarchy")
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
   transactions Transaction[]
+
+  @@unique([parentId, name])
+  @@index([parentId])
 }
 
 /// A dated, categorized ledger entry — distinct from Baseline's fixed

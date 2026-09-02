@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 import { resolveCategoryId } from "./categories";
 
 const CATEGORIES = [
-  { id: "cat-food", name: "Food" },
-  { id: "cat-housing", name: "Housing" },
-  { id: "cat-other", name: "Other" },
+  { id: "cat-food", name: "Food", parentId: null },
+  { id: "cat-housing", name: "Housing", parentId: null },
+  { id: "cat-other", name: "Other", parentId: null },
 ];
 
 describe("resolveCategoryId", () => {

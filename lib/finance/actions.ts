@@ -147,7 +147,7 @@ export async function uploadStatement(accountId: string, file: File): Promise<Up
     // resolved defensively via resolveCategoryId below, since an LLM can
     // occasionally return something outside the given enum despite the
     // constraint.
-    const categories = await prisma.category.findMany({ select: { id: true, name: true } });
+    const categories = await prisma.category.findMany({ select: { id: true, name: true, parentId: true } });
     // At least one Category always exists — the migration seeds a default
     // set and merge (the only removal path) always keeps its target.
     const fallbackCategoryId = (categories.find((c) => c.name.toLowerCase() === "other") ?? categories[0]).id;

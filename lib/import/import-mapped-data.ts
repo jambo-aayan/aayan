@@ -105,7 +105,7 @@ export async function importMappedData(mapped: MappedImport): Promise<ImportSumm
   }
 
   if (mapped.transactions.length > 0) {
-    const categories = await prisma.category.findMany({ select: { id: true, name: true } });
+    const categories = await prisma.category.findMany({ select: { id: true, name: true, parentId: true } });
     // At least one Category always exists — see uploadStatement's identical
     // invariant note (lib/finance/actions.ts).
     const fallbackCategoryId = (categories.find((c) => c.name.toLowerCase() === "other") ?? categories[0]).id;
