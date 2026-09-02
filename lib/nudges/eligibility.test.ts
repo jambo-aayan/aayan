@@ -18,6 +18,7 @@ function baseCtx(overrides: Partial<NudgeContext> = {}): NudgeContext {
     metrics: [],
     dueSystemReviews: [],
     categorySpendAnomalies: [],
+    metricsDue: [],
     existingNudgesToday: [],
     ...overrides,
   };
@@ -242,6 +243,78 @@ describe("evaluateEligibility — category spend anomaly", () => {
       ],
     });
     expect(evaluateEligibility(ctx).deliver.filter((c) => c.type === "CATEGORY_SPEND_ANOMALY")).toEqual([]);
+  });
+});
+
+describe("evaluateEligibility — metric log due", () => {
+  it("nudges a required DAILY metric not logged this evening", () => {
+    const ctx = baseCtx({
+      runKind: "EVENING",
+      metricsDue: [{ id: "m1", name: "Mood", cadence: "DAILY", required: true, loggedThisPeriod: false }],
+    });
+    const due = evaluateEligibility(ctx).deliver.filter((c) => c.type === "METRIC_LOG_DUE");
+    expect(due).toHaveLength(1);
+    expect(due[0].dedupKey).toBe("metric-log:m1:2026-08-21");
+  });
+
+  it("does not nudge once the metric is logged for the current period", () => {
+    const ctx = baseCtx({
+      runKind: "EVENING",
+      metricsDue: [{ id: "m1", name: "Mood", cadence: "DAILY", required: true, loggedThisPeriod: true }],
+    });
+    expect(evaluateEligibility(ctx).deliver.filter((c) => c.type === "METRIC_LOG_DUE")).toEqual([]);
+  });
+
+  it("never nudges a non-required metric, logged or not", () => {
+    const ctx = baseCtx({
+      runKind: "EVENING",
+      metricsDue: [{ id: "m1", name: "Steps", cadence: "DAILY", required: false, loggedThisPeriod: false }],
+    });
+    expect(evaluateEligibility(ctx).deliver.filter((c) => c.type === "METRIC_LOG_DUE")).toEqual([]);
+  });
+
+  it("only nudges a required WEEKLY metric on the last day of the week (Sunday)", () => {
+    const midWeekCtx = baseCtx({
+      runKind: "EVENING",
+      now: d("2026-08-21T20:00:00.000Z"), // Friday
+      metricsDue: [{ id: "m1", name: "Weigh-in", cadence: "WEEKLY", required: true, loggedThisPeriod: false }],
+    });
+    expect(evaluateEligibility(midWeekCtx).deliver.filter((c) => c.type === "METRIC_LOG_DUE")).toEqual([]);
+
+    const sundayCtx = baseCtx({
+      runKind: "EVENING",
+      now: d("2026-08-23T20:00:00.000Z"), // Sunday
+      metricsDue: [{ id: "m1", name: "Weigh-in", cadence: "WEEKLY", required: true, loggedThisPeriod: false }],
+    });
+    const due = evaluateEligibility(sundayCtx).deliver.filter((c) => c.type === "METRIC_LOG_DUE");
+    expect(due).toHaveLength(1);
+    expect(due[0].dedupKey).toBe("metric-log:m1:2026-08-17");
+  });
+
+  it("only evaluates on the evening run, matching HABIT_DUE's own cadence choice", () => {
+    const ctx = baseCtx({
+      runKind: "MORNING",
+      metricsDue: [{ id: "m1", name: "Mood", cadence: "DAILY", required: true, loggedThisPeriod: false }],
+    });
+    expect(evaluateEligibility(ctx).deliver.filter((c) => c.type === "METRIC_LOG_DUE")).toEqual([]);
+  });
+
+  it("respects the eveningCheckIn delivery rule, same as HABIT_DUE", () => {
+    const ctx = baseCtx({
+      runKind: "EVENING",
+      deliveryRules: { ...ALL_ON, eveningCheckIn: false },
+      metricsDue: [{ id: "m1", name: "Mood", cadence: "DAILY", required: true, loggedThisPeriod: false }],
+    });
+    expect(evaluateEligibility(ctx).deliver.filter((c) => c.type === "METRIC_LOG_DUE")).toEqual([]);
+  });
+
+  it("does not re-nag once already delivered and not yet resolved (per-day dedup)", () => {
+    const ctx = baseCtx({
+      runKind: "EVENING",
+      metricsDue: [{ id: "m1", name: "Mood", cadence: "DAILY", required: true, loggedThisPeriod: false }],
+      existingNudgesToday: [{ dedupKey: "metric-log:m1:2026-08-21", severity: 1 }],
+    });
+    expect(evaluateEligibility(ctx).deliver.filter((c) => c.type === "METRIC_LOG_DUE")).toEqual([]);
   });
 });
 

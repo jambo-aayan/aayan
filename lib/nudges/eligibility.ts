@@ -55,6 +55,17 @@ export type ExistingNudgeFixture = {
   severity: number;
 };
 
+/** A required DAILY/WEEKLY Metric (#186) — AD_HOC metrics have no period
+ * and never nudge, so they're excluded by the caller (lib/nudges/data.ts)
+ * rather than represented here at all. */
+export type MetricLogEligibilityFixture = {
+  id: string;
+  name: string;
+  cadence: "DAILY" | "WEEKLY";
+  required: boolean;
+  loggedThisPeriod: boolean;
+};
+
 /** A leaf category whose current-month spend is notably above its own
  * trailing-3-month baseline (ADR-0012's categorySpendDeviation) — the
  * caller (lib/nudges/data.ts) pre-filters to `callout: "more"` only,
@@ -78,6 +89,7 @@ export type NudgeContext = {
   metrics: MetricEligibilityFixture[];
   dueSystemReviews: SystemReviewEligibilityFixture[];
   categorySpendAnomalies: CategorySpendEligibilityFixture[];
+  metricsDue: MetricLogEligibilityFixture[];
   existingNudgesToday: ExistingNudgeFixture[];
 };
 
@@ -109,6 +121,14 @@ function isoWeekKey(date: Date): string {
  * app treats UTC as the user's local time throughout (see e.g. Task's
  * dueDate convention), so this follows the same rule rather than adding a
  * timezone dependency nothing else in the app has. */
+/** Sunday, UTC — the last day of a Monday-anchored week (matching
+ * isoWeekKey/mondayOf's own Monday-start convention), used to gate a
+ * WEEKLY metric's "past its cadence deadline" nudge to the one evening it
+ * actually applies. */
+function isLastDayOfWeek(now: Date): boolean {
+  return now.getUTCDay() === 0;
+}
+
 export function isQuietHours(now: Date): boolean {
   const minutesSinceMidnight = now.getUTCHours() * 60 + now.getUTCMinutes();
   return minutesSinceMidnight >= 22 * 60 || minutesSinceMidnight < 7 * 60 + 30;
@@ -151,6 +171,26 @@ function generateCandidates(ctx: NudgeContext): NudgeCandidate[] {
           targetId: habit.id,
           title: `${habit.name} is due`,
           body: "Still unlogged today — a quick check-in keeps it on track.",
+        });
+      }
+    }
+    if (ctx.deliveryRules.eveningCheckIn) {
+      for (const metric of ctx.metricsDue) {
+        if (!metric.required) continue;
+        if (metric.loggedThisPeriod) continue;
+        if (metric.cadence === "WEEKLY" && !isLastDayOfWeek(ctx.now)) continue;
+        const periodKey = metric.cadence === "DAILY" ? today : isoWeekKey(ctx.now);
+        candidates.push({
+          dedupKey: `metric-log:${metric.id}:${periodKey}`,
+          type: "METRIC_LOG_DUE",
+          severity: NUDGE_SEVERITY.METRIC_LOG_DUE,
+          targetType: "NONE",
+          targetId: null,
+          title: `${metric.name} is due`,
+          body:
+            metric.cadence === "DAILY"
+              ? "Still unlogged today — a quick log keeps your data complete."
+              : "Still unlogged this week — log it before the week resets.",
         });
       }
     }

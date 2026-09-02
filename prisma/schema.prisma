@@ -1135,6 +1135,10 @@ enum NudgeType {
   /// trailing-3-month baseline (ADR-0012's spend-deviation math) — see
   /// #179 and ADR-0015's #173 addendum.
   CATEGORY_SPEND_ANOMALY
+  /// A required DAILY/WEEKLY Metric with no entry for its current period,
+  /// past its cadence deadline (end of day for DAILY, end of week for
+  /// WEEKLY) — see #181/#186 and lib/nudges/eligibility.ts.
+  METRIC_LOG_DUE
 }
 
 enum NudgeTargetType {

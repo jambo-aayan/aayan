@@ -10,8 +10,9 @@ const CADENCE_LABELS: Record<string, string> = { DAILY: "Daily", WEEKLY: "Weekly
 
 export default async function MetricHistoryPage({ params }: { params: Promise<{ metricId: string }> }) {
   const { metricId } = await params;
-  const [metric, entries] = await Promise.all([getMetric(metricId), getMetricEntries(metricId)]);
+  const metric = await getMetric(metricId);
   if (!metric) notFound();
+  const entries = await getMetricEntries(metricId);
 
   return (
     <>
@@ -19,7 +20,7 @@ export default async function MetricHistoryPage({ params }: { params: Promise<{ 
       <div className={pageStyles.content}>
         <PageTitle eyebrow={CADENCE_LABELS[metric.cadence] ?? metric.cadence} title={metric.name} />
         <Card>
-          <MetricHistoryView entries={entries} valueType={metric.valueType} unit={metric.unit} />
+          <MetricHistoryView entries={entries} valueType={metric.valueType} cadence={metric.cadence} unit={metric.unit} />
         </Card>
       </div>
     </>

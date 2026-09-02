@@ -1,6 +1,8 @@
+export type MetricValueType = "NUMBER" | "SCALE_5" | "BOOLEAN" | "ENUM" | "TEXT";
+
 export type MetricValidationInput = {
   name: string;
-  valueType: "NUMBER" | "SCALE_5" | "BOOLEAN" | "ENUM" | "TEXT";
+  valueType: MetricValueType;
   enumOptions?: string[] | null;
 };
 

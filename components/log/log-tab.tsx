@@ -8,6 +8,21 @@ type Area = { id: string; pillarId: string };
 
 const GLOBAL_GROUP_KEY = "__global__";
 
+/** The three states a scheduled (DAILY/WEEKLY) metric's row can be in for
+ * its current period (#186): already logged; required and still not
+ * logged (the same state the METRIC_LOG_DUE nudge eventually fires for,
+ * once the period's deadline passes); or optional and simply not logged
+ * yet, which needs no urgency styling. */
+function LogStatusDot({ logged, required }: { logged: boolean; required: boolean }) {
+  if (logged) {
+    return <span className={styles.statusDot} data-state="logged" title="Logged" aria-label="Logged" />;
+  }
+  if (required) {
+    return <span className={styles.statusDot} data-state="overdue" title="Required — not yet logged" aria-label="Required — not yet logged" />;
+  }
+  return <span className={styles.statusDot} data-state="optional" title="Not yet logged" aria-label="Not yet logged" />;
+}
+
 /**
  * Every non-archived Metric due today/this week, grouped by pillar (a
  * "General" group first for global, unscoped metrics), plus an
@@ -63,9 +78,7 @@ export function LogTab({ metrics, pillars, areas }: { metrics: MetricForLog[]; p
                 <div className={styles.rowHead}>
                   <Link href={`/log/metrics/${m.id}`} className={styles.name}>
                     {m.name}
-                    {m.required && (
-                      <span className={styles.requiredDot} title="Required" aria-label="Required" />
-                    )}
+                    <LogStatusDot logged={m.currentEntry !== null} required={m.required} />
                   </Link>
                   <span className={styles.cadence}>{m.cadence === "DAILY" ? "Today" : "This week"}</span>
                 </div>

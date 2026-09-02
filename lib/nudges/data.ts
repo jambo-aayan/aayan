@@ -8,6 +8,7 @@ import { resolveColorHex, type ColorKey } from "@/lib/colors";
 import { isVerdictDue, resolveReviewNudgeTarget, systemDeepLinkHref } from "@/lib/systems/logic";
 import { categorySpendDeviation, SPEND_DEVIATION_BASELINE_MONTHS } from "@/lib/finance/spend-deviation";
 import { getTransactions } from "@/lib/finance/data";
+import { getMetricsForLog } from "@/lib/metrics/data";
 import {
   evaluateEligibility,
   reEvaluateSnoozed,
@@ -18,6 +19,7 @@ import {
   type MetricEligibilityFixture,
   type SystemReviewEligibilityFixture,
   type CategorySpendEligibilityFixture,
+  type MetricLogEligibilityFixture,
   type ExistingNudgeFixture,
   type EligibleTargetFixture,
 } from "./eligibility";
@@ -138,6 +140,25 @@ async function getCategorySpendAnomalyFixtures(today: Date): Promise<CategorySpe
     .map((d) => ({ category: d.category, categoryParent: d.categoryParent, current: d.current, baseline: d.baseline, diffPercent: d.diffPercent }));
 }
 
+/** Every DAILY/WEEKLY Metric (#186) — reuses lib/metrics/data.ts's own
+ * getMetricsForLog rather than a parallel query, since it already
+ * resolves "logged for the current period" the same way the Log tab
+ * itself does. AD_HOC metrics have no period/deadline and are excluded;
+ * the `required` filter happens in the pure eligibility engine, not
+ * here, so it stays unit-testable there. */
+async function getMetricLogFixtures(now: Date): Promise<MetricLogEligibilityFixture[]> {
+  const metrics = await getMetricsForLog(now);
+  return metrics
+    .filter((m) => m.cadence !== "AD_HOC")
+    .map((m) => ({
+      id: m.id,
+      name: m.name,
+      cadence: m.cadence as "DAILY" | "WEEKLY",
+      required: m.required,
+      loggedThisPeriod: m.currentEntry !== null,
+    }));
+}
+
 async function getDueSystemReviewFixtures(now: Date): Promise<SystemReviewEligibilityFixture[]> {
   const systems = await prisma.system.findMany({
     where: { state: "ACTIVE", type: "EXPERIMENT", verdict: null, review: { not: null } },
@@ -231,7 +252,7 @@ async function reEvaluateSnoozes(
  * moment. */
 export async function runNudgeEvaluation(runKind: NudgeRunKind, now: Date = new Date()): Promise<{ delivered: number; held: boolean }> {
   const today = utcMidnight(now);
-  const [deliveryRules, habits, overdueTasks, topTasks, metrics, dueSystemReviews, categorySpendAnomalies, existingNudgesToday] =
+  const [deliveryRules, habits, overdueTasks, topTasks, metrics, dueSystemReviews, categorySpendAnomalies, metricsDue, existingNudgesToday] =
     await Promise.all([
       getDeliveryRules(),
       getHabitFixtures(today),
@@ -240,6 +261,7 @@ export async function runNudgeEvaluation(runKind: NudgeRunKind, now: Date = new 
       getMetricFixtures(today),
       getDueSystemReviewFixtures(now),
       getCategorySpendAnomalyFixtures(today),
+      getMetricLogFixtures(now),
       getExistingNudgesToday(now),
     ]);
 
@@ -255,6 +277,7 @@ export async function runNudgeEvaluation(runKind: NudgeRunKind, now: Date = new 
     metrics,
     dueSystemReviews,
     categorySpendAnomalies,
+    metricsDue,
     existingNudgesToday,
   });
 

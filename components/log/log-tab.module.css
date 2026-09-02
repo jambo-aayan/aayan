@@ -52,12 +52,26 @@
   color: var(--muted);
 }
 
-.requiredDot {
-  width: 6px;
-  height: 6px;
+.statusDot {
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
-  background: var(--gold);
   display: inline-block;
+  flex-shrink: 0;
+}
+
+.statusDot[data-state="logged"] {
+  background: var(--green);
+}
+
+.statusDot[data-state="overdue"] {
+  background: var(--gold);
+  box-shadow: 0 0 0 3px var(--amber-soft);
+}
+
+.statusDot[data-state="optional"] {
+  background: transparent;
+  border: 1px solid var(--faint);
 }
 
 .cadence {

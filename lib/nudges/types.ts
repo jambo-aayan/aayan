@@ -6,7 +6,8 @@ export type NudgeType =
   | "METRIC_OFF_TARGET"
   | "MORNING_BRIEF"
   | "SYSTEM_REVIEW_DUE"
-  | "CATEGORY_SPEND_ANOMALY";
+  | "CATEGORY_SPEND_ANOMALY"
+  | "METRIC_LOG_DUE";
 
 export type NudgeTargetType = "HABIT" | "TASK" | "SYSTEM" | "NONE";
 
@@ -25,6 +26,7 @@ export const NUDGE_SEVERITY: Record<NudgeType, number> = {
   HABIT_DUE: 1,
   WEEKLY_REVIEW_READY: 1,
   MORNING_BRIEF: 1,
+  METRIC_LOG_DUE: 1,
 };
 
 /** Semantic accent per the design_handoff_aayan README's Nudges type
@@ -42,6 +44,9 @@ export const NUDGE_ACCENT: Record<Exclude<NudgeType, "HABIT_DUE">, "danger" | "c
   // Same "gold" as METRIC_OFF_TARGET — both are a Finance figure trending
   // the wrong way, not an urgent/danger-level event.
   CATEGORY_SPEND_ANOMALY: "gold",
+  // Same tier as HABIT_DUE — a gentle end-of-period reminder, not an
+  // urgent/danger-level event.
+  METRIC_LOG_DUE: "gold",
 };
 
 /** SYSTEM_REVIEW_DUE's primary action is the first that actually
@@ -56,6 +61,7 @@ export const NUDGE_PRIMARY_ACTION_LABEL: Record<NudgeType, string> = {
   MORNING_BRIEF: "Open My Day",
   SYSTEM_REVIEW_DUE: "Set verdict",
   CATEGORY_SPEND_ANOMALY: "See finances",
+  METRIC_LOG_DUE: "Log now",
 };
 
 export type NudgeCandidate = {
