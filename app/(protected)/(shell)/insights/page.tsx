@@ -12,6 +12,7 @@ import { TaskFlowCard } from "@/components/insights/task-flow-card";
 import { CorrelationsSection } from "@/components/insights/correlations-section";
 import { TrajectoryCard } from "@/components/insights/trajectory-card";
 import { WeeklyDigestCard } from "@/components/insights/weekly-digest-card";
+import { CategorySpendCard } from "@/components/insights/category-spend-card";
 import {
   getMomentumSummary,
   getKpiSummary,
@@ -22,6 +23,7 @@ import {
   getCorrelations,
   getTrajectory,
   getWeeklyDigest,
+  getCategorySpendSummary,
 } from "@/lib/insights/data";
 import { parseInsightsRange } from "@/lib/insights/range";
 import styles from "./insights.module.css";
@@ -38,17 +40,19 @@ export default async function InsightsPage({
   // Trajectory are fixed-window charts, and the digest is always "this
   // week." Every KPI, the Consistency grid, Attention balance, and
   // Correlations do respond to it.
-  const [momentum, kpis, consistencyGrid, neglectRows, attentionRows, taskFlow, correlations, trajectory, weeklyDigest] = await Promise.all([
-    getMomentumSummary(),
-    getKpiSummary(range),
-    getConsistencyGridSummary(range),
-    getNeglectRadar(),
-    getAttentionBalance(range),
-    getTaskFlowSummary(),
-    getCorrelations(range),
-    getTrajectory(),
-    getWeeklyDigest(),
-  ]);
+  const [momentum, kpis, consistencyGrid, neglectRows, attentionRows, taskFlow, correlations, trajectory, weeklyDigest, categorySpend] =
+    await Promise.all([
+      getMomentumSummary(),
+      getKpiSummary(range),
+      getConsistencyGridSummary(range),
+      getNeglectRadar(),
+      getAttentionBalance(range),
+      getTaskFlowSummary(),
+      getCorrelations(range),
+      getTrajectory(),
+      getWeeklyDigest(),
+      getCategorySpendSummary(),
+    ]);
 
   return (
     <>
@@ -104,6 +108,10 @@ export default async function InsightsPage({
 
         <div className={styles.section}>
           <WeeklyDigestCard digest={weeklyDigest} />
+        </div>
+
+        <div className={styles.section}>
+          <CategorySpendCard summary={categorySpend} />
         </div>
       </div>
     </>

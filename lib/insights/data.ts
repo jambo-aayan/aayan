@@ -39,6 +39,8 @@ import { computeTrajectory, type TrajectoryPoint } from "./trajectory";
 import { netWorth } from "@/lib/finance/net-worth";
 import { isRealSpend } from "@/lib/finance/logic";
 import { FINANCE_NORTH_STAR_ID } from "@/lib/finance/north-star-id";
+import { categorySpendTrend } from "./category-spend";
+import type { TransactionForBreakdown } from "@/lib/finance/category-breakdown";
 import { computeWeeklyDigest, type DeltaFixture, type CorrelationFixture, type HabitAdherenceFixture } from "./weekly-digest";
 import { adherenceForHabit } from "./momentum";
 import { resolveColorHex, type ColorKey } from "@/lib/colors";
@@ -656,6 +658,54 @@ const CORRELATION_EXPECTED_SIGN: Record<string, 1 | -1 | 0> = {
   "adherence-pain": -1,
   "adherence-surplus": 1,
 };
+
+const CATEGORY_SPEND_TREND_MONTHS = 6;
+
+/** Per-category spend trend + anomaly callouts over a fixed trailing
+ * 6-month window (#180) — fixed, not the range control, same reasoning
+ * as Momentum/Task flow/Trajectory's own fixed windows (a month-bucketed
+ * spend trend doesn't map onto a day-count range control the way
+ * KPIs/Correlations do). 6 months covers categorySpendDeviation's own
+ * 3-prior-month baseline requirement for the trend's last (current)
+ * month with room to spare, so one transaction fetch serves both the
+ * trend and its anomaly callouts. */
+export async function getCategorySpendSummary(asOf: Date = new Date()) {
+  const currentMonthStart = new Date(Date.UTC(asOf.getUTCFullYear(), asOf.getUTCMonth(), 1));
+  const months = Array.from(
+    { length: CATEGORY_SPEND_TREND_MONTHS },
+    (_, i) => new Date(Date.UTC(currentMonthStart.getUTCFullYear(), currentMonthStart.getUTCMonth() - (CATEGORY_SPEND_TREND_MONTHS - 1 - i), 1))
+  );
+
+  const transactions = await prisma.transaction.findMany({
+    where: { date: { gte: months[0], lte: asOf } },
+    select: {
+      date: true,
+      amount: true,
+      direction: true,
+      receivableId: true,
+      goalContributionId: true,
+      transferId: true,
+      category: { include: { parent: true } },
+    },
+  });
+  const forBreakdown: TransactionForBreakdown[] = transactions.map((t) => ({
+    date: t.date,
+    amount: t.amount.toNumber(),
+    direction: t.direction,
+    category: t.category.name,
+    categoryParent: t.category.parent?.name ?? t.category.name,
+    receivableId: t.receivableId,
+    goalContributionId: t.goalContributionId,
+    transferId: t.transferId,
+  }));
+
+  return {
+    months: months.map((m) => m.toISOString().slice(0, 7)),
+    rows: categorySpendTrend(forBreakdown, months),
+  };
+}
+
+export type CategorySpendSummary = Awaited<ReturnType<typeof getCategorySpendSummary>>;
 
 /** Assembles the Weekly digest from data this module already knows how
  * to compute: the four KPIs' week-over-week deltas (reusing getKpiSummary
