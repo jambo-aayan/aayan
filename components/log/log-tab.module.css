@@ -1,0 +1,83 @@
+.group {
+  margin-bottom: 24px;
+}
+
+.groupTitle {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+  margin-bottom: 10px;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px;
+  border-top: 1px solid var(--row-divider);
+}
+
+.row:first-child {
+  border-top: none;
+}
+
+.rowHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.name {
+  font-size: 14px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.requiredDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--gold);
+  display: inline-block;
+}
+
+.cadence {
+  font-size: 11px;
+  color: var(--muted-2);
+}
+
+.manageLink {
+  display: inline-block;
+  font-size: 12.5px;
+  color: var(--muted);
+  margin-top: 4px;
+}
+
+.manageLink:hover {
+  color: var(--ink);
+}
+
+.empty {
+  text-align: center;
+  padding: 40px 20px;
+}
+
+.emptyText {
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 10px;
+}

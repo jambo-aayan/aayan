@@ -1,4 +1,4 @@
-import { House, BarChart3, Bell, Settings } from "lucide-react";
+import { House, BarChart3, ClipboardList, Bell, Settings } from "lucide-react";
 
 /** Shared between the desktop Sidebar and the mobile nav drawer so both stay
  * in sync. Per the design_handoff_aayan README's Global chrome spec, active/
@@ -12,6 +12,7 @@ import { House, BarChart3, Bell, Settings } from "lucide-react";
  * components/mobile-nav-drawer.tsx). */
 export const NAV_BEFORE_PILLARS = [
   { href: "/today", label: "Home", icon: House },
+  { href: "/log", label: "Log", icon: ClipboardList },
   { href: "/insights", label: "Insights", icon: BarChart3 },
 ] as const;
 
