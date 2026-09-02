@@ -27,19 +27,44 @@ export const CATEGORY_HIERARCHY: { name: string; subcategories: string[] }[] = [
 
 export type CategoryOption = { id: string; name: string; parentId: string | null };
 
-/** Turns a free-text category guess (from Gemini's statement extraction,
- * or any other untrusted source) into a real categoryId — case-
- * insensitively matched against the user's actual Category list, falling
- * back to `fallbackId` (the caller's "Other" > "Uncategorized" leaf)
- * when nothing matches. Pure — no DB access, so the caller fetches
- * `categories` once and can call this per-row.
- *
- * Still matches against every category (parent and leaf alike) rather
- * than leaves only — constraining the guess (and the extraction prompt
- * feeding it) to leaf subcategories only is #174's job, not this one. */
+/** A leaf (subcategory) as "Parent: Subcategory" — subcategory names
+ * alone aren't globally unique across different parents (e.g. "General"
+ * exists under both Shopping and Travel), so this composite label is
+ * both what the AI categorizer is asked to choose from (#174) and what
+ * `resolveCategoryId` matches a guess against. */
+export function leafCategoryLabel(categories: CategoryOption[], leaf: CategoryOption): string {
+  const parent = categories.find((c) => c.id === leaf.parentId);
+  return parent ? `${parent.name}: ${leaf.name}` : leaf.name;
+}
+
+/** Every leaf (subcategory) in `categories` — the only level a
+ * Transaction is ever categorized at (see ADR-0015's #173 addendum). */
+export function leafCategories(categories: CategoryOption[]): CategoryOption[] {
+  return categories.filter((c) => c.parentId !== null);
+}
+
+/** The system fallback leaf — "Other" > "Uncategorized" — for a category
+ * guess that doesn't match anything real. Centralized here since the two
+ * independent callers that need it (statement upload, spreadsheet
+ * import) would otherwise each hand-roll a slightly different lookup.
+ * At least one Category always exists post-#173's seed migration, so
+ * falling all the way back to `categories[0]` is a defensive last
+ * resort only, never expected to be hit. */
+export function fallbackCategoryId(categories: CategoryOption[]): string {
+  const other = categories.find((c) => c.parentId === null && c.name.toLowerCase() === "other");
+  const leaf = other && categories.find((c) => c.parentId === other.id);
+  return (leaf ?? categories[0]).id;
+}
+
+/** Turns a category guess (from Gemini's statement extraction, or any
+ * other untrusted source) into a real categoryId — matched
+ * case-insensitively against every leaf's "Parent: Subcategory" label
+ * (never a top-level category — see `leafCategoryLabel`), falling back
+ * to `fallbackId` when nothing matches. Pure — no DB access, so the
+ * caller fetches `categories` once and can call this per-row. */
 export function resolveCategoryId(categories: CategoryOption[], guessedName: string, fallbackId: string): string {
   const normalized = guessedName.trim().toLowerCase();
   if (!normalized) return fallbackId;
-  const match = categories.find((c) => c.name.toLowerCase() === normalized);
+  const match = leafCategories(categories).find((c) => leafCategoryLabel(categories, c).toLowerCase() === normalized);
   return match?.id ?? fallbackId;
 }

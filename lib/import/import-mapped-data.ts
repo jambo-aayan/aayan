@@ -1,7 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { BASELINE_ID } from "@/lib/finance/baseline-id";
-import { resolveCategoryId } from "@/lib/finance/categories";
+import { fallbackCategoryId, resolveCategoryId } from "@/lib/finance/categories";
 import type { MappedImport } from "./map-legacy-export";
 
 function toUtcDate(dateStr: string): Date {
@@ -107,11 +107,14 @@ export async function importMappedData(mapped: MappedImport): Promise<ImportSumm
   if (mapped.transactions.length > 0) {
     const categories = await prisma.category.findMany({ select: { id: true, name: true, parentId: true } });
     // At least one Category always exists — see uploadStatement's identical
-    // invariant note (lib/finance/actions.ts).
-    const fallbackCategoryId = (categories.find((c) => c.name.toLowerCase() === "other") ?? categories[0]).id;
+    // invariant note (lib/finance/actions.ts). A legacy export's free-text
+    // category string won't match a "Parent: Subcategory" leaf label, so
+    // this always falls back to Uncategorized — accepted, since re-sorting
+    // legacy imports into the new hierarchy isn't this import path's job.
+    const fallback = fallbackCategoryId(categories);
 
     for (const tx of mapped.transactions) {
-      const categoryId = resolveCategoryId(categories, tx.category, fallbackCategoryId);
+      const categoryId = resolveCategoryId(categories, tx.category, fallback);
       await prisma.transaction.upsert({
         where: { id: tx.id },
         update: {

@@ -8,7 +8,7 @@ import { BASELINE_ID } from "./baseline-id";
 import { canLinkTransfer, canReclassifyTransaction, isHeldForReview, resolveStatementBalance, validateStatementUpload } from "./logic";
 import { FINANCE_NORTH_STAR_ID } from "./north-star-id";
 import { parseStatement, parseValuation } from "./statement-parser";
-import { resolveCategoryId } from "./categories";
+import { fallbackCategoryId as resolveFallbackCategoryId, leafCategories, leafCategoryLabel, resolveCategoryId } from "./categories";
 import { generateStatementName } from "./statement-naming";
 import { partitionNewTransactions } from "./statement-dedup";
 import { buildWhere, type TransactionFilters } from "./transaction-query";
@@ -142,18 +142,19 @@ export async function uploadStatement(accountId: string, file: File): Promise<Up
       addRandomSuffix: true,
     });
 
-    // Gemini's per-transaction category is constrained to the user's real
-    // taxonomy (#147/#148, ADR-0015) rather than free-generated — still
-    // resolved defensively via resolveCategoryId below, since an LLM can
-    // occasionally return something outside the given enum despite the
-    // constraint.
+    // Gemini's per-transaction category is constrained to the fixed
+    // hierarchy's leaf labels (#147/#148/#173/#174, ADR-0015) rather than
+    // free-generated — still resolved defensively via resolveCategoryId
+    // below, since an LLM can occasionally return something outside the
+    // given enum despite the constraint.
     const categories = await prisma.category.findMany({ select: { id: true, name: true, parentId: true } });
-    // At least one Category always exists — the migration seeds a default
-    // set and merge (the only removal path) always keeps its target.
-    const fallbackCategoryId = (categories.find((c) => c.name.toLowerCase() === "other") ?? categories[0]).id;
+    // At least one Category always exists — the migration seeds the fixed
+    // hierarchy and it's no longer user-deletable (#175).
+    const fallbackCategoryId = resolveFallbackCategoryId(categories);
+    const categoryLabels = leafCategories(categories).map((c) => leafCategoryLabel(categories, c));
 
     const fileBuffer = Buffer.from(await file.arrayBuffer());
-    const parsed = await parseStatement(fileBuffer, file.type, categories.map((c) => c.name));
+    const parsed = await parseStatement(fileBuffer, file.type, categoryLabels);
     // Distinguish "nothing to import" from a successful zero-transaction
     // parse — an empty Gemini response (blocked, safety-filtered, no
     // candidate) shouldn't silently write a same-balance Snapshot and
