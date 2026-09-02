@@ -36,6 +36,12 @@ export const BUILT_IN_COLUMNS: Record<TableAdapterKind, BuiltInColumnDef[]> = {
     { id: "systems:type", name: "Type", type: "TEXT" },
     { id: "systems:state", name: "State", type: "TEXT" },
   ],
+  "category-spend": [
+    { id: "category-spend:category", name: "Category", type: "TEXT" },
+    { id: "category-spend:parent", name: "Parent", type: "TEXT" },
+    { id: "category-spend:thisMonth", name: "This month", type: "NUMBER" },
+    { id: "category-spend:lastMonth", name: "Last month", type: "NUMBER" },
+  ],
 };
 
 export type GoalRow = { name: string; status: string; tasks: { completedAt: Date | null }[] };
@@ -93,6 +99,20 @@ export function systemBuiltInValues(system: SystemRow): Record<string, unknown> 
     "systems:name": system.name,
     "systems:type": system.type,
     "systems:state": system.state,
+  };
+}
+
+export type CategorySpendRow = { category: string; categoryParent: string; thisMonth: number; lastMonth: number };
+
+/** One row per (leaf) Category (#178) — "This month"/"Last month" are
+ * whole-month totals, not the running-total-over-time a bound chart's
+ * category-spend adapter plots; a table row is a snapshot, not a series. */
+export function categorySpendBuiltInValues(row: CategorySpendRow): Record<string, unknown> {
+  return {
+    "category-spend:category": row.category,
+    "category-spend:parent": row.categoryParent,
+    "category-spend:thisMonth": row.thisMonth,
+    "category-spend:lastMonth": row.lastMonth,
   };
 }
 

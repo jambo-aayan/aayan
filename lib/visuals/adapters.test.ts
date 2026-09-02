@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { balancePoints, checkinPoints, evaluationPoints, goalProgressPoints, joinBoundWithManual, joinPointsByDate } from "./adapters";
+import {
+  balancePoints,
+  categorySpendPoints,
+  checkinPoints,
+  evaluationPoints,
+  goalProgressPoints,
+  joinBoundWithManual,
+  joinPointsByDate,
+} from "./adapters";
 
 describe("checkinPoints", () => {
   it("maps FULL to 1 and MINIMUM to 0.5, sorted chronologically", () => {
@@ -58,6 +66,36 @@ describe("balancePoints", () => {
       { date: new Date("2026-01-01"), value: 1000 },
       { date: new Date("2026-01-02"), value: 900 },
     ]);
+  });
+});
+
+describe("categorySpendPoints", () => {
+  const base = { receivableId: null, goalContributionId: null, transferId: null };
+
+  it("buckets transactions into one point per calendar month, sorted chronologically", () => {
+    const points = categorySpendPoints([
+      { date: new Date("2026-02-05"), amount: 30, ...base },
+      { date: new Date("2026-01-10"), amount: 40, ...base },
+      { date: new Date("2026-01-20"), amount: 25, ...base },
+    ]);
+    expect(points).toEqual([
+      { date: new Date(Date.UTC(2026, 0, 1)), value: 65 },
+      { date: new Date(Date.UTC(2026, 1, 1)), value: 30 },
+    ]);
+  });
+
+  it("excludes receivable-, goal-contribution-, and transfer-flagged transactions", () => {
+    const points = categorySpendPoints([
+      { date: new Date("2026-01-05"), amount: 200, receivableId: "r1", goalContributionId: null, transferId: null },
+      { date: new Date("2026-01-06"), amount: 300, receivableId: null, goalContributionId: "g1", transferId: null },
+      { date: new Date("2026-01-07"), amount: 400, receivableId: null, goalContributionId: null, transferId: "t1" },
+      { date: new Date("2026-01-08"), amount: 40, ...base },
+    ]);
+    expect(points).toEqual([{ date: new Date(Date.UTC(2026, 0, 1)), value: 40 }]);
+  });
+
+  it("returns an empty array for no transactions", () => {
+    expect(categorySpendPoints([])).toEqual([]);
   });
 });
 

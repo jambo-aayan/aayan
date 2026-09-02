@@ -58,6 +58,38 @@ export function balancePoints(snapshots: { date: Date; balance: number }[]): Syn
     .sort((a, b) => a.date.getTime() - b.date.getTime());
 }
 
+export type SpendTransactionForPoints = {
+  date: Date;
+  amount: number;
+  receivableId: string | null;
+  goalContributionId: string | null;
+  transferId: string | null;
+};
+
+/** Category spend: one point per calendar month with any matching real
+ * spend (#178) — unlike every other adapter here (one point per event
+ * date), spend is naturally a monthly aggregate (matching
+ * lib/finance/category-breakdown.ts's own month-bucketed model), so this
+ * buckets each transaction into its calendar month rather than plotting
+ * per-event. The caller (lib/visuals/resolve-binding.ts) is expected to
+ * have already queried only OUT transactions in the target category (or,
+ * for a parent-bound chart, categories) — this re-applies the same
+ * real-spend exclusion (receivable/goal-contribution/transfer) every
+ * other spend total in this app uses, inlined rather than imported from
+ * lib/finance/logic.ts's isRealSpend to keep this module's only
+ * dependency its own local shapes, same as every other adapter here. */
+export function categorySpendPoints(transactions: SpendTransactionForPoints[]): SyntheticPoint[] {
+  const byMonth = new Map<number, number>();
+  for (const t of transactions) {
+    if (t.receivableId !== null || t.goalContributionId !== null || t.transferId !== null) continue;
+    const monthStart = Date.UTC(t.date.getUTCFullYear(), t.date.getUTCMonth(), 1);
+    byMonth.set(monthStart, (byMonth.get(monthStart) ?? 0) + t.amount);
+  }
+  return [...byMonth.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([monthStart, value]) => ({ date: new Date(monthStart), value }));
+}
+
 export type XYPoint = { x: number; y: number };
 
 /** Scatter's own join (#167) — its two axes can bind to two entirely

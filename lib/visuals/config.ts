@@ -29,13 +29,21 @@ export function progressPercent(current: number, target: number): number {
   return Math.min(100, Math.round((current / target) * 100));
 }
 
-/** The four sources a Line/Bar/Progress bar/Streak heatmap chart can bind
- * to instead of holding ad-hoc VisualRecords (#166, ADR-0017) — resolved
- * at render time by lib/visuals/resolve-binding.ts, never persisted as
- * records. Scatter's own binding is #167. */
-export type ChartAdapterKind = "habit-checkins" | "system-evaluations" | "goal-progress" | "finance-balances";
+/** The sources a Line/Bar/Progress bar/Streak heatmap chart can bind to
+ * instead of holding ad-hoc VisualRecords (#166, ADR-0017) — resolved at
+ * render time by lib/visuals/resolve-binding.ts, never persisted as
+ * records. Scatter's own binding is #167. "category-spend" (#178) binds
+ * to a Category — a top-level category rolls up all its subcategories'
+ * spend, a subcategory binds to just its own. */
+export type ChartAdapterKind = "habit-checkins" | "system-evaluations" | "goal-progress" | "finance-balances" | "category-spend";
 
-const ADAPTER_KINDS: ChartAdapterKind[] = ["habit-checkins", "system-evaluations", "goal-progress", "finance-balances"];
+const ADAPTER_KINDS: ChartAdapterKind[] = [
+  "habit-checkins",
+  "system-evaluations",
+  "goal-progress",
+  "finance-balances",
+  "category-spend",
+];
 
 export type ChartBinding = { adapter: ChartAdapterKind; refId: string };
 
@@ -71,9 +79,9 @@ export function parseScatterBinding(config: unknown): ScatterBinding | null {
  * `yBinding`, which each point at one specific entity (`refId`), a bound
  * table's rows are an entire live entity list, so there's nothing to
  * pick beyond which source. */
-export type TableAdapterKind = "goals" | "habits" | "tasks" | "systems";
+export type TableAdapterKind = "goals" | "habits" | "tasks" | "systems" | "category-spend";
 
-const TABLE_ADAPTER_KINDS: TableAdapterKind[] = ["goals", "habits", "tasks", "systems"];
+const TABLE_ADAPTER_KINDS: TableAdapterKind[] = ["goals", "habits", "tasks", "systems", "category-spend"];
 
 export type TableBinding = { adapter: TableAdapterKind };
 

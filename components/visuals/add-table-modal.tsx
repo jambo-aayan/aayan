@@ -11,6 +11,7 @@ const BOUND_OPTIONS: { adapter: TableAdapterKind; label: string }[] = [
   { adapter: "habits", label: "Habits" },
   { adapter: "tasks", label: "Tasks" },
   { adapter: "systems", label: "Systems" },
+  { adapter: "category-spend", label: "Spending categories" },
 ];
 
 /** The add-table flow (#168/#169, ADR-0017) — much shorter than

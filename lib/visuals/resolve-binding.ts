@@ -2,6 +2,7 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import {
   balancePoints,
+  categorySpendPoints,
   checkinPoints,
   evaluationPoints,
   goalProgressPoints,
@@ -83,6 +84,21 @@ async function resolvePoints(
         orderBy: { date: "asc" },
       });
       return { points: balancePoints(snapshots.map((s) => ({ date: s.date, balance: s.balance.toNumber() }))) };
+    }
+    case "category-spend": {
+      // refId may name a top-level category (roll up every subcategory's
+      // spend) or a leaf directly — same "expand a parent to its
+      // children, otherwise match exactly" shape #176's buildWhere uses
+      // for the transaction list's own category filter, since a
+      // Transaction only ever categorizes at a leaf (ADR-0015's #173
+      // addendum).
+      const children = await prisma.category.findMany({ where: { parentId: refId }, select: { id: true } });
+      const categoryIds = children.length > 0 ? children.map((c) => c.id) : [refId];
+      const transactions = await prisma.transaction.findMany({
+        where: { categoryId: { in: categoryIds }, direction: "OUT" },
+        select: { date: true, amount: true, receivableId: true, goalContributionId: true, transferId: true },
+      });
+      return { points: categorySpendPoints(transactions.map((t) => ({ ...t, amount: t.amount.toNumber() }))) };
     }
   }
 }

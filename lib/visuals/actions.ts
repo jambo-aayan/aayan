@@ -262,6 +262,17 @@ export async function getAdapterOptions(
       return prisma.goal.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } });
     case "finance-balances":
       return prisma.account.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } });
+    case "category-spend": {
+      // Category isn't Pillar/Area-owned either — lists every category,
+      // top-level and leaf alike, app-wide, same as Goal/Account above. A
+      // leaf's name is prefixed with its parent's so "General" (Shopping)
+      // and "General" (Travel) read as distinct options.
+      const categories = await prisma.category.findMany({
+        select: { id: true, name: true, parent: { select: { name: true } } },
+        orderBy: [{ parent: { name: "asc" } }, { name: "asc" }],
+      });
+      return categories.map((c) => ({ id: c.id, name: c.parent ? `${c.parent.name}: ${c.name}` : c.name }));
+    }
   }
 }
 

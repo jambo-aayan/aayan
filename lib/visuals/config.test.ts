@@ -49,6 +49,13 @@ describe("parseChartBinding", () => {
     expect(parseChartBinding({ binding: { adapter: "goal-progress" } })).toBeNull();
     expect(parseChartBinding({ binding: { adapter: "goal-progress", refId: "" } })).toBeNull();
   });
+
+  it("accepts the category-spend adapter (#178)", () => {
+    expect(parseChartBinding({ binding: { adapter: "category-spend", refId: "cat-1" } })).toEqual({
+      adapter: "category-spend",
+      refId: "cat-1",
+    });
+  });
 });
 
 describe("parseScatterBinding", () => {
@@ -100,6 +107,10 @@ describe("parseTableBinding", () => {
 
   it("returns null for an unrecognized adapter name", () => {
     expect(parseTableBinding({ tableBinding: { adapter: "made-up" } })).toBeNull();
+  });
+
+  it("accepts the category-spend adapter (#178)", () => {
+    expect(parseTableBinding({ tableBinding: { adapter: "category-spend" } })).toEqual({ adapter: "category-spend" });
   });
 });
 

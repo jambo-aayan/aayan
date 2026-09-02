@@ -17,6 +17,7 @@ const ADAPTER_TITLES: Record<TableAdapterKind, string> = {
   habits: "Habits",
   tasks: "Tasks",
   systems: "Systems",
+  "category-spend": "Spending categories",
 };
 
 /** A bound table's rows/columns are server-computed from live entities

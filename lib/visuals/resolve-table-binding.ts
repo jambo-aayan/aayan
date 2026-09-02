@@ -2,11 +2,13 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import {
   BUILT_IN_COLUMNS,
+  categorySpendBuiltInValues,
   goalBuiltInValues,
   habitBuiltInValues,
   systemBuiltInValues,
   taskBuiltInValues,
 } from "./table-binding";
+import { categorySpendPoints } from "./adapters";
 import { parseTableBinding, type TableAdapterKind } from "./config";
 import type { VisualWithRecords } from "./actions";
 import type { Prisma } from "@/lib/generated/prisma/client";
@@ -77,6 +79,45 @@ async function fetchBoundEntities(adapter: TableAdapterKind, pillarId: string, a
         orderBy: { createdAt: "asc" },
       });
       return systems.map((s) => ({ entityId: s.id, values: systemBuiltInValues(s) }));
+    }
+    case "category-spend": {
+      // Unlike every other adapter here, Category isn't Pillar/Area-owned
+      // (same as getAdapterOptions's "Goal and Account aren't Pillar/
+      // Area-owned, so those list app-wide" precedent) — pillarId/areaId
+      // are ignored, every leaf category always shows regardless of where
+      // this table is placed.
+      const categories = await prisma.category.findMany({
+        where: { parentId: { not: null } },
+        select: { id: true, name: true, parent: { select: { name: true } } },
+      });
+      const today = new Date();
+      const thisMonthStart = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1));
+      const lastMonthStart = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() - 1, 1));
+      const transactions = await prisma.transaction.findMany({
+        where: { direction: "OUT", date: { gte: lastMonthStart } },
+        select: { categoryId: true, date: true, amount: true, receivableId: true, goalContributionId: true, transferId: true },
+      });
+      const byCategory = new Map<string, typeof transactions>();
+      for (const t of transactions) {
+        const rows = byCategory.get(t.categoryId) ?? [];
+        rows.push(t);
+        byCategory.set(t.categoryId, rows);
+      }
+      return categories.map((c) => {
+        const points = categorySpendPoints(
+          (byCategory.get(c.id) ?? []).map((t) => ({ ...t, amount: t.amount.toNumber() }))
+        );
+        const totalAt = (monthStart: Date) => points.find((p) => p.date.getTime() === monthStart.getTime())?.value ?? 0;
+        return {
+          entityId: c.id,
+          values: categorySpendBuiltInValues({
+            category: c.name,
+            categoryParent: c.parent?.name ?? c.name,
+            thisMonth: totalAt(thisMonthStart),
+            lastMonth: totalAt(lastMonthStart),
+          }),
+        };
+      });
     }
   }
 }

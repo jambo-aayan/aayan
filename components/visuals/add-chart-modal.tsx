@@ -23,9 +23,16 @@ const ADAPTER_LABELS: Record<ChartAdapterKind, string> = {
   "system-evaluations": "A System",
   "goal-progress": "A Goal",
   "finance-balances": "An Account",
+  "category-spend": "A spending category",
 };
 
-const ALL_ADAPTERS: ChartAdapterKind[] = ["habit-checkins", "system-evaluations", "goal-progress", "finance-balances"];
+const ALL_ADAPTERS: ChartAdapterKind[] = [
+  "habit-checkins",
+  "system-evaluations",
+  "goal-progress",
+  "finance-balances",
+  "category-spend",
+];
 // A bound Progress bar's target has to come from somewhere with a natural
 // target — only Goal has one, so that's the only source it offers.
 const PROGRESS_BAR_ADAPTERS: ChartAdapterKind[] = ["goal-progress"];
