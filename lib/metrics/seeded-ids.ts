@@ -1,11 +1,10 @@
-/** Fixed ids for the Metrics seeded from the old DailyLog model by the
- * 20260902020000_metric_system_replaces_daily_log migration (#182) — a
- * name lookup would silently break if the user renamed one, so anything
- * that needs to key off "the metric that used to be DailyLog.mood"
- * specifically (lib/daily-log's transitional shim, kept until #183-#188
- * land the real generic Log UI; lib/insights/data.ts's correlation pairs)
+/** Fixed ids for the Metrics seeded from the old fixed-shape daily logging
+ * sheet by the 20260902020000_metric_system_replaces_daily_log migration
+ * (#182) — a name lookup would silently break if the user renamed one, so
+ * anything that needs to key off one of these specific seeded metrics
+ * (lib/metrics/derived-state.ts; lib/insights/data.ts's correlation pairs)
  * keys off these fixed ids instead — same convention as
- * lib/daily-log/habit-seed.ts's STRETCH_HABIT_ID/TRAINED_HABIT_ID. */
+ * lib/habits/derived-field-seed.ts's STRETCH_HABIT_ID/TRAINED_HABIT_ID. */
 export const METRIC_MOOD_ID = "metric-mood";
 export const METRIC_STRESS_ID = "metric-stress";
 export const METRIC_ENERGY_ID = "metric-energy";

@@ -2,7 +2,7 @@ import { utcMidnight } from "../habits/date-utils";
 
 export const SPLIT_MEAN_MIN_DAYS_PER_SIDE = 3;
 
-export type DailyLog = { date: Date; value: number };
+export type DatedValue = { date: Date; value: number };
 
 export type SplitMeanResult =
   | { ready: false; sampleSize: number }
@@ -25,7 +25,7 @@ export type SplitMeanResult =
  * logged days on both sides before returning anything comparable — never
  * enough data shouldn't quietly render a misleading two-data-point "trend."
  */
-export function splitMean(logs: DailyLog[], predicateDates: Date[]): SplitMeanResult {
+export function splitMean(logs: DatedValue[], predicateDates: Date[]): SplitMeanResult {
   const predicateDays = new Set(predicateDates.map((d) => utcMidnight(d).getTime()));
 
   const trueLogs = logs.filter((l) => predicateDays.has(utcMidnight(l.date).getTime()));
@@ -35,7 +35,7 @@ export function splitMean(logs: DailyLog[], predicateDates: Date[]): SplitMeanRe
     return { ready: false, sampleSize: logs.length };
   }
 
-  const average = (entries: DailyLog[]) => entries.reduce((sum, l) => sum + l.value, 0) / entries.length;
+  const average = (entries: DatedValue[]) => entries.reduce((sum, l) => sum + l.value, 0) / entries.length;
 
   return {
     ready: true,

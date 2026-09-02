@@ -314,9 +314,9 @@ enum MetricCadence {
 }
 
 /// A user-defined thing to log over time (#181/#182) — replaces the old
-/// fixed-shape DailyLog (mobility/trained stay derived from CheckIn data
-/// exactly as before, unrelated to this model — see lib/daily-log/data.ts's
-/// former getDerivedStateFields, now in lib/metrics). valueType decides how
+/// fixed-shape single-row-per-day logging sheet (mobility/trained stay
+/// derived from CheckIn data exactly as before, unrelated to this model —
+/// see lib/metrics/derived-state.ts's getDerivedStateFields). valueType decides how
 /// MetricEntry.numberValue/textValue is interpreted: NUMBER/SCALE_5/BOOLEAN
 /// (stored 0/1) use numberValue; ENUM/TEXT use textValue. enumOptions only
 /// applies to ENUM — a JSON-encoded string array, no separate join table for
@@ -357,7 +357,7 @@ model Metric {
 /// DateTime, not @db.Date, because its precision depends on the Metric's
 /// cadence: for DAILY/WEEKLY it's truncated to that period's start
 /// (midnight, or that week's Monday) by the app layer before writing —
-/// exactly like DailyLog's own utcMidnight did — so `@@unique([metricId,
+/// exactly like the old logging sheet's own utcMidnight did — so `@@unique([metricId,
 /// date])` alone enforces "one entry per period" with no extra DB
 /// constraint needed. For AD_HOC it's the exact log timestamp instead, so
 /// the same unique constraint effectively never collides (two genuinely

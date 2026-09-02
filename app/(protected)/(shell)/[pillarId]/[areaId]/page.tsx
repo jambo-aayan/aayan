@@ -9,7 +9,6 @@ import { HabitsList } from "@/components/habits-list";
 import { AreaTasks } from "@/components/tasks/area-tasks";
 import { PainMobilityTracker } from "@/components/pain-mobility-tracker";
 import { CorrelationView } from "@/components/correlation-view";
-import { DailyMetricHistory } from "@/components/daily-metric-history";
 import { SystemsList } from "@/components/systems-list";
 import { getArea } from "@/lib/areas/data";
 import { getSystemsForArea, getHabitOptionsForPillar } from "@/lib/systems/data";
@@ -25,29 +24,24 @@ import { TableZone } from "@/components/visuals/table-zone";
 import { getVisualsForArea } from "@/lib/visuals/data";
 import { getPainMobilityLogs } from "@/lib/pain-mobility/data";
 import { PAIN_MOBILITY_AREA_ID } from "@/lib/pain-mobility/scope";
-import { getDailyLogs } from "@/lib/daily-log/data";
-import { SLEEP_AREA_ID, CARE_AREA_ID } from "@/lib/health/seed-data";
 import { pillarHref } from "@/lib/pillars/nav";
 import { resolveColorHex, type ColorKey } from "@/lib/colors";
-import type { StiffnessBucket } from "@/lib/daily-log/logic";
 import { resolveSectionOrder, type PageSection, type SectionConfigEntry } from "@/lib/pillar-page/sections";
 import { SectionManager } from "@/components/pillar-page/section-manager";
 import styles from "./area-detail.module.css";
 
-const STIFFNESS_LABELS: Record<StiffnessBucket, string> = {
-  UNDER_15: "Under 15 min",
-  "15_TO_30": "15–30 min",
-  "30_TO_60": "30–60 min",
-  OVER_60: "Over an hour",
-};
-
 /** Generic Area page (#157/ADR-0016) — every Area, seeded or user-created,
  * gets this same page under its Pillar's /[pillarId]/[areaId] route,
- * retrofitted off the original Health-only implementation. The three
- * bespoke, non-section cards below (Pain & Mobility, Sleep quality, Blood
- * pressure) stay hardcoded to their specific Health Areas, unchanged in
- * behavior — not generalized into anything any Area can add (per ADR-0016's
- * explicit "no generic score-tracking primitive"). */
+ * retrofitted off the original Health-only implementation. Pain & Mobility
+ * stays hardcoded to its specific Health Area, unchanged in behavior — not
+ * generalized into anything any Area can add (per ADR-0016's explicit "no
+ * generic score-tracking primitive"); it's backed by its own PainMobilityLog
+ * table, kept intentionally separate from the generic Metric system per
+ * #181's Out of Scope. Sleep quality/Blood pressure's own former bespoke
+ * cards here are gone (#188) — those are now just ordinary Metrics (Sleep
+ * quality global, Blood pressure scoped to this Pillar/Area), logged and
+ * browsed the same way every other Metric is: the Log tab (#184) and its
+ * per-metric history page (#185). */
 export default async function AreaPage({
   params,
   searchParams,
@@ -78,12 +72,7 @@ export default async function AreaPage({
   const chartVisuals = visuals.filter((v) => v.type !== "TABLE");
   const tableVisuals = visuals.filter((v) => v.type === "TABLE");
   const isPainMobilityArea = areaId === PAIN_MOBILITY_AREA_ID;
-  const isSleepArea = areaId === SLEEP_AREA_ID;
-  const isCareArea = areaId === CARE_AREA_ID;
   const painLogs = isPainMobilityArea ? await getPainMobilityLogs(areaId) : [];
-  // Raw daily-log-sheet values only, per docs/adr/0007-v2-phase3-daily-log-sheet.md
-  // — new correlation cards reading DailyLog are Phase 6, not this page.
-  const dailyLogs = isPainMobilityArea || isSleepArea || isCareArea ? await getDailyLogs() : [];
   const pillarHrefValue = pillarHref(area.pillarId);
   const pillar = pillars.find((p) => p.id === area.pillarId);
   const accentColor = resolveColorHex(pillar?.color as ColorKey | null);
@@ -231,39 +220,7 @@ export default async function AreaPage({
                 painLogs={painLogs.map((l) => ({ date: l.date, pain: l.pain }))}
               />
             </Card>
-            <Card title="Pain (daily log)">
-              <DailyMetricHistory
-                entries={dailyLogs.map((l) => ({ date: l.date, label: `Pain ${l.pain}` }))}
-                emptyMessage="No daily log entries yet."
-              />
-            </Card>
-            <Card title="Morning stiffness (daily log)">
-              <DailyMetricHistory
-                entries={dailyLogs
-                  .filter((l) => l.stiffnessBucket !== null)
-                  .map((l) => ({ date: l.date, label: STIFFNESS_LABELS[l.stiffnessBucket!] }))}
-                emptyMessage="No daily log entries yet."
-              />
-            </Card>
           </>
-        )}
-        {isSleepArea && (
-          <Card title="Sleep quality (daily log)">
-            <DailyMetricHistory
-              entries={dailyLogs.map((l) => ({ date: l.date, label: `Sleep quality ${l.sleepQuality}` }))}
-              emptyMessage="No daily log entries yet."
-            />
-          </Card>
-        )}
-        {isCareArea && (
-          <Card title="Blood pressure (daily log)">
-            <DailyMetricHistory
-              entries={dailyLogs
-                .filter((l) => l.bpSystolic !== null && l.bpDiastolic !== null)
-                .map((l) => ({ date: l.date, label: `${l.bpSystolic}/${l.bpDiastolic}` }))}
-              emptyMessage="No blood pressure readings logged yet."
-            />
-          </Card>
         )}
       </div>
     </>

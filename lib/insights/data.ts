@@ -41,7 +41,7 @@ import {
   type MetricSeriesFixture,
 } from "./correlations";
 import { splitMean } from "./split-mean";
-import { TRAINED_HABIT_ID } from "@/lib/daily-log/habit-seed";
+import { TRAINED_HABIT_ID } from "@/lib/habits/derived-field-seed";
 import { computeTrajectory, type TrajectoryPoint } from "./trajectory";
 import { netWorth } from "@/lib/finance/net-worth";
 import { isRealSpend } from "@/lib/finance/logic";
@@ -504,8 +504,13 @@ export async function getCorrelations(range: InsightsRange, asOf: Date = new Dat
     // over all of these rather than a hand-picked list; sleep-stiffness
     // and mood are just ordinary Metrics among them now, not special-cased
     // at the query level.
+    // orderBy matches every other prisma.metric.findMany in the app
+    // (lib/metrics/data.ts) — without it, iteration order (and so which
+    // Metric lands as labelA vs labelB, and the `metric:<a>:<b>` pair id)
+    // would be undefined rather than stable across requests.
     prisma.metric.findMany({
       where: { archivedAt: null, valueType: { in: ["NUMBER", "SCALE_5", "BOOLEAN"] } },
+      orderBy: { sortOrder: "asc" },
       select: { id: true, name: true },
     }),
     prisma.metricEntry.findMany({
@@ -620,9 +625,13 @@ export async function getCorrelations(range: InsightsRange, asOf: Date = new Dat
 
   // Trained-vs-mood isn't a Pearson pair — "trained" is a boolean per day
   // (from the TRAINED_HABIT_ID check-in, same derivation as
-  // lib/daily-log/data.ts's getDerivedStateFields), not a numeric series —
-  // so it's a mean-split (lib/insights/split-mean.ts), a different shape
-  // from CorrelationResult, surfaced as its own small card (#128, ADR-0011).
+  // lib/metrics/derived-state.ts's getDerivedStateFields), not a numeric
+  // series — so it's a mean-split (lib/insights/split-mean.ts), a
+  // different shape from CorrelationResult, surfaced as its own small card
+  // (#128, ADR-0011). moodLogs is drawn from `metricEntries`, which is
+  // pre-filtered to non-archived Metrics — if Mood is ever archived,
+  // trainedVsMood correctly stops populating rather than continuing to
+  // read a metric the Log tab itself no longer surfaces.
   const moodLogs = metricEntries
     .filter((e) => e.metricId === METRIC_MOOD_ID && e.numberValue !== null)
     .map((e) => ({ date: e.date, value: e.numberValue! }));

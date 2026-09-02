@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { ensureHealthAreasSeeded } from "@/lib/health/ensure-seeded";
 import { ensureFinancePillarSeeded } from "@/lib/finance/ensure-seeded";
 import { ensureMiscellaneousPillarSeeded } from "@/lib/miscellaneous/ensure-seeded";
-import { ensureDerivedFieldHabitsSeeded } from "@/lib/daily-log/ensure-seeded";
+import { ensureDerivedFieldHabitsSeeded } from "@/lib/habits/derived-field-seed";
 
 export type PillarWithStats = {
   id: string;
