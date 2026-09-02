@@ -2,14 +2,14 @@
 
 A personal life-management app covering health, habits, finance, and life admin for a single user. Originally prototyped as a single-file HTML/JS Claude.ai artifact (`window.storage` persistence, see `prototype/life-management-prototype.html`); this repo is the rebuild with a real backend and database, motivated mainly by unreliable persistence in the artifact environment (client-side storage intermittently failed with "Internal server error" / "Unexpected response type").
 
-**Single user. No multi-tenancy needed** for now — a possible future product to sell has been mentioned, but nothing here is designed for multi-tenancy yet. Auth can be a simple password gate rather than a full identity provider.
+**Single user. No multi-tenancy needed** for now — a possible future product to sell has been mentioned, but nothing here is designed for multi-tenancy yet. Auth can be a simple password gate rather than a full identity provider. **One narrow exception (ADR-0018):** the Faria Pillar is a two-person space (Aayan + his partner Faria) and gets its own separate password scoped to just that Pillar, plus a non-secure, device-local "who am I" pick for attributing content — not real multi-tenancy, and not a pattern to extend to any other Pillar without a similar reason.
 
 > **Status: actively being charted via `/wayfinder`.** The structure below reflects a restructuring decided during that charting session (see the `wayfinder:map` issue for the full decision trail) — it supersedes the flatter "10 buckets" model from the original prototype chat. MVP scope is **Health + Finances** only; the other Pillars are sketched but deliberately left loose until their turn comes.
 
 ## Language
 
 **Pillar**:
-A top-level life domain — the highest level of the hierarchy. MVP Pillars: Health, Finances. Deferred Pillars (still real, just not yet built out): Religion, Productivity, Relationship, Career. As of ADR-0016, **a Pillar is user-creatable at any time** — the deferred list above isn't a gate on new Pillars, it's just what hasn't been fleshed out yet. Every Pillar (seeded or user-created) gets a dedicated page (a nav-bar entry, at `/{pillarId}`) built from the same generic **section**-based layout — see "Page section" below — except Finances, which keeps its own bespoke, non-sectioned shape (Items/Baseline/Goals/Expenses/North Star, ADR-0016 leaves it untouched).
+A top-level life domain — the highest level of the hierarchy. MVP Pillars: Health, Finances. Deferred Pillars (still real, just not yet built out): Religion, Productivity, Career. **Faria** (about Aayan's relationship with his partner, Faria — see "Faria" below) was deferred under the earlier working name "Relationship" but is no longer deferred: its Areas were settled via grilling and it's now in active design/build. As of ADR-0016, **a Pillar is user-creatable at any time** — the deferred list above isn't a gate on new Pillars, it's just what hasn't been fleshed out yet. Every Pillar (seeded or user-created) gets a dedicated page (a nav-bar entry, at `/{pillarId}`) built from the same generic **section**-based layout — see "Page section" below — except Finances, which keeps its own bespoke, non-sectioned shape (Items/Baseline/Goals/Expenses/North Star, ADR-0016 leaves it untouched).
 _Avoid_: Bucket (the original prototype's term — replaced for being too informal). "Category" used to be avoided here too (the original prototype used it as a synonym for Pillar) — as of ADR-0015, **Category is now a real, distinct Finance-scoped concept** (a Transaction's spending category — see "Finance" below), unrelated to Pillar. Don't conflate the two just because they share a name.
 
 **Area**:
@@ -48,7 +48,7 @@ Used to mean "a Habit or Goal" in this glossary's earlier draft, written before 
 A daily working view for Tasks only (not Goals — that flag was retired when Task/Habit/Goal split apart). A Task's My Day membership is a per-date record (so any past day's My Day is reconstructable), independent of that Task's List — reordering within My Day never reorders the List, and vice versa. Active Habits also surface on the Home page for the day, computed from their schedule rather than stored, but that's a separate concept from a Task's My Day membership.
 
 **Cross-Pillar link**:
-When something genuinely spans two Pillars (e.g. "buy a house" touches both Finances and Relationship), it lives in exactly one Pillar as its source of truth, with a visible link from the other — never duplicated as two independent copies. Extends the cross-links the original prototype's mind-map view already drew between buckets.
+When something genuinely spans two Pillars (e.g. "buy a house" touches both Finances and Faria's Wedding & Future Area), it lives in exactly one Pillar as its source of truth, with a visible link from the other — never duplicated as two independent copies. Extends the cross-links the original prototype's mind-map view already drew between buckets.
 
 **North Star**:
 Every Pillar has one, and every Area has one — a single headline goal that Actions within it work toward, always visible when you open that Pillar or Area. Originally a Finances-only concept (see "Finance" below); generalized to the whole hierarchy. **Optional, not mandatory upfront** — the structure supports setting one on any Pillar/Area, but nothing requires it to be filled in before launch. The user will set them from inside the app as they decide what each one should be, not as part of this spec.
@@ -80,8 +80,27 @@ Carries forward Jumma (Friday prayer) and Quran reading from the original protot
 ### Productivity (deferred)
 Existed in the original prototype as a flat bucket; not yet re-examined under the new model.
 
-### Relationship (deferred)
-About the user's relationship with his partner, Faria — wedding planning (getting married next summer), important shared dates/calendar, and a distinct sentimental sub-section for memories/highlights/moments from their conversations. Confirmed as in-scope and fairly wide, but not yet broken into Areas/Systems — deferred past MVP.
+### Faria (Areas settled, build starting)
+About Aayan's relationship with his partner, Faria — a long-distance couple planning a life together (including a move to Bristol), marriage discussed with no set timeline yet. Was deferred under the working name "Relationship"; Areas were settled via a grilling session and it's now moving from design into build, ahead of the other still-deferred Pillars. See ADR-0018 for its access model.
+
+Grew out of an earlier standalone plan for a separate two-person "Faria & Aayan" couples website (own stack, own auth, partially scaffolded) — that separate site was abandoned in favor of building this out as a Pillar here instead; its feature brainstorm carried over as the input for the Areas below, nothing else about it did.
+
+**Areas** (all bespoke, feature-shaped pages rather than sub-topics with their own North Star/Habits — see "Page section" above — except Wedding & Future, which uses the real generic Tasks/Goals sections):
+- **Memories & Milestones** — an animated scrollable timeline of milestones (past + future), a casual photo scrapbook ("Polaroid Wall"), and deeper **Memory** entries (see "Memory" below) for specific shared experiences.
+- **Words for Us** — Letters, an Appreciation Jar (quick-add appreciations, "shaken" to reveal one at random), a Nickname dictionary (pet names with first-used date/context, including Banglish variants), curated quotes ("Who Said It"), and a Voice Memo Time Capsule (recorded now, locked until a future date like the wedding).
+- **Together** — shared Recipes, an Activities checklist (ticking an item off can prompt logging it as a Memory), and a Places map (been vs. want-to-go, UK and World views).
+- **Us in Numbers** — a stats dashboard (days together, message/voice-note counts, most-used words) and a Firsts tracker (first message, first "goodnight," etc.) — both seeded from a WhatsApp chat export Aayan curates by hand before anything is shown, never a raw archive dump.
+- **Faria's Corner** / **Aayan's Corner** — each partner's own personal space/theme.
+- **Wedding & Future** — practical planning: shared dates, a House Hunt board, wedding admin.
+- **Watch List** — movies/shows/documentaries the two of them watch, rated, plus a watch-later list; looks up posters/thumbnails from an external media data source rather than rendering as a plain list.
+
+**Deferred within this Pillar** (not part of the current build pass, not forgotten): a Bingo card of observed "Faria-isms"/"Aayan-isms," a couples quiz comparing answers, an auto-generated Year in Review (needs a year of data first), and Letters to Future Children (better once engaged/married).
+
+**Memory** (Faria-scoped):
+A deeper journal entry about one specific shared experience (e.g. an escape room) — distinct from a Thought (general, cross-cutting) and from a Polaroid Wall item (casual, caption-only). Carries two independent voice fields, Aayan's thoughts and Faria's thoughts, plus a photo dump. Faria's field is left visibly empty/inviting until she writes it herself — never written on her behalf, even provisionally.
+
+**Identity pick** (Faria-scoped, ADR-0018):
+A one-time, per-device choice of "I'm Faria" or "I'm Aayan," remembered indefinitely once made. Used only to attribute content (e.g. which voice field a Memory entry is written into) — it is not authentication and carries no access-control weight of its own.
 
 ### Career (deferred, name not fully settled — working name, was "Startup")
 Two parts: the user's day job (e.g. sample-apps work) and Jumbo Labs (his startup with friends), each with further sub-parts. Ideas floated but not committed: an agent that keeps a CV up to date, an agent that surfaces job opportunities. Explicitly open-ended — user is still open to suggestions here. Deferred past MVP.
@@ -192,7 +211,7 @@ What needs real user input before the app is useful, vs. what ships pre-filled:
 - **Diet** (Health Area): dislikes most fruit/veg plus separate anxiety around trying new foods — build from what already works, never push unfamiliar produce. Protein is a relative strength.
 - **Body Composition** (Health Area): reframed from a weight target to muscle-to-fat ratio; track waist + photos over scale weight.
 - **Blood Pressure** (Health Area): previously elevated, resolved after ~10kg weight loss.
-- **Finances**: UK-based. LISA under-40 first-time-buyer bonus is the highest-priority savings vehicle (25% guaranteed return, £450k property cap — a real constraint in Surrey). Pension: 5% employee + 11% employer (exceptional, ~£10k/yr growth). Emergency fund → LISA → wedding → S&S ISA is the priority order. Dental work is explicitly conditional on the quote being reasonable, not a committed goal. (A house purchase, 3-4 years out, is anticipated — will need a cross-Pillar link to Relationship once that Pillar is designed.)
+- **Finances**: UK-based. LISA under-40 first-time-buyer bonus is the highest-priority savings vehicle (25% guaranteed return, £450k property cap — a real constraint in Surrey). Pension: 5% employee + 11% employer (exceptional, ~£10k/yr growth). Emergency fund → LISA → wedding → S&S ISA is the priority order. Dental work is explicitly conditional on the quote being reasonable, not a committed goal. (A house purchase, 3-4 years out, is anticipated — will need a cross-Pillar link to Faria's Wedding & Future Area, now that it's designed.)
 - **Religion**: Islamic practice — Jumma (Friday prayer), Quran reading.
 
 ## Migrating existing data
