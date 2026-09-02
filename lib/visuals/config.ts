@@ -10,6 +10,25 @@ export function parseProgressBarConfig(config: unknown): ProgressBarConfig | nul
   return typeof target === "number" && Number.isFinite(target) ? { target } : null;
 }
 
+/** Current/target → a percent, clamped at 100 and rounded (#171) — the
+ * one canonical formula behind every progress percentage in this app: a
+ * Progress bar Visual's own fill width, and (via lib/finance/goal-math.ts's
+ * goalProgressPercent, which now delegates here) Finance's goal rings.
+ * Rounds because a Ring literally displays this as text ("70%"); a
+ * Progress bar's fill width doesn't need that precision but rounding
+ * doesn't visibly change a CSS percentage width either, so one formula
+ * serves both without a visible difference to either. Deliberately has NO
+ * lower clamp — Finance's own net-worth-backed goal ring can be
+ * legitimately negative (liabilities exceeding assets) and must keep
+ * showing that as a real negative percent, not floor it to "0%"; a
+ * caller that specifically needs a non-negative result (a Progress bar's
+ * CSS fill width can't render a negative one sensibly) clamps that itself
+ * — see ProgressBarVisual. */
+export function progressPercent(current: number, target: number): number {
+  if (target <= 0) return 0;
+  return Math.min(100, Math.round((current / target) * 100));
+}
+
 /** The four sources a Line/Bar/Progress bar/Streak heatmap chart can bind
  * to instead of holding ad-hoc VisualRecords (#166, ADR-0017) — resolved
  * at render time by lib/visuals/resolve-binding.ts, never persisted as

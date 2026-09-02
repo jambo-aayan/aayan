@@ -1,6 +1,13 @@
+import { progressPercent } from "../visuals/config";
+
+/** Delegates to the one canonical current/target → percent formula (#171,
+ * ADR-0017) — the same one behind a Progress bar Visual's fill width and
+ * Finance's own goal rings, so both ultimately compute the same number
+ * from the same rule rather than two near-identical formulas drifting
+ * apart. Every existing call site/test importing goalProgressPercent from
+ * here is untouched; only the body changed. */
 export function goalProgressPercent(saved: number, target: number): number {
-  if (target <= 0) return 0;
-  return Math.min(100, Math.round((saved / target) * 100));
+  return progressPercent(saved, target);
 }
 
 /** Projects the completion date at the current monthly contribution rate, or null if it never completes. */

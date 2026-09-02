@@ -1,4 +1,5 @@
 import type { ConsistencyGridSummary } from "@/lib/insights/data";
+import { HeatmapCell } from "@/components/visuals/heatmap-cell";
 import styles from "./consistency-grid.module.css";
 
 export function ConsistencyGrid({ grid }: { grid: ConsistencyGridSummary }) {
@@ -25,13 +26,11 @@ export function ConsistencyGrid({ grid }: { grid: ConsistencyGridSummary }) {
                 </span>
                 <div className={styles.cells} aria-hidden>
                   {row.cells.map((cell, i) => (
-                    <span
+                    <HeatmapCell
                       key={grid.days[i]}
                       className={styles.cell}
-                      style={{
-                        background: cell === "none" ? "rgba(34, 30, 26, .055)" : color,
-                        opacity: cell === "full" ? 0.85 : cell === "partial" ? 0.34 : 1,
-                      }}
+                      background={cell === "none" ? "rgba(34, 30, 26, .055)" : color}
+                      opacity={cell === "full" ? 0.85 : cell === "partial" ? 0.34 : 1}
                       title={`${row.habitName} — ${grid.days[i]}: ${cell}`}
                     />
                   ))}

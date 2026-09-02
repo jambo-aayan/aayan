@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseChartBinding, parseProgressBarConfig, parseScatterBinding, parseTableBinding } from "./config";
+import { parseChartBinding, parseProgressBarConfig, parseScatterBinding, parseTableBinding, progressPercent } from "./config";
 
 describe("parseProgressBarConfig", () => {
   it("returns the target when config is a valid shape", () => {
@@ -100,5 +100,28 @@ describe("parseTableBinding", () => {
 
   it("returns null for an unrecognized adapter name", () => {
     expect(parseTableBinding({ tableBinding: { adapter: "made-up" } })).toBeNull();
+  });
+});
+
+describe("progressPercent", () => {
+  it("is the current/target ratio as a rounded percentage", () => {
+    expect(progressPercent(4200, 6000)).toBe(70);
+  });
+
+  it("clamps at 100 when current exceeds target", () => {
+    expect(progressPercent(7000, 6000)).toBe(100);
+  });
+
+  it("does NOT clamp a negative current — Finance's net-worth-backed goal ring needs a real negative percent, not a floor", () => {
+    expect(progressPercent(-600, 6000)).toBe(-10);
+  });
+
+  it("is 0 when target is 0 or negative (avoids divide-by-zero)", () => {
+    expect(progressPercent(100, 0)).toBe(0);
+    expect(progressPercent(100, -10)).toBe(0);
+  });
+
+  it("rounds to the nearest whole percent", () => {
+    expect(progressPercent(1, 3)).toBe(33);
   });
 });

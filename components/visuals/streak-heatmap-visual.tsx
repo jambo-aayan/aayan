@@ -6,6 +6,7 @@ import { useToast } from "@/components/toast/toast-provider";
 import { AddRecordForm } from "./add-record-form";
 import { BulkAddForm } from "./bulk-add-form";
 import { VisualCard } from "./visual-card";
+import { HeatmapCell } from "./heatmap-cell";
 import { heatmapIntensities } from "@/lib/visuals/records";
 import { formatDateShort } from "@/lib/visuals/format";
 import { parseChartBinding } from "@/lib/visuals/config";
@@ -60,10 +61,11 @@ export function StreakHeatmapVisual({
       ) : (
         <div className={styles.grid}>
           {cells.map((cell) => (
-            <div
+            <HeatmapCell
               key={cell.date.toISOString()}
               className={styles.cell}
-              style={{ opacity: 0.15 + cell.intensity * 0.85 }}
+              background="var(--coral)"
+              opacity={0.15 + cell.intensity * 0.85}
               title={`${formatDateShort(cell.date)}: ${cell.value}`}
             />
           ))}

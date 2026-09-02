@@ -6,7 +6,7 @@ import { useToast } from "@/components/toast/toast-provider";
 import { AddRecordForm } from "./add-record-form";
 import { VisualCard } from "./visual-card";
 import { latestValue } from "@/lib/visuals/records";
-import { parseChartBinding, parseProgressBarConfig } from "@/lib/visuals/config";
+import { parseChartBinding, parseProgressBarConfig, progressPercent } from "@/lib/visuals/config";
 import type { VisualWithRecords } from "@/lib/visuals/actions";
 import cardStyles from "./visual-card.module.css";
 import styles from "./progress-bar-visual.module.css";
@@ -42,7 +42,10 @@ export function ProgressBarVisual({
 
   const current = latestValue(visual.records);
   const config = parseProgressBarConfig(visual.config);
-  const percent = config && current !== null ? Math.max(0, Math.min(100, (current / config.target) * 100)) : 0;
+  // progressPercent deliberately has no lower clamp (Finance's net-worth
+  // ring needs to show a real negative %) — a Progress bar's CSS fill
+  // width can't render a negative percentage sensibly, so it clamps here.
+  const percent = config && current !== null ? Math.max(0, progressPercent(current, config.target)) : 0;
   const bound = parseChartBinding(visual.config) !== null;
 
   return (

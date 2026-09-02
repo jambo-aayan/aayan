@@ -1,12 +1,13 @@
 "use client";
 
-import { LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { createVisualRecord, createVisualRecordsBulk } from "@/lib/visuals/actions";
 import { withRetry } from "@/lib/with-retry";
 import { useToast } from "@/components/toast/toast-provider";
 import { AddRecordForm } from "./add-record-form";
 import { BulkAddForm } from "./bulk-add-form";
 import { VisualCard } from "./visual-card";
+import { LineTrendChart } from "./line-trend-chart";
 import { formatDateShort } from "@/lib/visuals/format";
 import { dateValuePoints } from "@/lib/visuals/records";
 import { parseChartBinding } from "@/lib/visuals/config";
@@ -63,24 +64,17 @@ export function DateSeriesChartVisual({
     <VisualCard title={visual.title} onRemove={onRemove}>
       {points.length === 0 ? (
         <p className={styles.empty}>No data yet.</p>
-      ) : (
+      ) : visual.type === "BAR" ? (
         <ResponsiveContainer width="100%" height={180}>
-          {visual.type === "BAR" ? (
-            <BarChart data={points}>
-              <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-              <YAxis tick={{ fontSize: 11 }} width={32} />
-              <Tooltip />
-              <Bar dataKey="value" fill="var(--coral)" radius={[3, 3, 0, 0]} />
-            </BarChart>
-          ) : (
-            <LineChart data={points}>
-              <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-              <YAxis tick={{ fontSize: 11 }} width={32} />
-              <Tooltip />
-              <Line type="monotone" dataKey="value" stroke="var(--coral)" strokeWidth={2} dot={{ r: 3 }} />
-            </LineChart>
-          )}
+          <BarChart data={points}>
+            <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+            <YAxis tick={{ fontSize: 11 }} width={32} />
+            <Tooltip />
+            <Bar dataKey="value" fill="var(--coral)" radius={[3, 3, 0, 0]} />
+          </BarChart>
         </ResponsiveContainer>
+      ) : (
+        <LineTrendChart points={points} />
       )}
 
       {bound ? (

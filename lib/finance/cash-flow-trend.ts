@@ -31,22 +31,3 @@ export function cashFlowTrend(transactions: TransactionForTrend[]): CashFlowPoin
     return { date: new Date(key), cumulative: running };
   });
 }
-
-/** Finds the plotted point nearest a hover x-coordinate (ADR-0015) —
- * `points` are assumed evenly spaced by index across `width` (the SVG
- * chart's own layout, TrendChart's `x = (i / (n-1)) * width`), so the
- * nearest point is a direct ratio-to-index conversion, not a distance
- * search. Clamped to the first/last point outside [0, width]. Returns
- * the point's own `index` alongside its data, so the caller can
- * reposition a guide line without recomputing it. */
-export function nearestCashFlowPoint(
-  points: CashFlowPoint[],
-  x: number,
-  width: number
-): (CashFlowPoint & { index: number }) | null {
-  if (points.length === 0) return null;
-  if (points.length === 1) return { ...points[0], index: 0 };
-  const ratio = Math.min(1, Math.max(0, x / width));
-  const index = Math.round(ratio * (points.length - 1));
-  return { ...points[index], index };
-}
