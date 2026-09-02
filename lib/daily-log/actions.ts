@@ -26,22 +26,17 @@ export type SaveDailyLogResult = { ok: true; headache: HeadacheLevel } | { ok: f
 
 const SAVE_ERROR = "Couldn't save — try again.";
 
-function upsertEntry(metricId: string, date: Date, numberValue: number | null, textValue: string | null) {
-  return prisma.metricEntry.upsert({
-    where: { metricId_date: { metricId, date } },
-    create: { metricId, date, numberValue, textValue },
-    update: { numberValue, textValue },
-  });
-}
 
 /**
  * Upserts today's (or any date's) 11 seeded-metric entries as one batch —
  * the same "one sheet, all core fields together" shape the old DailyLog
- * upsert had. Headache is folded through applyHeadacheTap against
- * whatever's already stored for that date, so a lower tap later in the day
- * never overwrites a worse value already logged (see lib/daily-log/logic.ts).
- * mobility/trained are never part of the input — unchanged, see data.ts's
- * getDerivedStateFields.
+ * upsert had, including its atomicity: all 11 upserts run inside one
+ * $transaction, same as the single-row upsert it replaces, so a failure
+ * partway through can never leave a day half-saved. Headache is folded
+ * through applyHeadacheTap against whatever's already stored for that
+ * date, so a lower tap later in the day never overwrites a worse value
+ * already logged (see lib/daily-log/logic.ts). mobility/trained are never
+ * part of the input — unchanged, see data.ts's getDerivedStateFields.
  */
 export async function saveDailyLog(date: Date, input: DailyLogInput): Promise<SaveDailyLogResult> {
   const validation = validateDailyLogInput(input);
@@ -52,25 +47,39 @@ export async function saveDailyLog(date: Date, input: DailyLogInput): Promise<Sa
   let headache: HeadacheLevel;
 
   try {
-    const existing = await prisma.metricEntry.findUnique({
-      where: { metricId_date: { metricId: METRIC_HEADACHE_ID, date: day } },
-      select: { textValue: true },
-    });
-    headache = existing?.textValue ? applyHeadacheTap(existing.textValue as HeadacheLevel, input.headache) : input.headache;
+    headache = await prisma.$transaction(async (tx) => {
+      const existing = await tx.metricEntry.findUnique({
+        where: { metricId_date: { metricId: METRIC_HEADACHE_ID, date: day } },
+        select: { textValue: true },
+      });
+      const resolvedHeadache = existing?.textValue
+        ? applyHeadacheTap(existing.textValue as HeadacheLevel, input.headache)
+        : input.headache;
 
-    await Promise.all([
-      upsertEntry(METRIC_MOOD_ID, day, input.mood, null),
-      upsertEntry(METRIC_STRESS_ID, day, input.stress, null),
-      upsertEntry(METRIC_ENERGY_ID, day, input.energy, null),
-      upsertEntry(METRIC_SLEEP_QUALITY_ID, day, input.sleepQuality, null),
-      upsertEntry(METRIC_PAIN_ID, day, input.pain, null),
-      upsertEntry(METRIC_HEADACHE_ID, day, null, headache),
-      upsertEntry(METRIC_STIFFNESS_ID, day, stiffness, null),
-      upsertEntry(METRIC_WEIGHT_ID, day, input.weight, null),
-      upsertEntry(METRIC_WAIST_ID, day, input.waist, null),
-      upsertEntry(METRIC_BP_SYSTOLIC_ID, day, input.bpSystolic, null),
-      upsertEntry(METRIC_BP_DIASTOLIC_ID, day, input.bpDiastolic, null),
-    ]);
+      function upsertEntry(metricId: string, numberValue: number | null, textValue: string | null) {
+        return tx.metricEntry.upsert({
+          where: { metricId_date: { metricId, date: day } },
+          create: { metricId, date: day, numberValue, textValue },
+          update: { numberValue, textValue },
+        });
+      }
+
+      await Promise.all([
+        upsertEntry(METRIC_MOOD_ID, input.mood, null),
+        upsertEntry(METRIC_STRESS_ID, input.stress, null),
+        upsertEntry(METRIC_ENERGY_ID, input.energy, null),
+        upsertEntry(METRIC_SLEEP_QUALITY_ID, input.sleepQuality, null),
+        upsertEntry(METRIC_PAIN_ID, input.pain, null),
+        upsertEntry(METRIC_HEADACHE_ID, null, resolvedHeadache),
+        upsertEntry(METRIC_STIFFNESS_ID, stiffness, null),
+        upsertEntry(METRIC_WEIGHT_ID, input.weight, null),
+        upsertEntry(METRIC_WAIST_ID, input.waist, null),
+        upsertEntry(METRIC_BP_SYSTOLIC_ID, input.bpSystolic, null),
+        upsertEntry(METRIC_BP_DIASTOLIC_ID, input.bpDiastolic, null),
+      ]);
+
+      return resolvedHeadache;
+    });
   } catch {
     return { ok: false, error: SAVE_ERROR };
   }
