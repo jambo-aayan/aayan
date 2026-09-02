@@ -6,7 +6,11 @@ import {
   computeCorrelation,
   computeCorrelations,
   CORRELATION_CAVEAT,
+  generateMetricCorrelationPairs,
+  capCorrelationsByMagnitude,
   type CorrelationPair,
+  type CorrelationResult,
+  type MetricSeriesFixture,
 } from "./correlations";
 
 describe("pearsonCorrelation", () => {
@@ -96,6 +100,71 @@ describe("computeCorrelations", () => {
     const thinPair: CorrelationPair = { id: "thin", labelA: "C", labelB: "D", seriesA: [1, 2, 3], seriesB: [1, 2, 3] };
     const results = computeCorrelations([strongPair, thinPair]);
     expect(results.map((r) => r.id)).toEqual(["strong"]);
+  });
+});
+
+describe("generateMetricCorrelationPairs", () => {
+  it("pairs every unordered combination of metrics, sharing only same-day entries", () => {
+    const metrics: MetricSeriesFixture[] = [
+      {
+        id: "m1",
+        name: "Sleep quality",
+        entries: [
+          { date: "2026-08-01", value: 3 },
+          { date: "2026-08-02", value: 4 },
+        ],
+      },
+      {
+        id: "m2",
+        name: "Stiffness",
+        entries: [
+          { date: "2026-08-01", value: 5 },
+          { date: "2026-08-03", value: 2 }, // no matching day on m1 — excluded
+        ],
+      },
+    ];
+    const pairs = generateMetricCorrelationPairs(metrics);
+    expect(pairs).toHaveLength(1);
+    expect(pairs[0]).toMatchObject({ id: "metric:m1:m2", labelA: "Sleep quality", labelB: "Stiffness", seriesA: [3], seriesB: [5], dates: ["2026-08-01"] });
+  });
+
+  it("produces one pair per combination for 3+ metrics, not permutations", () => {
+    const metrics: MetricSeriesFixture[] = [
+      { id: "a", name: "A", entries: [{ date: "d1", value: 1 }] },
+      { id: "b", name: "B", entries: [{ date: "d1", value: 2 }] },
+      { id: "c", name: "C", entries: [{ date: "d1", value: 3 }] },
+    ];
+    const pairs = generateMetricCorrelationPairs(metrics);
+    expect(pairs.map((p) => p.id).sort()).toEqual(["metric:a:b", "metric:a:c", "metric:b:c"]);
+  });
+
+  it("omits a pair with no shared days at all", () => {
+    const metrics: MetricSeriesFixture[] = [
+      { id: "a", name: "A", entries: [{ date: "d1", value: 1 }] },
+      { id: "b", name: "B", entries: [{ date: "d2", value: 2 }] },
+    ];
+    expect(generateMetricCorrelationPairs(metrics)).toEqual([]);
+  });
+
+  it("returns no pairs for fewer than two metrics", () => {
+    expect(generateMetricCorrelationPairs([])).toEqual([]);
+    expect(generateMetricCorrelationPairs([{ id: "a", name: "A", entries: [] }])).toEqual([]);
+  });
+});
+
+describe("capCorrelationsByMagnitude", () => {
+  function result(id: string, r: number): CorrelationResult {
+    return { id, labelA: "A", labelB: "B", r, n: 5, strength: correlationStrength(r), claim: "", points: [] };
+  }
+
+  it("keeps only the top N results by |r|, strongest first", () => {
+    const results = [result("weak", 0.1), result("strong-neg", -0.9), result("moderate", 0.4)];
+    expect(capCorrelationsByMagnitude(results, 2).map((r) => r.id)).toEqual(["strong-neg", "moderate"]);
+  });
+
+  it("does not drop anything when under the cap", () => {
+    const results = [result("a", 0.2), result("b", -0.3)];
+    expect(capCorrelationsByMagnitude(results, 8)).toHaveLength(2);
   });
 });
 

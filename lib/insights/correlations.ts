@@ -112,3 +112,61 @@ export function computeCorrelation(pair: CorrelationPair): CorrelationResult | n
 export function computeCorrelations(pairs: CorrelationPair[]): CorrelationResult[] {
   return pairs.map(computeCorrelation).filter((r): r is CorrelationResult => r !== null);
 }
+
+/** One numeric-valued Metric's dated entries (#187) — `date` is a plain
+ * day-key string (e.g. "2026-08-21"), matching every other pair source in
+ * lib/insights/data.ts's getCorrelations, so pairing here is a plain
+ * string-keyed intersection rather than a second date-parsing scheme. */
+export type MetricSeriesFixture = {
+  id: string;
+  name: string;
+  entries: { date: string; value: number }[];
+};
+
+/**
+ * Every unordered pair of Metrics, paired by shared date-key only (#187)
+ * — a day either side didn't log is excluded from both series, not
+ * defaulted to 0, same rule as every other pair getCorrelations builds.
+ * O(metrics^2 * entries) is fine at this app's scale (a personal log, not
+ * a multi-tenant dataset) — no attempt to prune the metric list before
+ * pairing, since computeCorrelations' own n < CORRELATION_MIN_N gate
+ * already suppresses anything too thin to be worth computing.
+ */
+export function generateMetricCorrelationPairs(metrics: MetricSeriesFixture[]): CorrelationPair[] {
+  const pairs: CorrelationPair[] = [];
+  for (let i = 0; i < metrics.length; i++) {
+    for (let j = i + 1; j < metrics.length; j++) {
+      const a = metrics[i];
+      const b = metrics[j];
+      const byDateB = new Map(b.entries.map((e) => [e.date, e.value]));
+      const seriesA: number[] = [];
+      const seriesB: number[] = [];
+      const dates: string[] = [];
+      for (const e of a.entries) {
+        const bValue = byDateB.get(e.date);
+        if (bValue === undefined) continue;
+        seriesA.push(e.value);
+        seriesB.push(bValue);
+        dates.push(e.date);
+      }
+      if (seriesA.length === 0) continue;
+      pairs.push({ id: `metric:${a.id}:${b.id}`, labelA: a.name, labelB: b.name, seriesA, seriesB, dates });
+    }
+  }
+  return pairs;
+}
+
+/** As the number of logged Metrics grows, every-pair generation
+ * (generateMetricCorrelationPairs) grows quadratically — an unbounded
+ * wall of mostly-low-signal pairs would bury the few that matter. Capped
+ * to the top N by |r| (magnitude, not raw sign) rather than a fixed |r|
+ * threshold, so a handful of genuinely strong pairs are never hidden
+ * just because nothing crossed an arbitrary cutoff, and a data-poor
+ * period never shows an empty section when weaker pairs are all there
+ * is. 8 is a deliberately generous "still fits on one screen" number, not
+ * derived from any spec — #187's own call, documented here. */
+export const CORRELATION_PAIR_CAP = 8;
+
+export function capCorrelationsByMagnitude(results: CorrelationResult[], cap: number = CORRELATION_PAIR_CAP): CorrelationResult[] {
+  return [...results].sort((a, b) => Math.abs(b.r) - Math.abs(a.r)).slice(0, cap);
+}

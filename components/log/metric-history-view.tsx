@@ -52,12 +52,15 @@ export function MetricHistoryView({
   if (valueType === "BOOLEAN") {
     return (
       <ul className={styles.list}>
-        {[...entries].reverse().map((entry) => (
-          <li key={entry.id} className={styles.row}>
-            <span className={styles.date}>{formatDate(entry.date)}</span>
-            <span className={styles.value}>{formatBoolean(entry.numberValue)}</span>
-          </li>
-        ))}
+        {[...entries]
+          .reverse()
+          .filter((entry) => entry.numberValue !== null)
+          .map((entry) => (
+            <li key={entry.id} className={styles.row}>
+              <span className={styles.date}>{formatDate(entry.date)}</span>
+              <span className={styles.value}>{formatBoolean(entry.numberValue)}</span>
+            </li>
+          ))}
       </ul>
     );
   }

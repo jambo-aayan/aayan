@@ -32,7 +32,14 @@ import { computeNeglectRadar, type NeglectFixture } from "./neglect";
 import { computeAttentionBalance, type ActivityFixture, type PillarFixture } from "./attention-balance";
 import { computeTaskFlow, TASK_FLOW_WEEKS } from "./task-flow";
 import { mondayOf } from "@/lib/habits/streak";
-import { computeCorrelations, CORRELATION_MIN_N, type CorrelationPair } from "./correlations";
+import {
+  computeCorrelations,
+  generateMetricCorrelationPairs,
+  capCorrelationsByMagnitude,
+  CORRELATION_MIN_N,
+  type CorrelationPair,
+  type MetricSeriesFixture,
+} from "./correlations";
 import { splitMean } from "./split-mean";
 import { TRAINED_HABIT_ID } from "@/lib/daily-log/habit-seed";
 import { computeTrajectory, type TrajectoryPoint } from "./trajectory";
@@ -41,7 +48,7 @@ import { isRealSpend } from "@/lib/finance/logic";
 import { FINANCE_NORTH_STAR_ID } from "@/lib/finance/north-star-id";
 import { categorySpendTrend } from "./category-spend";
 import { getTransactions } from "@/lib/finance/data";
-import { METRIC_MOOD_ID, METRIC_SLEEP_QUALITY_ID, METRIC_STIFFNESS_ID } from "@/lib/metrics/seeded-ids";
+import { METRIC_MOOD_ID } from "@/lib/metrics/seeded-ids";
 import { computeWeeklyDigest, type DeltaFixture, type CorrelationFixture, type HabitAdherenceFixture } from "./weekly-digest";
 import { adherenceForHabit } from "./momentum";
 import { resolveColorHex, type ColorKey } from "@/lib/colors";
@@ -473,7 +480,7 @@ export async function getCorrelations(range: InsightsRange, asOf: Date = new Dat
   const [start, end] = current;
   const days = eachDayCorr(start, end);
 
-  const [habits, checkIns, tasks, painLogs, transactions, sleepMoodStiffnessEntries, experiments] = await Promise.all([
+  const [habits, checkIns, tasks, painLogs, transactions, metrics, metricEntries, experiments] = await Promise.all([
     prisma.habit.findMany({
       where: { status: "ACTIVE" },
       select: {
@@ -492,8 +499,17 @@ export async function getCorrelations(range: InsightsRange, asOf: Date = new Dat
       where: { date: { gte: start, lte: end } },
       select: { date: true, amount: true, direction: true, receivableId: true, goalContributionId: true, transferId: true },
     }),
+    // Every numeric-valued (NUMBER/SCALE_5/BOOLEAN) Metric — ENUM/TEXT
+    // metrics have no numberValue to correlate. #187 generalizes pairing
+    // over all of these rather than a hand-picked list; sleep-stiffness
+    // and mood are just ordinary Metrics among them now, not special-cased
+    // at the query level.
+    prisma.metric.findMany({
+      where: { archivedAt: null, valueType: { in: ["NUMBER", "SCALE_5", "BOOLEAN"] } },
+      select: { id: true, name: true },
+    }),
     prisma.metricEntry.findMany({
-      where: { metricId: { in: [METRIC_SLEEP_QUALITY_ID, METRIC_STIFFNESS_ID, METRIC_MOOD_ID] }, date: { gte: start, lte: end } },
+      where: { date: { gte: start, lte: end }, metric: { archivedAt: null, valueType: { in: ["NUMBER", "SCALE_5", "BOOLEAN"] } } },
       select: { metricId: true, date: true, numberValue: true },
     }),
     prisma.system.findMany({
@@ -562,17 +578,6 @@ export async function getCorrelations(range: InsightsRange, asOf: Date = new Dat
   const adherenceVsPain = pairedSeries(adherenceByDay, new Set(avgPainByDay.keys()), avgPainByDay);
   const adherenceVsSurplus = pairedSeries(adherenceByDay, hasTxByDay, surplusByDay);
 
-  // Sleep quality/stiffness/mood are now three separate Metrics (#182,
-  // replacing DailyLog's one-row-per-date shape) fetched in a single query
-  // above and split back out by metricId here.
-  const sleepByDay = new Map(
-    sleepMoodStiffnessEntries.filter((e) => e.metricId === METRIC_SLEEP_QUALITY_ID).map((e) => [dateKeyCorr(e.date), e.numberValue!])
-  );
-  const stiffnessByDay = new Map(
-    sleepMoodStiffnessEntries.filter((e) => e.metricId === METRIC_STIFFNESS_ID).map((e) => [dateKeyCorr(e.date), e.numberValue!])
-  );
-  const sleepVsStiffness = pairedSeries(sleepByDay, new Set(stiffnessByDay.keys()), stiffnessByDay);
-
   // "On track" is a live snapshot check, re-evaluated per day via the same
   // onTrackPercent aggregate computeSystemsOnTrackKpi's own sparkline uses
   // (lib/insights/kpis.ts) — not a historical record of what verdict/review
@@ -584,26 +589,47 @@ export async function getCorrelations(range: InsightsRange, asOf: Date = new Dat
   const systemsOnTrackByDay = new Map(days.map((day) => [dateKeyCorr(day), onTrackPercent(experimentFixtures, day)]));
   const systemsOnTrackVsSurplus = pairedSeries(systemsOnTrackByDay, hasTxByDay, surplusByDay);
 
-  const pairs: CorrelationPair[] = [
+  // These four don't cleanly reduce to a pair of numeric Metrics (Habit
+  // adherence/Task follow-through/Systems-on-track are computed rollups,
+  // and pain is sourced from PainMobilityLog, which #181 explicitly keeps
+  // out of scope) — kept as their own hand-built CorrelationPairs.
+  const specialPairs: CorrelationPair[] = [
     { id: "adherence-followthrough", labelA: "Habit adherence", labelB: "Task follow-through", ...adherenceVsFollowThrough },
     { id: "adherence-pain", labelA: "Habit adherence", labelB: "Pain level", ...adherenceVsPain },
     { id: "adherence-surplus", labelA: "Habit adherence", labelB: "Daily surplus", ...adherenceVsSurplus },
-    { id: "sleep-stiffness", labelA: "Sleep quality", labelB: "Stiffness", ...sleepVsStiffness },
     { id: "systemsontrack-surplus", labelA: "Systems on track", labelB: "Daily surplus", ...systemsOnTrackVsSurplus },
   ];
+
+  // Every pair of numeric Metrics (#187) — sleep-stiffness and any other
+  // Metric-to-Metric relationship (e.g. the old sleep-stiffness pair, now
+  // just two ordinary seeded Metrics among the rest) falls out of this
+  // generic mechanism rather than being hand-picked. Capped to the top
+  // CORRELATION_PAIR_CAP by |r| so the page doesn't grow an unbounded wall
+  // of low-signal pairs as the number of logged Metrics grows — the
+  // special pairs above are always shown regardless, same as before #187.
+  const metricEntriesByMetric = new Map<string, { date: string; value: number }[]>();
+  for (const e of metricEntries) {
+    if (e.numberValue === null) continue;
+    const list = metricEntriesByMetric.get(e.metricId) ?? [];
+    list.push({ date: dateKeyCorr(e.date), value: e.numberValue });
+    metricEntriesByMetric.set(e.metricId, list);
+  }
+  const metricFixtures: MetricSeriesFixture[] = metrics.map((m) => ({ id: m.id, name: m.name, entries: metricEntriesByMetric.get(m.id) ?? [] }));
+  const genericMetricPairs = generateMetricCorrelationPairs(metricFixtures);
+  const genericResults = capCorrelationsByMagnitude(computeCorrelations(genericMetricPairs));
 
   // Trained-vs-mood isn't a Pearson pair — "trained" is a boolean per day
   // (from the TRAINED_HABIT_ID check-in, same derivation as
   // lib/daily-log/data.ts's getDerivedStateFields), not a numeric series —
   // so it's a mean-split (lib/insights/split-mean.ts), a different shape
   // from CorrelationResult, surfaced as its own small card (#128, ADR-0011).
-  const moodLogs = sleepMoodStiffnessEntries
-    .filter((e) => e.metricId === METRIC_MOOD_ID)
+  const moodLogs = metricEntries
+    .filter((e) => e.metricId === METRIC_MOOD_ID && e.numberValue !== null)
     .map((e) => ({ date: e.date, value: e.numberValue! }));
   const trainedDates = checkIns.filter((c) => c.habitId === TRAINED_HABIT_ID).map((c) => c.date);
   const trainedVsMood = moodLogs.length >= CORRELATION_MIN_N ? splitMean(moodLogs, trainedDates) : null;
 
-  return { pairs: computeCorrelations(pairs), trainedVsMood };
+  return { pairs: [...computeCorrelations(specialPairs), ...genericResults], trainedVsMood };
 }
 
 const TRAJECTORY_LOOKBACK_DAYS = 60;

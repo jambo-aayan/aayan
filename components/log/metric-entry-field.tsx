@@ -4,9 +4,8 @@ import { useState } from "react";
 import { logMetricEntry } from "@/lib/metrics/actions";
 import { withRetry } from "@/lib/with-retry";
 import { useToast } from "@/components/toast/toast-provider";
+import type { MetricValueType } from "@/lib/metrics/logic";
 import styles from "./metric-entry-field.module.css";
-
-type ValueType = "NUMBER" | "SCALE_5" | "BOOLEAN" | "ENUM" | "TEXT";
 
 function parseEnumOptions(raw: string | null): string[] {
   if (!raw) return [];
@@ -39,7 +38,7 @@ export function MetricEntryField({
 }: {
   metricId: string;
   date: Date;
-  valueType: ValueType;
+  valueType: MetricValueType;
   enumOptions: string | null;
   unit: string | null;
   initialNumberValue: number | null;
