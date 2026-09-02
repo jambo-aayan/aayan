@@ -12,7 +12,7 @@ export default async function LogPage() {
       <PageHeader backHref="/today" />
       <div className={pageStyles.content}>
         <PageTitle eyebrow="Log" title="Log" lede="Everything due today or this week, in one place." />
-        <LogTab metrics={metrics} pillars={scope.pillars} />
+        <LogTab metrics={metrics} pillars={scope.pillars} areas={scope.areas} />
       </div>
     </>
   );

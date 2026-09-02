@@ -4,6 +4,7 @@ import type { MetricForLog } from "@/lib/metrics/data";
 import styles from "./log-tab.module.css";
 
 type Pillar = { id: string; name: string };
+type Area = { id: string; pillarId: string };
 
 const GLOBAL_GROUP_KEY = "__global__";
 
@@ -15,7 +16,7 @@ const GLOBAL_GROUP_KEY = "__global__";
  * sheet. A plain server component: every interactive bit lives in
  * MetricEntryField, so this only needs to group and lay out.
  */
-export function LogTab({ metrics, pillars }: { metrics: MetricForLog[]; pillars: Pillar[] }) {
+export function LogTab({ metrics, pillars, areas }: { metrics: MetricForLog[]; pillars: Pillar[]; areas: Area[] }) {
   if (metrics.length === 0) {
     return (
       <div className={styles.empty}>
@@ -31,9 +32,16 @@ export function LogTab({ metrics, pillars }: { metrics: MetricForLog[]; pillars:
   const scheduled = metrics.filter((m) => m.cadence !== "AD_HOC");
 
   const pillarNameById = new Map(pillars.map((p) => [p.id, p.name]));
+  const pillarIdByAreaId = new Map(areas.map((a) => [a.id, a.pillarId]));
+  // pillarId/areaId are independently nullable on Metric — an area-scoped
+  // metric with no pillarId of its own (shouldn't happen via the
+  // management UI, which always sets both together, but the schema
+  // allows it) still resolves to its area's real pillar here rather than
+  // silently landing in "General".
   const groups = new Map<string, MetricForLog[]>();
   for (const m of scheduled) {
-    const key = m.pillarId ?? GLOBAL_GROUP_KEY;
+    const effectivePillarId = m.pillarId ?? (m.areaId ? (pillarIdByAreaId.get(m.areaId) ?? null) : null);
+    const key = effectivePillarId ?? GLOBAL_GROUP_KEY;
     const list = groups.get(key) ?? [];
     list.push(m);
     groups.set(key, list);
@@ -53,12 +61,12 @@ export function LogTab({ metrics, pillars }: { metrics: MetricForLog[]; pillars:
             {groups.get(key)!.map((m) => (
               <li key={m.id} className={styles.row}>
                 <div className={styles.rowHead}>
-                  <span className={styles.name}>
+                  <Link href={`/log/metrics/${m.id}`} className={styles.name}>
                     {m.name}
                     {m.required && (
                       <span className={styles.requiredDot} title="Required" aria-label="Required" />
                     )}
-                  </span>
+                  </Link>
                   <span className={styles.cadence}>{m.cadence === "DAILY" ? "Today" : "This week"}</span>
                 </div>
                 <MetricEntryField
@@ -84,7 +92,9 @@ export function LogTab({ metrics, pillars }: { metrics: MetricForLog[]; pillars:
             {adHoc.map((m) => (
               <li key={m.id} className={styles.row}>
                 <div className={styles.rowHead}>
-                  <span className={styles.name}>{m.name}</span>
+                  <Link href={`/log/metrics/${m.id}`} className={styles.name}>
+                    {m.name}
+                  </Link>
                 </div>
                 <MetricEntryField
                   metricId={m.id}

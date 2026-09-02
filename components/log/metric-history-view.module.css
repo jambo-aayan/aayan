@@ -1,0 +1,35 @@
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--row-divider);
+  font-size: 13px;
+}
+
+.row:first-child {
+  border-top: none;
+}
+
+.date {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.value {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.unitNote {
+  font-size: 11px;
+  color: var(--muted-2);
+  margin-top: 6px;
+}

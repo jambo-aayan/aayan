@@ -163,9 +163,10 @@ export async function createVisualRecord(
 
 /** Home's "Log today" widget (#170) — upserts by date rather than always
  * creating, the same "entering a second value the same day updates
- * rather than duplicates" shape lib/daily-log/actions.ts's saveDailyLog
- * established for the Daily Log Sheet. Unlike saveDailyLog, there's no DB
- * uniqueness on (visualId, date) backing this — a chart's regular "Add
+ * rather than duplicates" shape lib/metrics/actions.ts's logMetricEntry
+ * uses for its own DAILY/WEEKLY-cadence upsert (#184). Unlike
+ * logMetricEntry, there's no DB uniqueness on (visualId, date) backing
+ * this — a chart's regular "Add
  * data" form and bulk CSV import both intentionally allow multiple
  * records on the same date already (#163/#165), so this only upserts at
  * the app level, matching whatever single record (if any) this widget

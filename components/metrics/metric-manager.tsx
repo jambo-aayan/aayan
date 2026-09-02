@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { Ruler } from "lucide-react";
 import { createMetric, updateMetric, archiveMetric, type MetricInput } from "@/lib/metrics/actions";
 import { withRetry } from "@/lib/with-retry";
@@ -112,6 +113,9 @@ export function MetricManager({
                 </span>
               </div>
               <RowActions>
+                <Link href={`/log/metrics/${m.id}`} className={styles.link}>
+                  History
+                </Link>
                 <button type="button" className={styles.link} onClick={() => setEditingId(m.id)}>
                   Edit
                 </button>

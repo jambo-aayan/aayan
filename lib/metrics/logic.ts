@@ -6,7 +6,8 @@ export type MetricValidationInput = {
 
 /** A Metric's own validation, kept separate from the server action so it's
  * testable without touching Prisma — same "pure logic, separate file"
- * split as lib/daily-log/logic.ts's validateDailyLogInput. */
+ * split every other domain's actions.ts/logic.ts pair in this app uses
+ * (e.g. lib/finance/logic.ts). */
 export function validateMetricInput(input: MetricValidationInput): string | null {
   if (!input.name.trim()) return "Enter a name.";
   if (input.valueType === "ENUM" && (!input.enumOptions || input.enumOptions.length < 2)) {
