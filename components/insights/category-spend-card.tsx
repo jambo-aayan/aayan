@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { LineTrendChart } from "@/components/visuals/line-trend-chart";
 import { formatGBP } from "@/lib/finance/format";
+import { drilldownKey } from "@/lib/finance/category-breakdown";
 import type { CategorySpendSummary } from "@/lib/insights/data";
 import styles from "./category-spend-card.module.css";
 
@@ -30,7 +31,7 @@ export function CategorySpendCard({ summary }: { summary: CategorySpendSummary }
     );
   }
 
-  const rowKey = (r: CategorySpendSummary["rows"][number]) => `${r.categoryParent}: ${r.category}`;
+  const rowKey = (r: CategorySpendSummary["rows"][number]) => drilldownKey(r.category, r.categoryParent);
   const selected = rows.find((r) => rowKey(r) === selectedKey) ?? rows[0];
   const points = months.map((m, i) => ({ label: monthLabel(m), value: selected.totals[i] }));
 

@@ -7,7 +7,7 @@ import { APP_SETTINGS_ID } from "@/lib/settings/constants";
 import { resolveColorHex, type ColorKey } from "@/lib/colors";
 import { isVerdictDue, resolveReviewNudgeTarget, systemDeepLinkHref } from "@/lib/systems/logic";
 import { categorySpendDeviation, SPEND_DEVIATION_BASELINE_MONTHS } from "@/lib/finance/spend-deviation";
-import type { TransactionForBreakdown } from "@/lib/finance/category-breakdown";
+import { getTransactions } from "@/lib/finance/data";
 import {
   evaluateEligibility,
   reEvaluateSnoozed,
@@ -130,31 +130,10 @@ async function getMetricFixtures(today: Date): Promise<MetricEligibilityFixture[
  * spans those prior months. */
 async function getCategorySpendAnomalyFixtures(today: Date): Promise<CategorySpendEligibilityFixture[]> {
   const earliestNeeded = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() - SPEND_DEVIATION_BASELINE_MONTHS, 1));
-  const transactions = await prisma.transaction.findMany({
-    where: { date: { gte: earliestNeeded } },
-    select: {
-      date: true,
-      amount: true,
-      direction: true,
-      receivableId: true,
-      goalContributionId: true,
-      transferId: true,
-      category: { include: { parent: true } },
-    },
-  });
-  const forBreakdown: TransactionForBreakdown[] = transactions.map((t) => ({
-    date: t.date,
-    amount: t.amount.toNumber(),
-    direction: t.direction,
-    category: t.category.name,
-    categoryParent: t.category.parent?.name ?? t.category.name,
-    receivableId: t.receivableId,
-    goalContributionId: t.goalContributionId,
-    transferId: t.transferId,
-  }));
+  const transactions = await getTransactions({ date: { gte: earliestNeeded } });
 
   const monthStart = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1));
-  return categorySpendDeviation(forBreakdown, monthStart)
+  return categorySpendDeviation(transactions, monthStart)
     .filter((d) => d.callout === "more")
     .map((d) => ({ category: d.category, categoryParent: d.categoryParent, current: d.current, baseline: d.baseline, diffPercent: d.diffPercent }));
 }

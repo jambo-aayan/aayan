@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
+import type { Prisma } from "@/lib/generated/prisma/client";
 import { ensureBaselineExists } from "./ensure-baseline";
 import { BASELINE_ID } from "./baseline-id";
 import { ensureFinanceNorthStarExists } from "./ensure-north-star";
@@ -86,9 +87,16 @@ export async function getFinanceNorthStar() {
  * `category.parent` should always exist (a Transaction only ever
  * categorizes at a leaf — see ADR-0015's #173 addendum), but the
  * fallback to `category.name` keeps this from crashing if that invariant
- * is ever violated, rather than throwing on a null parent. */
-export async function getTransactions() {
+ * is ever violated, rather than throwing on a null parent.
+ *
+ * `where` (default unfiltered) lets a caller that only needs a date-range
+ * slice — lib/nudges/data.ts's getCategorySpendAnomalyFixtures (#179),
+ * lib/insights/data.ts's getCategorySpendSummary (#180) — reuse this
+ * exact fetch+resolve instead of hand-rolling the same categoryId->name/
+ * parent mapping a third and fourth time. */
+export async function getTransactions(where: Prisma.TransactionWhereInput = {}) {
   const transactions = await prisma.transaction.findMany({
+    where,
     orderBy: { date: "desc" },
     include: { category: { include: { parent: true } } },
   });
